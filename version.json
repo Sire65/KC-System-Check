@@ -1,5 +1,5 @@
 {
-  "version": "0.4.4",
-  "note": "Mobiler Leitstand: abhängige Prüfungen werden automatisch deaktiviert; veraltete Kommunikations-, Programm- und Backup-Status werden neutral als VERALTET statt als aktuelle Störung angezeigt",
+  "version": "0.4.5",
+  "note": "Gesamtstatus unterscheidet bestandene Prüfungen von unvollständiger LIVE-Abdeckung; neue Problemhilfe bietet kontextbezogene Lösungsvorschläge ohne automatische Änderungen",
   "channel": "stable"
 }
