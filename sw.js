@@ -1,4 +1,4 @@
-const CACHE="kc-system-check-v0.3.7";
+const CACHE="kc-system-check-v0.3.8";
 const APP_PREFIX="kc-system-check-";
 
 async function purgeOldCaches(){
