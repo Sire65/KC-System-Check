@@ -1,5 +1,5 @@
 {
-  "version": "0.4.1",
-  "note": "KC Live-Leitstand zeigt zusätzlich Push- und E-Mail-Providerzustand inklusive Fehlerfolgen und echter Kommunikationsstörung",
+  "version": "0.4.2",
+  "note": "Superadmin-Leitstand erweitert um registrierte KC Programme, echte Heartbeat-Altersbewertung, Versionsabweichungen und Backup-/Restore-Telemetrie",
   "channel": "stable"
 }
