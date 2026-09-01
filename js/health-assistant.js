@@ -3,9 +3,12 @@ const $$=s=>[...document.querySelectorAll(s)];
 
 const UNKNOWN_WORDS=["veraltet","historisch","unbekannt","noch keine telemetrie","anbindung vorbereitet","telemetrie vorbereitet","heartbeat-anbindung vorbereitet","nicht aktiv","statusdaten veraltet"];
 const SEVERE_WORDS=["störung","fehler aktuell","critical","handlungsbedarf"];
+const OWN_HEALTH_TEXTS=new Set(["Prüfungen bestanden · Live-Störung vorhanden","Prüfungen bestanden · Live unvollständig"]);
 
 function textOf(el){return(el?.textContent||"").replace(/\s+/g," ").trim().toLowerCase()}
 function hasAny(text,words){return words.some(w=>text.includes(w))}
+function setText(el,value){if(el&&el.textContent!==value)el.textContent=value}
+function setState(el,value){if(el&&el.dataset.state!==value)el.dataset.state=value}
 
 export function classifyCoverage(root=document){
   const live=textOf(root.querySelector?.("#live"));
@@ -53,9 +56,11 @@ function ensureGlobalHelp(){
 }
 
 function guardOverall(){
-  const value=Number($("#healthValue")?.textContent);const text=$("#healthText"),coverage=$("#coverageText"),orb=$("#statusOrb");if(!text||!coverage||!orb)return;const state=classifyCoverage(document);
-  if(state.severe){orb.dataset.state="bad";if(value===100)text.textContent="Prüfungen bestanden · Live-Störung vorhanden";return}
-  if(state.incomplete&&value===100){orb.dataset.state="warn";text.textContent="Prüfungen bestanden · Live unvollständig";const base=(coverage.textContent||"Prüfabdeckung 100%").split(" · ")[0];coverage.textContent=`${base} · Live-Abdeckung unvollständig`}
+  const value=Number($("#healthValue")?.textContent);const text=$("#healthText"),coverage=$("#coverageText"),orb=$("#statusOrb");if(!text||!coverage||!orb)return;const state=classifyCoverage(document);const current=text.textContent||"";const baseCoverage=(coverage.textContent||"Prüfabdeckung 100%").split(" · ")[0];
+  if(value!==100)return;
+  if(state.severe){setState(orb,"bad");setText(text,"Prüfungen bestanden · Live-Störung vorhanden");setText(coverage,`${baseCoverage} · Live-Abdeckung mit Störung`);return}
+  if(state.incomplete){setState(orb,"warn");setText(text,"Prüfungen bestanden · Live unvollständig");setText(coverage,`${baseCoverage} · Live-Abdeckung unvollständig`);return}
+  if(OWN_HEALTH_TEXTS.has(current)){setState(orb,"ok");setText(text,"Alles gesund");setText(coverage,baseCoverage)}
 }
 
 function refresh(){ensureStyles();ensureGlobalHelp();decorateFindings();guardOverall()}
