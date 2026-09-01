@@ -1,5 +1,5 @@
 {
-  "version": "0.3.4",
-  "note": "UI-Konsistenz: Gesundheitsskala korrigiert, Verlauf dedupliziert und letzter Lauf wird aus der Server-Historie wiederhergestellt",
+  "version": "0.3.5",
+  "note": "Saubere aktuelle Befunde: keine alten Warnungen im Live-Bereich; Neon bis zum echten Direktcheck nicht Teil von One Touch",
   "channel": "stable"
 }
