@@ -1,4 +1,4 @@
-const CACHE="kc-system-check-v0.3.8";
+const CACHE="kc-system-check-v0.4.0";
 const APP_PREFIX="kc-system-check-";
 
 async function purgeOldCaches(){
@@ -23,26 +23,7 @@ async function networkFirst(request){
   }
 }
 
-self.addEventListener("install",event=>{
-  event.waitUntil(caches.open(CACHE));
-  self.skipWaiting();
-});
-
-self.addEventListener("activate",event=>{
-  event.waitUntil((async()=>{
-    await purgeOldCaches();
-    await self.clients.claim();
-  })());
-});
-
-self.addEventListener("fetch",event=>{
-  if(event.request.method!=="GET")return;
-  const url=new URL(event.request.url);
-  if(url.origin!==self.location.origin)return;
-  event.respondWith(networkFirst(event.request));
-});
-
-self.addEventListener("message",event=>{
-  if(event.data?.type==="SKIP_WAITING")self.skipWaiting();
-  if(event.data?.type==="PURGE_CACHES")event.waitUntil(purgeOldCaches());
-});
+self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE));self.skipWaiting()});
+self.addEventListener("activate",event=>{event.waitUntil((async()=>{await purgeOldCaches();await self.clients.claim()})())});
+self.addEventListener("fetch",event=>{if(event.request.method!=="GET")return;const url=new URL(event.request.url);if(url.origin!==self.location.origin)return;event.respondWith(networkFirst(event.request))});
+self.addEventListener("message",event=>{if(event.data?.type==="SKIP_WAITING")self.skipWaiting();if(event.data?.type==="PURGE_CACHES")event.waitUntil(purgeOldCaches())});
