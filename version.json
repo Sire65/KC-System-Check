@@ -1,5 +1,5 @@
 {
-  "version": "0.3.7",
-  "note": "Klickbare Gelb/Rot-Diagnosen mit Ursachen und Lösungsvorschlägen, keine Prognose ohne belastbare Messhistorie, mobile Navigation optimiert",
+  "version": "0.3.8",
+  "note": "Provider-Register erweitert: B2, Cloudflare R2 und Oracle OCI vorbereitet; B2-Telemetrie integriert; Scharfstellung erst mit sicheren Zugängen",
   "channel": "stable"
 }
