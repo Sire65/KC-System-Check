@@ -34,7 +34,8 @@ jobs:
       - name: Release contract
         run: |
           grep -q 'id="appVersion"' index.html
-          grep -q '"version": "0.3.0"' version.json
-          grep -q 'kc-system-check-v0.3.0' sw.js
+          grep -q '"version": "0.3.1"' version.json
+          grep -q 'kc-system-check-v0.3.1' sw.js
+          grep -q 'growthWindow' js/usage.js
       - name: Worker syntax
         run: node --check worker/src/index.js
