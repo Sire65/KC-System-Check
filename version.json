@@ -1,5 +1,5 @@
 {
-  "version": "0.3.5",
-  "note": "Saubere aktuelle Befunde: keine alten Warnungen im Live-Bereich; Neon bis zum echten Direktcheck nicht Teil von One Touch",
+  "version": "0.3.6",
+  "note": "Schneller KC-Core-Healthcheck, parallele Provider-Abfragen und optimierter Mirror-Snapshot",
   "channel": "stable"
 }
