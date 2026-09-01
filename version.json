@@ -1,5 +1,5 @@
 {
-  "version": "0.3.6",
-  "note": "Schneller KC-Core-Healthcheck, parallele Provider-Abfragen und optimierter Mirror-Snapshot",
+  "version": "0.3.7",
+  "note": "Klickbare Gelb/Rot-Diagnosen mit Ursachen und Lösungsvorschlägen, keine Prognose ohne belastbare Messhistorie, mobile Navigation optimiert",
   "channel": "stable"
 }
