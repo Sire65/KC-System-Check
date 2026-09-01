@@ -1,10 +1,10 @@
--- Bereits produktiv im Projekt Future Academy installiert.
+-- Produktiv im Projekt Future Academy installiert.
 -- Gibt ausschließlich technische Kapazitätsdaten zurück; keine Nutzerdaten.
 create or replace function public.kc_system_check_public_snapshot()
 returns jsonb
 language sql
 stable
-security definer
+security invoker
 set search_path = pg_catalog, public
 as $$
   select jsonb_build_object(
