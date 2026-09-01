@@ -1,5 +1,5 @@
 {
-  "version": "0.4.2",
-  "note": "Superadmin-Leitstand erweitert um registrierte KC Programme, echte Heartbeat-Altersbewertung, Versionsabweichungen und Backup-/Restore-Telemetrie",
+  "version": "0.4.3",
+  "note": "Nur aktiv angehakte Systeme erscheinen in Leitstand und Kapazität; Auswahl wird gespeichert und steuert One Touch",
   "channel": "stable"
 }
