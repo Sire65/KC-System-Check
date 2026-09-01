@@ -34,8 +34,10 @@ jobs:
       - name: Release contract
         run: |
           grep -q 'id="appVersion"' index.html
-          grep -q '"version": "0.3.1"' version.json
-          grep -q 'kc-system-check-v0.3.1' sw.js
+          VERSION=$(node -p "require('./version.json').version")
+          test -n "$VERSION"
+          grep -q "kc-system-check-v${VERSION}" sw.js
           grep -q 'growthWindow' js/usage.js
+          grep -q 'js/usage.js' .github/workflows/pages.yml
       - name: Worker syntax
         run: node --check worker/src/index.js
