@@ -1,0 +1,1 @@
+export class MonitoringAdapter{constructor(definition){this.id=definition.id;this.name=definition.name;this.kind=definition.kind||"service";this.enabled=definition.enabled!==false}async quickCheck(){throw new Error("quickCheck not implemented")}async standardCheck(){return this.quickCheck()}async deepCheck(){return this.standardCheck()}}
