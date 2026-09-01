@@ -19,8 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build static PWA
-        env:
-          API_BASE_URL: ${{ vars.KC_CHECK_API_BASE_URL }}
         run: |
           rm -rf dist
           mkdir -p dist/js/adapters dist/icons dist/config
@@ -28,11 +26,7 @@ jobs:
           cp js/app.js js/state.js js/charts.js js/gauges.js js/updater.js dist/js/
           cp js/adapters/base.js js/adapters/demo.js js/adapters/live.js dist/js/adapters/
           cp icons/icon-192.svg icons/icon-512.svg dist/icons/
-          if [ -n "$API_BASE_URL" ]; then
-            printf '{"apiBaseUrl":"%s","mode":"live"}\n' "$API_BASE_URL" > dist/config/runtime.json
-          else
-            printf '{"apiBaseUrl":"","mode":"demo"}\n' > dist/config/runtime.json
-          fi
+          cp config/runtime.public.json dist/config/runtime.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,0 +1,6 @@
+{
+  "apiBaseUrl": "https://ptblnpiroqftcvlsrhac.supabase.co/functions/v1/kc-system-check",
+  "apiToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0YmxucGlyb3FmdGN2bHNyaGFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNzU1MzEsImV4cCI6MjEwMDY1MTUzMX0.NRfXGXDoW17VjHeOHjupfrcPHMkbvtizY_K-BguJqz0",
+  "apiStyle": "supabase-edge",
+  "mode": "live"
+}
