@@ -1,5 +1,5 @@
 {
-  "version": "0.3.1",
-  "note": "Verbrauchsmessung korrigiert, Wachstum 1/7/30 Tage und Sicherheits-Feinschliff",
+  "version": "0.3.2",
+  "note": "PWA Cache-Hotfix: aktuelle App-Version und Live-Konfiguration werden bevorzugt aus dem Netz geladen",
   "channel": "stable"
 }
