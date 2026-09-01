@@ -1,0 +1,3 @@
+import test from'node:test';import assert from'node:assert/strict';import fs from'node:fs';
+test('quality triage summarizes visible anomalies without auto repair',()=>{const s=fs.readFileSync('js/quality-tools.js','utf8');assert.match(s,/Auffälligkeiten zusammenfassen/);assert.match(s,/Aktuelle Auffälligkeiten/);assert.match(s,/störung/);assert.match(s,/veraltet/);assert.doesNotMatch(s,/fetch\(|runLive\(|standardCheck\(/)});
+test('release 0.4.6 is aligned',()=>{const v=JSON.parse(fs.readFileSync('version.json','utf8'));const u=fs.readFileSync('js/updater.js','utf8'),sw=fs.readFileSync('sw.js','utf8');assert.equal(v.version,'0.4.6');assert.match(u,/CURRENT_VERSION="0\.4\.6"/);assert.match(sw,/kc-system-check-v0\.4\.6/)});
