@@ -1,5 +1,5 @@
 {
-  "version": "0.4.8",
-  "note": "Handlungsprioritäten: Auffälligkeiten werden nach Schwere und Betriebsrelevanz als P1, P2, P3 … sortiert und erhalten einen empfohlenen nächsten Schritt",
+  "version": "0.4.9",
+  "note": "Fehler-Zeitachse: Auffälligkeiten merken sich lokal Erstauftreten, Dauer, Wiederholungen und einen zwischenzeitlich wieder unauffälligen Zustand",
   "channel": "stable"
 }
