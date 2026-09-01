@@ -1,5 +1,5 @@
 {
-  "version": "0.4.5",
-  "note": "Gesamtstatus unterscheidet bestandene Prüfungen von unvollständiger LIVE-Abdeckung; neue Problemhilfe bietet kontextbezogene Lösungsvorschläge ohne automatische Änderungen",
+  "version": "0.4.6",
+  "note": "Qualitätsverbesserung: sichtbare LIVE- und Befund-Auffälligkeiten können kompakt zusammengefasst und nach Dringlichkeit eingeordnet werden; bestehende Problemhilfe bleibt erhalten",
   "channel": "stable"
 }
