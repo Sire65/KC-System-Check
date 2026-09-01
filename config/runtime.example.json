@@ -1,5 +1,9 @@
 {
   "apiBaseUrl": "http://localhost:8787",
   "apiToken": "",
-  "mode": "live"
+  "mode": "live",
+  "heartbeatEndpoint": "",
+  "heartbeatToken": "",
+  "heartbeatApiKey": "",
+  "heartbeatUseApiToken": false
 }
