@@ -1,5 +1,5 @@
 {
-  "version": "0.3.8",
-  "note": "Provider-Register erweitert: B2, Cloudflare R2 und Oracle OCI vorbereitet; B2-Telemetrie integriert; Scharfstellung erst mit sicheren Zugängen",
+  "version": "0.4.0",
+  "note": "KC Superadmin Live-Leitstand mit Heartbeats, Programm-/Gerätestatus, Sync-Queue, Datenflüssen und vorbereitetem Live-Buchungsmonitor",
   "channel": "stable"
 }
