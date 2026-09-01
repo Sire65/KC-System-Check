@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
-  "note": "Repo-ready Architektur und echte Prüf-API vorbereitet",
+  "version": "0.2.1",
+  "note": "Live-Supabase-Edge-Anbindung für KC Core, Future Academy, Spiegelung, Neon-Indikator und GitHub",
   "channel": "stable"
 }
