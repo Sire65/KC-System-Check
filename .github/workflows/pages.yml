@@ -1,0 +1,36 @@
+name: Deploy PWA to GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build static PWA
+        run: |
+          rm -rf dist
+          mkdir -p dist/js/adapters dist/icons dist/config
+          cp index.html manifest.webmanifest sw.js version.json dist/
+          cp js/app.js js/state.js js/charts.js js/gauges.js js/updater.js dist/js/
+          cp js/adapters/base.js js/adapters/demo.js js/adapters/live.js dist/js/adapters/
+          cp icons/icon-192.svg icons/icon-512.svg dist/icons/
+          cp config/runtime.public.json dist/config/runtime.json
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,34 @@
+name: Tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Unit tests
+        run: node --test tests/*.test.js
+      - name: Backend syntax
+        run: |
+          node --check backend/server.js
+          node --check backend/config.js
+          node --check backend/health-model.js
+          node --check backend/adapters/http-json.js
+          node --check backend/adapters/supabase.js
+          node --check backend/adapters/neon.js
+          node --check backend/adapters/mirror.js
+          node --check backend/adapters/b2.js
+      - name: Frontend syntax
+        run: |
+          node --check js/app.js
+          node --check js/state.js
+          node --check js/charts.js
+          node --check js/gauges.js
+          node --check js/updater.js
+          node --check js/adapters/base.js
+          node --check js/adapters/demo.js
+          node --check js/adapters/live.js
+      - name: Worker syntax
+        run: node --check worker/src/index.js
