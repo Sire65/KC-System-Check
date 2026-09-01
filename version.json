@@ -1,5 +1,5 @@
 {
-  "version": "0.3.3",
-  "note": "Immer aktuell: altes PWA-Cache wird entfernt, App-Dateien werden netzwerkbevorzugt geladen und das Pages-Bundle enthält alle Module",
+  "version": "0.3.4",
+  "note": "UI-Konsistenz: Gesundheitsskala korrigiert, Verlauf dedupliziert und letzter Lauf wird aus der Server-Historie wiederhergestellt",
   "channel": "stable"
 }
