@@ -1,5 +1,5 @@
 {
-  "version": "0.4.6",
-  "note": "Qualitätsverbesserung: sichtbare LIVE- und Befund-Auffälligkeiten können kompakt zusammengefasst und nach Dringlichkeit eingeordnet werden; bestehende Problemhilfe bleibt erhalten",
+  "version": "0.4.7",
+  "note": "Betriebsfokus: Auffälligkeiten zeigen jetzt eine Live-Anzahl, unterscheiden aktuelle Störungen von Prüfhinweisen und lassen sich direkt filtern",
   "channel": "stable"
 }
