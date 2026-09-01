@@ -1,5 +1,5 @@
 {
-  "version": "0.5.2",
-  "note": "KICC-kompatibler Eigen-Heartbeat: KC System Check meldet sich lokal alle 30 Sekunden und kann über einen konfigurierten, authentifizierten Heartbeat-Endpunkt an den PC-Leitstand senden",
+  "version": "0.5.3",
+  "note": "Produktiver KICC-Heartbeat: sicherer Supabase-Heartbeat-Endpunkt aktiviert und KC System Check in der Server-Allowlist freigeschaltet",
   "channel": "stable"
 }
