@@ -1,5 +1,5 @@
 {
-  "version": "0.4.3",
-  "note": "Nur aktiv angehakte Systeme erscheinen in Leitstand und Kapazität; Auswahl wird gespeichert und steuert One Touch",
+  "version": "0.4.4",
+  "note": "Mobiler Leitstand: abhängige Prüfungen werden automatisch deaktiviert; veraltete Kommunikations-, Programm- und Backup-Status werden neutral als VERALTET statt als aktuelle Störung angezeigt",
   "channel": "stable"
 }
