@@ -1,5 +1,5 @@
 {
-  "version": "0.3.2",
-  "note": "PWA Cache-Hotfix: aktuelle App-Version und Live-Konfiguration werden bevorzugt aus dem Netz geladen",
+  "version": "0.3.3",
+  "note": "Immer aktuell: altes PWA-Cache wird entfernt, App-Dateien werden netzwerkbevorzugt geladen und das Pages-Bundle enthält alle Module",
   "channel": "stable"
 }
