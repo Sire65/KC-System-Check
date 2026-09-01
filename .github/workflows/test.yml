@@ -28,6 +28,9 @@ jobs:
           node --check js/gauges.js
           node --check js/updater.js
           node --check js/usage.js
+          node --check js/diagnostics.js
+          node --check js/diagnostics-runtime.js
+          node --check js/leitstand.js
           node --check js/adapters/base.js
           node --check js/adapters/demo.js
           node --check js/adapters/live.js
