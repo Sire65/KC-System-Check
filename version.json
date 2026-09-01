@@ -1,5 +1,5 @@
 {
-  "version": "0.5.1",
-  "note": "Leitstand-Selbstkontrolle: erkennt veraltete Prüfläufe, ungewöhnlich lange laufende Prüfungen, fehlende aktive Prüfsysteme und widersprüchliche Statusanzeigen",
+  "version": "0.5.2",
+  "note": "KICC-kompatibler Eigen-Heartbeat: KC System Check meldet sich lokal alle 30 Sekunden und kann über einen konfigurierten, authentifizierten Heartbeat-Endpunkt an den PC-Leitstand senden",
   "channel": "stable"
 }

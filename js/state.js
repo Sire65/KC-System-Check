@@ -1,4 +1,5 @@
 import"./health-assistant.js";
 import"./early-warning.js";
 import"./self-check.js";
+import"./kicc-heartbeat.js";
 export const state={systems:[],history:JSON.parse(localStorage.getItem("kc-history")||"[]"),lastRun:null,settings:JSON.parse(localStorage.getItem("kc-settings")||"null")||{autoEnabled:false,autoTime:"06:30",autoProfile:"standard",notifyYellow:true,notifyRed:true,warnUsage:70,critUsage:90},abortController:null,runtime:null};export function saveSettings(){localStorage.setItem("kc-settings",JSON.stringify(state.settings));}export function saveHistory(){localStorage.setItem("kc-history",JSON.stringify(state.history.slice(-100)));}
