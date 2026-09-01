@@ -1,0 +1,25 @@
+name: Daily KC System Check
+on:
+  schedule:
+    - cron: '20 5 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run one Free-Tier-safe standard check
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL=$(jq -r '.apiBaseUrl' config/runtime.public.json)
+          TOKEN=$(jq -r '.apiToken' config/runtime.public.json)
+          curl --fail --silent --show-error --retry 2 --max-time 45 \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "apikey: ${TOKEN}" \
+            "${URL}?trigger=auto"
+          echo
+          echo "Daily standard check completed. No deep test and no B2 test upload performed."

@@ -1,5 +1,5 @@
 {
-  "version": "0.2.2",
-  "note": "Versionsanzeige im Kopf und Vorbereitung des Free-Tier-schonenden Ausbaus",
+  "version": "0.3.0",
+  "note": "Messqualität, getrennte Supabase-Werte, Verlauf, Kapazität, Prüfverbrauch und tägliche Server-Automatik",
   "channel": "stable"
 }
