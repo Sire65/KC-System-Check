@@ -28,6 +28,8 @@ jobs:
           cp icons/icon-192.svg icons/icon-512.svg dist/icons/
           cp config/runtime.public.json dist/config/runtime.json
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
