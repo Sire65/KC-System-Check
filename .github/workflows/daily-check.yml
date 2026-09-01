@@ -22,4 +22,4 @@ jobs:
             -H "apikey: ${TOKEN}" \
             "${URL}?trigger=auto"
           echo
-          echo "Daily standard check completed. No deep test and no B2 test upload performed."
+          echo "Daily standard check completed. No deep or storage-write check performed."
