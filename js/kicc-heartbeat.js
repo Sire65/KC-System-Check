@@ -2,7 +2,7 @@ const SCHEMA='kicc.program-heartbeat.v1';
 const REMOTE_SCHEMA='kicc.remote-program-heartbeat.v1';
 const CHANNEL='kicc-program-heartbeat-v1';
 const INSTANCE_KEY='kc-system-check.instance.id.v1';
-const VERSION='0.5.5';
+const VERSION='0.5.6';
 let channel=null;try{if('BroadcastChannel'in globalThis)channel=new BroadcastChannel(CHANNEL)}catch{}
 function instanceId(){try{let id=localStorage.getItem(INSTANCE_KEY);if(!id){id=`browser-${crypto.randomUUID?.()||Math.random().toString(36).slice(2)}`;localStorage.setItem(INSTANCE_KEY,id)}return id}catch{return'browser'}}
 const INSTANCE_ID=instanceId();
