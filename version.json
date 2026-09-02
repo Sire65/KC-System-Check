@@ -1,5 +1,5 @@
 {
-  "version": "0.5.7",
-  "note": "Problemhilfe bereinigt: bei 0 aktuellen Problemen keine Rohdaten mehr; nur echte rote/gelbe Befunde erhalten gezielte Lösungsschritte",
+  "version": "0.5.8",
+  "note": "Mobiler Leitstand neu priorisiert: gesund = kompakte Statuszeile und Instrumente sofort sichtbar; Handlungsbereiche erscheinen nur bei echten Warnungen oder Störungen",
   "channel": "stable"
 }
