@@ -1,5 +1,5 @@
 {
-  "version": "0.5.3",
-  "note": "Produktiver KICC-Heartbeat: sicherer Supabase-Heartbeat-Endpunkt aktiviert und KC System Check in der Server-Allowlist freigeschaltet",
+  "version": "0.5.4",
+  "note": "Mobiler Start repariert: Syntaxfehler in der Leitstand-Selbstkontrolle behoben; Browser-Speicher gegen ungültige Altwerte gehärtet",
   "channel": "stable"
 }
