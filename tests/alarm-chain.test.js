@@ -19,6 +19,14 @@ test('green alarm-chain state requires current server run and healthy enabled ch
 
 test('disabled alarm chain is neutral and desktop settings use two columns',()=>{
   assert.match(code,/Alarmkette ausgeschaltet/);
-  assert.match(code,/grid-template-columns:minmax\(0,1\.35fr\) minmax\(300px,\.65fr\)/);
+  assert.match(code,/grid-template-columns:minmax\(0,1\.35fr\) minmax\(320px,\.65fr\)/);
   assert.match(code,/@media\(min-width:900px\)/);
+});
+
+test('production settings keep actions visible and expose real email channel test',()=>{
+  assert.match(code,/alarm-sticky-actions/);
+  assert.match(code,/position:sticky/);
+  assert.match(code,/id="testEmailBtn"/);
+  assert.match(code,/action:'test_email'/);
+  assert.match(code,/echte Testmail über KC Communicator/);
 });
