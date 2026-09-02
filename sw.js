@@ -1,8 +1,12 @@
-const CACHE="kc-system-check-v0.6.7";
+const CACHE="kc-system-check-v0.6.8";
 const APP_PREFIX="kc-system-check-";
+const PUSH_RECEIPT_URL="https://ptblnpiroqftcvlsrhac.supabase.co/functions/v1/kc-communication-push-receipt";
 async function purgeOldCaches(){const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith(APP_PREFIX)&&k!==CACHE).map(k=>caches.delete(k)))}
 async function networkFirst(request){try{const response=await fetch(request,{cache:"no-store"});if(response&&response.ok){const copy=response.clone(),cache=await caches.open(CACHE);await cache.put(request,copy)}return response}catch(error){const cached=await caches.match(request);if(cached)return cached;if(request.mode==="navigate")return caches.match("./index.html");throw error}}
+async function sendPushReceipt(requestId,state){if(!requestId)return;try{await fetch(PUSH_RECEIPT_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({requestId,state}),keepalive:true})}catch{}}
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE));self.skipWaiting()});
 self.addEventListener("activate",event=>{event.waitUntil((async()=>{await purgeOldCaches();await self.clients.claim()})())});
 self.addEventListener("fetch",event=>{if(event.request.method!=="GET")return;const url=new URL(event.request.url);if(url.origin!==self.location.origin)return;event.respondWith(networkFirst(event.request))});
+self.addEventListener("push",event=>{event.waitUntil((async()=>{let payload={};try{payload=event.data?event.data.json():{}}catch{payload={body:event.data?event.data.text():""}}const requestId=payload?.data?.requestId||payload?.requestId||"";const title=payload?.title||payload?.subject||"KC System Check";const body=payload?.body||payload?.text||"Neue KC-Systemmeldung";await self.registration.showNotification(title,{body,tag:requestId||"kc-system-check-alert",renotify:true,requireInteraction:false,data:{requestId,url:"./"}});await sendPushReceipt(requestId,"displayed")})())});
+self.addEventListener("notificationclick",event=>{event.notification.close();event.waitUntil((async()=>{const requestId=event.notification?.data?.requestId||"";await sendPushReceipt(requestId,"opened");const all=await self.clients.matchAll({type:"window",includeUncontrolled:true});for(const c of all){if("focus" in c){await c.focus();return}}if(self.clients.openWindow)await self.clients.openWindow("./")})())});
 self.addEventListener("message",event=>{if(event.data?.type==="SKIP_WAITING")self.skipWaiting();if(event.data?.type==="PURGE_CACHES")event.waitUntil(purgeOldCaches())});
