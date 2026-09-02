@@ -1,5 +1,5 @@
 {
-  "version": "0.5.4",
-  "note": "Mobiler Start repariert: Syntaxfehler in der Leitstand-Selbstkontrolle behoben; Browser-Speicher gegen ungültige Altwerte gehärtet",
+  "version": "0.5.5",
+  "note": "Live-Auswertung korrigiert: nur echte rote/gelbe Statusklassen zählen; 'Fehler aktuell 0' sowie historische, veraltete und vorbereitete Einträge erzeugen keine falsche Störung mehr",
   "channel": "stable"
 }
