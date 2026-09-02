@@ -22,8 +22,8 @@ jobs:
         run: |
           rm -rf dist
           mkdir -p dist/js/adapters dist/icons dist/config
-          cp index.html manifest.webmanifest sw.js version.json dist/
-          cp js/app.js js/state.js js/charts.js js/gauges.js js/updater.js js/usage.js js/diagnostics.js js/diagnostics-runtime.js js/leitstand.js dist/js/
+          cp index.html diagnose.html manifest.webmanifest sw.js version.json dist/
+          cp js/app.js js/state.js js/charts.js js/gauges.js js/updater.js js/usage.js js/diagnostics.js js/diagnostics-runtime.js js/leitstand.js js/health-assistant.js js/early-warning.js js/self-check.js js/kicc-heartbeat.js js/quality-tools.js dist/js/
           cp js/adapters/base.js js/adapters/demo.js js/adapters/live.js dist/js/adapters/
           cp icons/icon-192.svg icons/icon-512.svg dist/icons/
           cp config/runtime.public.json dist/config/runtime.json
@@ -31,6 +31,12 @@ jobs:
           test -f dist/js/diagnostics.js
           test -f dist/js/diagnostics-runtime.js
           test -f dist/js/leitstand.js
+          test -f dist/js/health-assistant.js
+          test -f dist/js/early-warning.js
+          test -f dist/js/self-check.js
+          test -f dist/js/kicc-heartbeat.js
+          test -f dist/js/quality-tools.js
+          test -f dist/diagnose.html
           test -f dist/config/runtime.json
       - uses: actions/configure-pages@v5
         with:
