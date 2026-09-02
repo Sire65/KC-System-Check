@@ -1,5 +1,5 @@
 {
-  "version": "0.5.8",
-  "note": "Mobiler Leitstand neu priorisiert: gesund = kompakte Statuszeile und Instrumente sofort sichtbar; Handlungsbereiche erscheinen nur bei echten Warnungen oder Störungen",
+  "version": "0.5.9",
+  "note": "Mobile-Feinschliff und evidenzbasierter Prüfnachweis: definierte Prüfungen, echte Prüfabdeckung, LIVE/HTTPS-Baseline und OWASP-ASVS-5.0.0/WSTG-orientierte Methodik klar getrennt von einer Vollgarantie",
   "channel": "stable"
 }
