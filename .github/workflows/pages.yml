@@ -23,7 +23,7 @@ jobs:
           rm -rf dist
           mkdir -p dist/js/adapters dist/icons dist/config
           cp index.html diagnose.html manifest.webmanifest sw.js version.json dist/
-          cp js/app.js js/state.js js/charts.js js/gauges.js js/updater.js js/usage.js js/diagnostics.js js/diagnostics-runtime.js js/leitstand.js js/health-assistant.js js/early-warning.js js/self-check.js js/kicc-heartbeat.js js/quality-tools.js js/mobile-compact.js js/verification-profile.js dist/js/
+          cp js/app.js js/state.js js/charts.js js/gauges.js js/updater.js js/usage.js js/diagnostics.js js/diagnostics-runtime.js js/leitstand.js js/health-assistant.js js/early-warning.js js/self-check.js js/kicc-heartbeat.js js/quality-tools.js js/mobile-compact.js js/desktop-layout.js js/verification-profile.js dist/js/
           cp js/adapters/base.js js/adapters/demo.js js/adapters/live.js dist/js/adapters/
           cp icons/icon-192.svg icons/icon-512.svg dist/icons/
           cp config/runtime.public.json dist/config/runtime.json
@@ -37,6 +37,7 @@ jobs:
           test -f dist/js/kicc-heartbeat.js
           test -f dist/js/quality-tools.js
           test -f dist/js/mobile-compact.js
+          test -f dist/js/desktop-layout.js
           test -f dist/js/verification-profile.js
           test -f dist/diagnose.html
           test -f dist/config/runtime.json
