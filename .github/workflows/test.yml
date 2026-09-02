@@ -8,7 +8,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Unit tests
+      - name: Unit regression tests
         run: node --test tests/*.test.js
       - name: Backend syntax
         run: |
@@ -23,6 +23,14 @@ jobs:
       - name: Frontend syntax
         run: |
           for f in js/*.js js/adapters/*.js; do node --check "$f"; done
+      - name: ESLint external static analysis
+        run: |
+          npx --yes eslint@10.9.1 js backend worker/src --no-config-lookup \
+            --rule 'no-unreachable:error' \
+            --rule 'no-dupe-keys:error' \
+            --rule 'no-dupe-case:error'
+      - name: esbuild external module bundle check
+        run: npx --yes esbuild@0.25.10 js/app.js --bundle --format=esm --platform=browser --outfile=/tmp/kc-system-check.bundle.js
       - name: Release contract
         run: |
           grep -q 'id="appVersion"' index.html
@@ -34,5 +42,13 @@ jobs:
           grep -q 'js/verification-profile.js' .github/workflows/pages.yml
           grep -q 'ASVS' js/verification-profile.js
           grep -q '100% bedeutet 100% der definierten' js/verification-profile.js
+          grep -q 'keine absolute Fehlerfreiheitsgarantie' docs/VERIFICATION_PROFILE.md
       - name: Worker syntax
         run: node --check worker/src/index.js
+      - name: Playwright external mobile browser TÜV
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+          python3 -m http.server 4173 >/tmp/kc-http.log 2>&1 &
+          npx playwright test tests/external-smoke.spec.js --reporter=line --workers=1
