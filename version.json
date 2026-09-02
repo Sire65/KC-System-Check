@@ -1,5 +1,5 @@
 {
-  "version": "0.6.6",
-  "note": "Desktop-Feinschliff: Spiegelungsstatus neben One Touch verbreitert und nach links gezogen, damit der vollständige Text sichtbar bleibt",
+  "version": "0.6.7",
+  "note": "Alarmdiagnose per LED-Klick und Details-Link; Push- und E-Mail-End-to-End-Test direkt aus der Diagnose",
   "channel": "stable"
 }
