@@ -1,5 +1,5 @@
 {
-  "version": "0.6.12",
-  "note": "Fernüberwachung für PC Manager, zwei Marktkassen und Weihnachtsmarkt-Präsentation mit serverseitigem 1-Minuten-Wächter, Push/E-Mail bei Ausfall und Entwarnung",
+  "version": "0.6.13",
+  "note": "Kompakter Fernschutz für Infrastruktur, Kassenbetrieb, KC Communicator, Backup/Wiederherstellbarkeit und Versionsgleichstand; serverseitige Alarmierung nur bei Zustandswechseln",
   "channel": "stable"
 }
