@@ -7,6 +7,7 @@ import"./desktop-layout.js";
 import"./verification-profile.js";
 import"./alert-settings.js";
 import"./delivery-proof.js";
+import"./health-empty-guard.js";
 
 function safeJson(key,fallback){
   try{
