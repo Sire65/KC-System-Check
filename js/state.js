@@ -3,6 +3,7 @@ import"./early-warning.js";
 import"./self-check.js";
 import"./kicc-heartbeat.js";
 import"./mobile-compact.js";
+import"./desktop-layout.js";
 import"./verification-profile.js";
 
 function safeJson(key,fallback){
