@@ -1,5 +1,5 @@
 {
-  "version": "0.5.9",
-  "note": "Mobile-Feinschliff und evidenzbasierter Prüfnachweis: definierte Prüfungen, echte Prüfabdeckung, LIVE/HTTPS-Baseline und OWASP-ASVS-5.0.0/WSTG-orientierte Methodik klar getrennt von einer Vollgarantie",
+  "version": "0.6.0",
+  "note": "TÜV-konsolidierter Stand: grüner Startbildschirm ohne Beobachtungslärm, präziser Prüfnachweis, mindestens 50 Regressionstests sowie ESLint-, esbuild- und Playwright-Fremdprüfungen in CI",
   "channel": "stable"
 }
