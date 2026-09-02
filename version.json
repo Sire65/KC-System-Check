@@ -1,5 +1,5 @@
 {
-  "version": "0.6.8",
-  "note": "Push wird im Service Worker angezeigt und mit displayed/opened bestätigt; Diagnose unterscheidet Provider-Annahme von echter Geräteanzeige und Brevo-Übergabe",
+  "version": "0.6.9",
+  "note": "KC System Check registriert den aktuellen Browser als eigenes Push-Gerät; Push-Nachweis unterscheidet sent/displayed/opened und E-Mail Brevo-Übergabe von echter Zustellung",
   "channel": "stable"
 }
