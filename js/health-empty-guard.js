@@ -1,0 +1,3 @@
+const $=s=>document.querySelector(s);
+function applyGuard(){const evidence=document.querySelector('.kc-evidence')?.textContent||'';const noChecks=/\b0\s*\/\s*4\b/.test(evidence)||/0\s*Kernprüfungen/i.test(evidence);if(!noChecks)return;const orb=$('#statusOrb'),health=$('#healthValue'),text=$('#healthText'),coverage=$('#coverageText'),metric=$('#metricHealth');if(orb)orb.dataset.state='warn';if(health)health.textContent='—';if(text)text.textContent='Noch nicht geprüft';if(coverage)coverage.textContent='Prüfabdeckung 0% · keine Kernprüfung ausgewertet';if(metric)metric.textContent='—';}
+setInterval(applyGuard,1000);setTimeout(applyGuard,250);
