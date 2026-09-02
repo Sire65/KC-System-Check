@@ -2,6 +2,7 @@ import"./health-assistant.js";
 import"./early-warning.js";
 import"./self-check.js";
 import"./kicc-heartbeat.js";
+import"./mobile-compact.js";
 
 function safeJson(key,fallback){
   try{
