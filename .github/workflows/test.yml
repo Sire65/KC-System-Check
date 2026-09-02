@@ -28,7 +28,7 @@ jobs:
           npx --yes eslint@10.9.1 js backend worker/src --no-config-lookup \
             --rule 'no-unreachable:error' \
             --rule 'no-dupe-keys:error' \
-            --rule 'no-dupe-case:error'
+            --rule 'no-duplicate-case:error'
       - name: esbuild external module bundle check
         run: npx --yes esbuild@0.25.10 js/app.js --bundle --format=esm --platform=browser --outfile=/tmp/kc-system-check.bundle.js
       - name: Release contract
