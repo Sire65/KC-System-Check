@@ -6,14 +6,14 @@ function installStyles(){if($('#kcDesktopLayoutStyles'))return;const s=document.
   .topbar h1{font-size:26px}.topbar .eyebrow{font-size:11px}.header-meta{gap:9px}.badge{font-size:12px;padding:6px 10px}.icon-btn{padding:10px 13px}
   main{max-width:1400px;padding:16px 22px 24px}
   footer{max-width:1400px;padding:0 22px;margin-top:12px}
-  .hero{grid-template-columns:86px minmax(280px,1fr) 230px 230px;gap:18px;padding:18px 22px}
+  .hero{grid-template-columns:86px minmax(280px,1fr) 320px 230px;gap:18px;padding:18px 22px}
   .hero>.status-orb{width:78px;height:78px}
   .health-value{font-size:46px}.health-text{font-size:18px}.coverage{font-size:12px}
   .hero>#oneTouchBtn{grid-column:4;min-width:210px;padding:14px 20px;font-size:14px}
   .kc-evidence{font-size:11px!important}
-  .desktop-hero-extra{grid-column:3;grid-row:1;display:grid;gap:7px;align-self:stretch}
-  .desktop-hero-extra-row{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:10px;background:#0e1728;min-width:0}
-  .desktop-hero-extra-row .k{font-size:11px;color:var(--muted)}.desktop-hero-extra-row .v{font-size:14px;font-weight:800;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .desktop-hero-extra{grid-column:3;grid-row:1;display:grid;gap:7px;align-self:stretch;min-width:0}
+  .desktop-hero-extra-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;padding:7px 11px;border:1px solid var(--line);border-radius:10px;background:#0e1728;min-width:0}
+  .desktop-hero-extra-row .k{font-size:11px;color:var(--muted)}.desktop-hero-extra-row .v{font-size:13px;font-weight:800;text-align:right;white-space:nowrap;overflow:visible;text-overflow:clip;min-width:0}
   .tabs{grid-template-columns:repeat(6,minmax(120px,1fr));gap:10px;margin:14px 0}.tab{padding:11px 8px;font-size:13px}
   #dashboard.view.active{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr);gap:14px;align-items:start}
   #dashboard>.gauges{grid-column:1/-1;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
@@ -36,6 +36,7 @@ function installStyles(){if($('#kcDesktopLayoutStyles'))return;const s=document.
 @media(min-width:1450px){
   main,footer{max-width:1480px}
   .topbar{padding-left:max(28px,calc((100vw - 1480px)/2 + 28px));padding-right:max(28px,calc((100vw - 1480px)/2 + 28px))}
+  .hero{grid-template-columns:86px minmax(320px,1fr) 350px 230px}
   .gauge-card canvas{max-height:250px}
 }
 `;document.head.appendChild(s)}
