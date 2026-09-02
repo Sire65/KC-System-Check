@@ -5,6 +5,7 @@ import"./kicc-heartbeat.js";
 import"./mobile-compact.js";
 import"./desktop-layout.js";
 import"./verification-profile.js";
+import"./alert-settings.js";
 
 function safeJson(key,fallback){
   try{
