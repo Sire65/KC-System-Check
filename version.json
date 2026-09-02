@@ -1,5 +1,5 @@
 {
-  "version": "0.6.1",
-  "note": "Desktop-Erweiterung: breite PC-Leitzentrale mit zentriertem 1400px-Layout, zusätzlichen Desktop-KPIs, Systemstatus und Antwortzeiten nebeneinander; mobile Ansicht unverändert",
+  "version": "0.6.2",
+  "note": "Desktop-Feinschliff mit besser lesbaren KPIs, zusätzlichen GitHub-/Spiegelungsdetails und beschrifteter Antwortzeit-Grafik; serverseitige KC-Communication-Alarmierung bei echten Gelb-/Rot-Zustandswechseln",
   "channel": "stable"
 }
