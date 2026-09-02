@@ -1,5 +1,5 @@
 {
-  "version": "0.6.3",
-  "note": "Serverseitige Alarmsteuerung unter Einstellungen: Push/E-Mail an oder aus, Schwelle Gelb/Rot, Prüftakt 15/30/60 Minuten und Entwarnung; funktioniert auch bei geschlossener App",
+  "version": "0.6.4",
+  "note": "Alarmketten-LED neben KC System Check mit echtem Server-/Providerstatus; Desktop-Einstellungen breiter und zweispaltig mit kompakter Alarmketten-Zustandsanzeige",
   "channel": "stable"
 }
