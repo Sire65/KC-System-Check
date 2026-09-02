@@ -1,5 +1,5 @@
 {
-  "version": "0.6.9",
-  "note": "KC System Check registriert den aktuellen Browser als eigenes Push-Gerät; Push-Nachweis unterscheidet sent/displayed/opened und E-Mail Brevo-Übergabe von echter Zustellung",
+  "version": "0.6.10",
+  "note": "Alarmstatus-Abfragen entkoppelt und gedrosselt; 0/4 Kernprüfungen werden nicht mehr fälschlich als 100% gesund dargestellt",
   "channel": "stable"
 }
