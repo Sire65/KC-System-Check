@@ -8,6 +8,7 @@ import"./verification-profile.js";
 import"./alert-settings.js";
 import"./delivery-proof.js";
 import"./health-empty-guard.js";
+import"./action-progress.js";
 
 function safeJson(key,fallback){
   try{
