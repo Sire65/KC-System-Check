@@ -1,5 +1,5 @@
 {
-  "version": "0.6.7",
-  "note": "Alarmdiagnose per LED-Klick und Details-Link; Push- und E-Mail-End-to-End-Test direkt aus der Diagnose",
+  "version": "0.6.8",
+  "note": "Push wird im Service Worker angezeigt und mit displayed/opened bestätigt; Diagnose unterscheidet Provider-Annahme von echter Geräteanzeige und Brevo-Übergabe",
   "channel": "stable"
 }
