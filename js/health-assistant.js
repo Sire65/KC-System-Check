@@ -1,21 +1,23 @@
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 
-const UNKNOWN_WORDS=["veraltet","historisch","unbekannt","noch keine telemetrie","anbindung vorbereitet","telemetrie vorbereitet","heartbeat-anbindung vorbereitet","nicht aktiv","statusdaten veraltet"];
-const SEVERE_WORDS=["störung","fehler aktuell","critical","handlungsbedarf"];
 const OWN_HEALTH_TEXTS=new Set(["Prüfungen bestanden · Live-Störung vorhanden","Prüfungen bestanden · Live unvollständig"]);
 
 function textOf(el){return(el?.textContent||"").replace(/\s+/g," ").trim().toLowerCase()}
-function hasAny(text,words){return words.some(w=>text.includes(w))}
 function setText(el,value){if(el&&el.textContent!==value)el.textContent=value}
 function setState(el,value){if(el&&el.dataset.state!==value)el.dataset.state=value}
+function explicitSeverity(el){
+  if(!el)return"ok";
+  const dot=el.matches?.(".dot")?el:el.querySelector?.(".dot");
+  if(dot?.classList.contains("bad")||el.classList?.contains("bad")||el.dataset?.state==="bad")return"bad";
+  if(dot?.classList.contains("warn")||el.classList?.contains("warn")||el.dataset?.state==="warn")return"warn";
+  return"ok";
+}
 
 export function classifyCoverage(root=document){
-  const live=textOf(root.querySelector?.("#live"));
-  const findings=textOf(root.querySelector?.("#findings"));
-  const severe=hasAny(live,SEVERE_WORDS)||hasAny(findings,SEVERE_WORDS);
-  const incomplete=hasAny(live,UNKNOWN_WORDS);
-  return{severe,incomplete};
+  const cards=[...root.querySelectorAll?.("#live .live-device,#live .live-kpi,#findings .finding")||[]];
+  const states=cards.map(explicitSeverity);
+  return{severe:states.includes("bad"),incomplete:states.includes("warn")};
 }
 
 export function solutionFor(text=""){
@@ -52,15 +54,15 @@ function decorateFindings(){
 }
 
 function ensureGlobalHelp(){
-  const hero=$(".hero");if(!hero||$("#kcGlobalHelpBtn"))return;const b=document.createElement("button");b.id="kcGlobalHelpBtn";b.type="button";b.className="secondary kc-help-btn";b.textContent="Probleme & Lösungen";b.onclick=()=>{const candidates=$$("#live .live-device,#live .live-kpi,#findings .finding");const hit=candidates.find(x=>hasAny(textOf(x),[...UNKNOWN_WORDS,...SEVERE_WORDS]))||$("#live");openHelp("Aktueller Leitstand",hit?hit.textContent:"Keine Detaildaten verfügbar")};hero.appendChild(b);
+  const hero=$(".hero");if(!hero||$("#kcGlobalHelpBtn"))return;const b=document.createElement("button");b.id="kcGlobalHelpBtn";b.type="button";b.className="secondary kc-help-btn";b.textContent="Probleme & Lösungen";b.onclick=()=>{const candidates=$$("#live .live-device,#live .live-kpi,#findings .finding");const hit=candidates.find(x=>explicitSeverity(x)!=="ok")||$("#live");openHelp("Aktueller Leitstand",hit?hit.textContent:"Keine Detaildaten verfügbar")};hero.appendChild(b);
 }
 
 function guardOverall(){
   const value=Number($("#healthValue")?.textContent);const text=$("#healthText"),coverage=$("#coverageText"),orb=$("#statusOrb");if(!text||!coverage||!orb)return;const state=classifyCoverage(document);const current=text.textContent||"";const baseCoverage=(coverage.textContent||"Prüfabdeckung 100%").split(" · ")[0];
   if(value!==100)return;
   if(state.severe){setState(orb,"bad");setText(text,"Prüfungen bestanden · Live-Störung vorhanden");setText(coverage,`${baseCoverage} · Live-Abdeckung mit Störung`);return}
-  if(state.incomplete){setState(orb,"warn");setText(text,"Prüfungen bestanden · Live unvollständig");setText(coverage,`${baseCoverage} · Live-Abdeckung unvollständig`);return}
-  if(OWN_HEALTH_TEXTS.has(current)){setState(orb,"ok");setText(text,"Alles gesund");setText(coverage,baseCoverage)}
+  if(state.incomplete){setState(orb,"warn");setText(text,"Prüfungen bestanden · Live-Warnung vorhanden");setText(coverage,`${baseCoverage} · Live-Abdeckung mit Warnung`);return}
+  if(OWN_HEALTH_TEXTS.has(current)||current==="Prüfungen bestanden · Live-Warnung vorhanden"){setState(orb,"ok");setText(text,"Alles gesund");setText(coverage,baseCoverage)}
 }
 
 function refresh(){ensureStyles();ensureGlobalHelp();decorateFindings();guardOverall()}
