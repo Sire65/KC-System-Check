@@ -22,18 +22,7 @@ jobs:
           node --check backend/adapters/b2.js
       - name: Frontend syntax
         run: |
-          node --check js/app.js
-          node --check js/state.js
-          node --check js/charts.js
-          node --check js/gauges.js
-          node --check js/updater.js
-          node --check js/usage.js
-          node --check js/diagnostics.js
-          node --check js/diagnostics-runtime.js
-          node --check js/leitstand.js
-          node --check js/adapters/base.js
-          node --check js/adapters/demo.js
-          node --check js/adapters/live.js
+          for f in js/*.js js/adapters/*.js; do node --check "$f"; done
       - name: Release contract
         run: |
           grep -q 'id="appVersion"' index.html
@@ -42,5 +31,8 @@ jobs:
           grep -q "kc-system-check-v${VERSION}" sw.js
           grep -q 'growthWindow' js/usage.js
           grep -q 'js/usage.js' .github/workflows/pages.yml
+          grep -q 'js/verification-profile.js' .github/workflows/pages.yml
+          grep -q 'ASVS' js/verification-profile.js
+          grep -q '100% bedeutet 100% der definierten' js/verification-profile.js
       - name: Worker syntax
         run: node --check worker/src/index.js
