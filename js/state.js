@@ -6,6 +6,7 @@ import"./mobile-compact.js";
 import"./desktop-layout.js";
 import"./verification-profile.js";
 import"./alert-settings.js";
+import"./delivery-proof.js";
 
 function safeJson(key,fallback){
   try{
@@ -21,27 +22,13 @@ function safeJson(key,fallback){
 }
 
 export const state={
+  runtime:null,
   systems:[],
-  history:Array.isArray(safeJson("kc-history",[]))?safeJson("kc-history",[]):[],
+  history:safeJson("kc-system-history",[]),
+  settings:{notifyYellow:true,notifyRed:true,warnUsage:70,critUsage:90,...safeJson("kc-system-settings",{})},
   lastRun:null,
-  settings:{
-    autoEnabled:false,
-    autoTime:"06:30",
-    autoProfile:"standard",
-    notifyYellow:true,
-    notifyRed:true,
-    warnUsage:70,
-    critUsage:90,
-    ...safeJson("kc-settings",{})
-  },
-  abortController:null,
-  runtime:null
+  cancelRequested:false,
+  currentController:null
 };
-
-export function saveSettings(){
-  try{localStorage.setItem("kc-settings",JSON.stringify(state.settings))}catch(error){console.warn("[KC System Check] Einstellungen konnten nicht gespeichert werden",error)}
-}
-
-export function saveHistory(){
-  try{localStorage.setItem("kc-history",JSON.stringify(state.history.slice(-100)))}catch(error){console.warn("[KC System Check] Verlauf konnte nicht gespeichert werden",error)}
-}
+export function saveSettings(){localStorage.setItem("kc-system-settings",JSON.stringify(state.settings))}
+export function saveHistory(){localStorage.setItem("kc-system-history",JSON.stringify(state.history))}
