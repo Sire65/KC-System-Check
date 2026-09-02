@@ -38,23 +38,26 @@ function ensureStyles(){
   .kc-help-summary{margin-top:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#0d1728;font-size:12px;color:var(--muted)}
   .kc-help-modal{position:fixed;inset:0;z-index:50;background:rgba(2,6,14,.82);display:grid;place-items:center;padding:16px}
   .kc-help-panel{width:min(620px,100%);max-height:88vh;overflow:auto;background:#0f1829;border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
-  .kc-help-panel ol{padding-left:22px}.kc-help-panel li{margin:10px 0;line-height:1.4}.kc-help-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.kc-help-close{min-width:44px;min-height:44px}
+  .kc-help-panel ol{padding-left:22px}.kc-help-panel li{margin:10px 0;line-height:1.4}.kc-help-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.kc-help-close{min-width:44px;min-height:44px}.kc-help-ok{padding:14px;border:1px solid #2ecc7188;border-radius:12px;background:#102318;color:#dff7e8;margin-top:12px}
   @media(max-width:620px){.kc-help-btn{width:100%}.kc-help-panel{border-radius:15px}}
   `;document.head.appendChild(s);
 }
 
 function closeHelp(){$("#kcProblemHelpModal")?.remove()}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
 function openHelp(title,detail){
   closeHelp();const steps=solutionFor(`${title} ${detail}`);const modal=document.createElement("div");modal.id="kcProblemHelpModal";modal.className="kc-help-modal";modal.innerHTML=`<div class="kc-help-panel" role="dialog" aria-modal="true" aria-label="Lösungsvorschläge"><div class="kc-help-head"><div><div class="eyebrow">Problemhilfe</div><h2>Lösungsvorschläge</h2></div><button class="secondary kc-help-close" type="button">✕</button></div><h3>${escapeHtml(title||"Auffälligkeit")}</h3><div class="muted small">${escapeHtml(detail||"Kein weiterer Detailtext vorhanden.")}</div><ol>${steps.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ol><div class="kc-help-summary">Die Vorschläge ändern nichts automatisch. Erst prüfen, dann gezielt handeln.</div></div>`;document.body.appendChild(modal);modal.querySelector(".kc-help-close").onclick=closeHelp;modal.addEventListener("click",e=>{if(e.target===modal)closeHelp()});
 }
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
+function openHealthy(){
+  closeHelp();const modal=document.createElement("div");modal.id="kcProblemHelpModal";modal.className="kc-help-modal";modal.innerHTML=`<div class="kc-help-panel" role="dialog" aria-modal="true" aria-label="Systemstatus"><div class="kc-help-head"><div><div class="eyebrow">Problemhilfe</div><h2>Keine aktuellen Probleme</h2></div><button class="secondary kc-help-close" type="button">✕</button></div><div class="kc-help-ok"><strong>Alles gesund.</strong><div class="muted small">Der Leitstand meldet derzeit keine aktive rote oder gelbe Störung. Historische, veraltete und vorbereitete Einträge werden nicht als aktuelle Probleme gewertet.</div></div></div>`;document.body.appendChild(modal);modal.querySelector(".kc-help-close").onclick=closeHelp;modal.addEventListener("click",e=>{if(e.target===modal)closeHelp()});
+}
 
 function decorateFindings(){
   $$("#findings .finding").forEach(f=>{if(f.querySelector(".kc-help-btn"))return;const title=f.querySelector("strong")?.textContent||"Auffälligkeit";const detail=f.querySelector(".muted")?.textContent||"";const b=document.createElement("button");b.type="button";b.className="kc-help-btn";b.textContent="Lösung anzeigen";b.onclick=()=>openHelp(title,detail);f.appendChild(b)});
 }
 
 function ensureGlobalHelp(){
-  const hero=$(".hero");if(!hero||$("#kcGlobalHelpBtn"))return;const b=document.createElement("button");b.id="kcGlobalHelpBtn";b.type="button";b.className="secondary kc-help-btn";b.textContent="Probleme & Lösungen";b.onclick=()=>{const candidates=$$("#live .live-device,#live .live-kpi,#findings .finding");const hit=candidates.find(x=>explicitSeverity(x)!=="ok")||$("#live");openHelp("Aktueller Leitstand",hit?hit.textContent:"Keine Detaildaten verfügbar")};hero.appendChild(b);
+  const hero=$(".hero");if(!hero||$("#kcGlobalHelpBtn"))return;const b=document.createElement("button");b.id="kcGlobalHelpBtn";b.type="button";b.className="secondary kc-help-btn";b.textContent="Probleme & Lösungen";b.onclick=()=>{const candidates=$$("#live .live-device,#live .live-kpi,#findings .finding");const hit=candidates.find(x=>explicitSeverity(x)!=="ok");if(!hit){openHealthy();return}const title=hit.querySelector("strong")?.textContent?.trim()||"Aktueller Leitstand";const detail=hit.querySelector(".muted")?.textContent?.trim()||hit.textContent?.trim()||"Keine Detaildaten verfügbar";openHelp(title,detail)};hero.appendChild(b);
 }
 
 function guardOverall(){
