@@ -1,5 +1,5 @@
 {
-  "version": "0.6.2",
-  "note": "Desktop-Feinschliff mit besser lesbaren KPIs, zusätzlichen GitHub-/Spiegelungsdetails und beschrifteter Antwortzeit-Grafik; serverseitige KC-Communication-Alarmierung bei echten Gelb-/Rot-Zustandswechseln",
+  "version": "0.6.3",
+  "note": "Serverseitige Alarmsteuerung unter Einstellungen: Push/E-Mail an oder aus, Schwelle Gelb/Rot, Prüftakt 15/30/60 Minuten und Entwarnung; funktioniert auch bei geschlossener App",
   "channel": "stable"
 }
