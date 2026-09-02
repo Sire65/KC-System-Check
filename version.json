@@ -1,5 +1,5 @@
 {
-  "version": "0.5.6",
-  "note": "Selbstkontrolle korrigiert: echte Statusklassen statt Textsuche; Uhrzeit des letzten Prüflaufs wird eindeutig erkannt",
+  "version": "0.5.7",
+  "note": "Problemhilfe bereinigt: bei 0 aktuellen Problemen keine Rohdaten mehr; nur echte rote/gelbe Befunde erhalten gezielte Lösungsschritte",
   "channel": "stable"
 }
