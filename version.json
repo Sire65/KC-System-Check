@@ -1,5 +1,5 @@
 {
-  "version": "0.6.5",
-  "note": "Produktionsabschluss des Überwachungssystems: feste Aktionsleiste im Alarmdialog, echter E-Mail-End-to-End-Test über KC Communicator und finalisierte Alarmketten-LED",
+  "version": "0.6.6",
+  "note": "Desktop-Feinschliff: Spiegelungsstatus neben One Touch verbreitert und nach links gezogen, damit der vollständige Text sichtbar bleibt",
   "channel": "stable"
 }
