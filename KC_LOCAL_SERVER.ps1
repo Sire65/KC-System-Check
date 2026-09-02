@@ -43,12 +43,13 @@ Write-Host "KC SYSTEM CHECK - LOKALE VERSION" -ForegroundColor Cyan
 Write-Host "--------------------------------" -ForegroundColor Cyan
 Write-Host "Server l${ae}uft unter: $url"
 Write-Host "Dieses Fenster ge${oe}ffnet lassen."
-Write-Host "Zum Beenden: Fenster schlie${sz}en oder STRG+C." -ForegroundColor Yellow
+Write-Host "Beenden: T${ue}r-Symbol im Programm oder STRG+C." -ForegroundColor Yellow
 Write-Host ""
 Start-Process $url
 
+$shutdown = $false
 try {
-    while ($true) {
+    while (-not $shutdown) {
         $client = $listener.AcceptTcpClient()
         try {
             $stream = $client.GetStream()
@@ -64,6 +65,19 @@ try {
             $method = $parts[0]
             $rawPath = if ($parts.Length -gt 1) { $parts[1] } else { '/' }
             $pathOnly = $rawPath.Split('?')[0]
+
+            if ($method -eq 'POST' -and $pathOnly -eq '/__kc_shutdown') {
+                $body = [Text.Encoding]::UTF8.GetBytes('{"ok":true,"message":"KC System Check wird beendet"}')
+                $headers = "HTTP/1.1 200 OK`r`nContent-Type: application/json; charset=utf-8`r`nContent-Length: $($body.Length)`r`nCache-Control: no-store`r`nConnection: close`r`n`r`n"
+                $headerBytes = [Text.Encoding]::ASCII.GetBytes($headers)
+                $stream.Write($headerBytes,0,$headerBytes.Length)
+                $stream.Write($body,0,$body.Length)
+                $stream.Flush()
+                $shutdown = $true
+                Write-Host "KC System Check wurde ${ue}ber die Ausgangstaste beendet." -ForegroundColor Green
+                continue
+            }
+
             $decoded = [Uri]::UnescapeDataString($pathOnly).TrimStart('/')
             if ([string]::IsNullOrWhiteSpace($decoded)) { $decoded = 'index.html' }
 
