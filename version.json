@@ -1,5 +1,5 @@
 {
-  "version": "0.6.4",
-  "note": "Alarmketten-LED neben KC System Check mit echtem Server-/Providerstatus; Desktop-Einstellungen breiter und zweispaltig mit kompakter Alarmketten-Zustandsanzeige",
+  "version": "0.6.5",
+  "note": "Produktionsabschluss des Überwachungssystems: feste Aktionsleiste im Alarmdialog, echter E-Mail-End-to-End-Test über KC Communicator und finalisierte Alarmketten-LED",
   "channel": "stable"
 }
