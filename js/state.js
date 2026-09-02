@@ -9,6 +9,7 @@ import"./alert-settings.js";
 import"./delivery-proof.js";
 import"./health-empty-guard.js";
 import"./action-progress.js";
+import"./remote-operations.js";
 
 function safeJson(key,fallback){
   try{
