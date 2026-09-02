@@ -10,6 +10,7 @@ import"./delivery-proof.js";
 import"./health-empty-guard.js";
 import"./action-progress.js";
 import"./remote-operations.js";
+import"./one-touch-watchdog.js";
 
 function safeJson(key,fallback){
   try{
