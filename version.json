@@ -1,5 +1,5 @@
 {
-  "version": "0.6.10",
-  "note": "Alarmstatus-Abfragen entkoppelt und gedrosselt; 0/4 Kernprüfungen werden nicht mehr fälschlich als 100% gesund dargestellt",
+  "version": "0.6.11",
+  "note": "Zeit- und Fortschrittsbalken bei Statusprüfung, Push-/E-Mail-Test, Geräte-Registrierung und weiteren längeren Aktionen",
   "channel": "stable"
 }
