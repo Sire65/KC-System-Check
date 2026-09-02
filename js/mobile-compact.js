@@ -16,7 +16,7 @@ function installStyles(){if($("#kcMobileCompactStyles"))return;const s=document.
   body.kc-has-alerts .hero>.status-orb{width:52px;height:52px;grid-column:1;grid-row:1}
   body.kc-has-alerts .hero>div:nth-child(2){grid-column:2;grid-row:1;display:block}
   body.kc-has-alerts .hero>div:nth-child(2)>.muted:first-child{display:block;font-size:10px}
-  body.kc-has-alerts .health-value{font-size:34px}.body.kc-has-alerts .health-text{font-size:15px}
+  body.kc-has-alerts .health-value{font-size:34px}body.kc-has-alerts .health-text{font-size:15px}
   body.kc-has-alerts .hero>#oneTouchBtn{grid-column:1/-1;grid-row:auto;width:100%;font-size:14px}
   body.kc-has-alerts .hero>#kcGlobalHelpBtn,body.kc-has-alerts .hero>#kcSelfCheck,body.kc-has-alerts .hero>#kcQualityStrip{grid-column:1/-1;width:100%}
 }
