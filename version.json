@@ -1,5 +1,5 @@
 {
-  "version": "0.6.13",
-  "note": "Kompakter Fernschutz für Infrastruktur, Kassenbetrieb, KC Communicator, Backup/Wiederherstellbarkeit und Versionsgleichstand; serverseitige Alarmierung nur bei Zustandswechseln",
+  "version": "0.6.14",
+  "note": "Härtung: Fremddaten werden vor der Anzeige entschärft, unbekannte Messwerte werden nie mehr als gesund dargestellt, Hintergrundabfragen sind an den LIVE-Tab gebunden",
   "channel": "stable"
 }

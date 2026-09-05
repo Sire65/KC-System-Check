@@ -1,4 +1,4 @@
-const CACHE="kc-system-check-v0.6.13";
+const CACHE="kc-system-check-v0.6.14";
 const APP_PREFIX="kc-system-check-";
 const PUSH_RECEIPT_URL="https://ptblnpiroqftcvlsrhac.supabase.co/functions/v1/kc-communication-push-receipt";
 async function purgeOldCaches(){const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith(APP_PREFIX)&&k!==CACHE).map(k=>caches.delete(k)))}

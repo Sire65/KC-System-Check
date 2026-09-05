@@ -51,4 +51,4 @@ jobs:
           npm install --no-save @playwright/test@1.55.0
           npx playwright install --with-deps chromium
           python3 -m http.server 4173 >/tmp/kc-http.log 2>&1 &
-          npx playwright test tests/external-smoke.spec.js --reporter=line --workers=1
+          npx playwright test tests/external-smoke.spec.js tests/hardening-smoke.spec.js --reporter=line --workers=1
