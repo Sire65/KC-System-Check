@@ -1,6 +1,6 @@
 {
-  "version": "0.7.23",
-  "note": "Ein selbst gemeldeter Programmfehler nennt sein Alter, statt als Gegenwart zu erscheinen",
+  "version": "0.7.24",
+  "note": "Ein blockierter Meldeweg nennt seinen Grund, statt wie Schweigen auszusehen",
   "channel": "stable",
   "installSekunden": 5
 }

@@ -48,7 +48,7 @@ export function startHeartbeat(o) {
     return { send: async () => false, state: () => ({ error: "unvollstaendig" }) };
   }
   const id = instanceId(programId);
-  let lastOkAt = null, lastError = null;
+  let lastOkAt = null, lastError = null, fehlerFolge = 0, gemeldeterGrund = null;
 
   const build = () => {
     let m = {};
@@ -82,10 +82,22 @@ export function startHeartbeat(o) {
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       lastOkAt = new Date().toISOString(); lastError = null;
+      fehlerFolge = 0; gemeldeterGrund = null;
       return true;
     } catch (e) {
       // Ein ausgefallenes Lebenszeichen darf das Programm nie stoeren.
       lastError = e instanceof Error ? e.message : String(e);
+      fehlerFolge += 1;
+      // Aber es darf auch nicht spurlos verschwinden: wer nicht melden kann,
+      // kann das Nichtmelden erst recht nicht melden. Auf der Empfaengerseite
+      // sieht ein blockierter Meldeweg genauso aus wie ein Programm, das
+      // niemand benutzt. Die einzige Stelle, an der der Grund ueberhaupt
+      // bekannt ist, ist hier - also steht er hier auch in der Konsole.
+      // Einmal je Grund, nicht bei jedem Versuch.
+      if (lastError !== gemeldeterGrund) {
+        gemeldeterGrund = lastError;
+        console.warn(`[kc-heartbeat] Lebenszeichen nicht zugestellt (${fehlerFolge}. Versuch): ${lastError} · fuer die Ueberwachung sieht das aus wie "Programm nicht benutzt"`);
+      }
       return false;
     }
   };
@@ -94,5 +106,5 @@ export function startHeartbeat(o) {
   setInterval(send, Math.max(30, everySeconds) * 1000);
   if (typeof document !== "undefined") document.addEventListener("visibilitychange", () => { if (!document.hidden) send(); });
 
-  return { send, state: () => ({ instanceId: id, lastOkAt, lastError }) };
+  return { send, state: () => ({ instanceId: id, lastOkAt, lastError, failedInARow: fehlerFolge }) };
 }

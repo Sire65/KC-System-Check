@@ -88,6 +88,36 @@ niemand an der Kasse steht.
 Für einen Dienst ohne Browser ist dieses Paket das falsche Werkzeug. Es setzt
 `window`, `localStorage` und `fetch` voraus.
 
+## Wenn das Melden selbst scheitert
+
+Der unangenehmste Fall, und er ist am 2026-09-06 in dieser Umgebung
+tatsächlich eingetreten: das Programm läuft, aber es **kann nicht melden** —
+kein Netz, abgelaufene Anmeldung, falsche Adresse. Auf der Empfängerseite ist
+das von „niemand hat das Programm offen" **nicht zu unterscheiden**. Beides ist
+Schweigen.
+
+Das lässt sich nicht wegprogrammieren: wer seinen einzigen Meldeweg nicht
+benutzen kann, kann darüber auch nicht melden, dass er ihn nicht benutzen kann.
+Was bleibt, sind drei Dinge — in dieser Reihenfolge:
+
+1. **Den Grund dort sichtbar machen, wo er bekannt ist: im Programm.** Dieses
+   Paket schreibt jeden neuen Fehlergrund einmal in die Browser-Konsole und
+   führt ihn in `state()` als `lastError` samt `failedInARow`. Ein Blick in die
+   Entwicklerkonsole beantwortet damit in Sekunden, was sonst eine
+   Datenbanksuche kostet.
+2. **Scharfstellen, wo Schweigen wirklich ein Befund ist** (siehe oben). Das
+   erkennt nicht den kaputten Meldeweg, sondern die Abwesenheit — aber es ist
+   das einzige Signal, das die Überwachung ohne Mithilfe des Programms hat.
+3. **Einen zweiten, unabhängigen Zeugen.** Ein Programm, das mit der Datenbank
+   arbeitet, hinterlässt dort Spuren, die es nicht unterdrücken kann. Wer
+   wissen will, ob ein Programm wirklich lief, findet die Antwort in den
+   Server-Protokollen, nicht im Lebenszeichen.
+
+**Was hier nicht die Lösung ist:** den Melde-Endpunkt für unangemeldete
+Aufrufe öffnen, damit auch ohne Anmeldung etwas ankommt. Dann könnte jeder
+„Programm läuft" melden. Ein Signal, das sich fälschen lässt, ist schlechter
+als gar keins.
+
 ## Was noch fehlt
 
 Das Lebenszeichen ist selbstgemeldet (`trust: SELF_REPORTED`). Ein Programm,
