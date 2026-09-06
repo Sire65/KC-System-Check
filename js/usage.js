@@ -2,5 +2,17 @@ export function formatBytes(n=0){n=Number(n)||0;const sign=n<0?"-":"";n=Math.abs
 function points(history=[],systemId){return history.map(r=>{const x=(r.results||[]).find(v=>v.id===systemId),b=Number(x?.metrics?.database_bytes),t=Date.parse(r.checked_at||r.at);return Number.isFinite(t)&&Number.isFinite(b)&&b>0?{t,b}:null}).filter(Boolean).sort((a,b)=>a.t-b.t)}
 export function growthWindow(history=[],systemId,days=1){const p=points(history,systemId);if(p.length<2)return null;const z=p.at(-1),target=z.t-days*86400000,candidates=p.filter(x=>x.t<=target);if(!candidates.length)return null;const a=candidates.at(-1),span=Math.max(.001,(z.t-a.t)/86400000);return{bytes:z.b-a.b,perDay:(z.b-a.b)/span,spanDays:span}}
 export function capacityTrend(history=[],systemId){const p=points(history,systemId);if(p.length<2)return{growthPerDay:null,daysToLimit:null};const a=p[0],z=p.at(-1),days=Math.max(.001,(z.t-a.t)/86400000),growth=(z.b-a.b)/days,limit=500*1024*1024;return{growthPerDay:growth,daysToLimit:growth>0?Math.max(0,Math.round((limit-z.b)/growth)):null}}
+// Der Server darf Pruefungen liefern, die die App lokal nicht kennt. Sie
+// erscheinen dann automatisch, statt unsichtbar zu bleiben.
+export function mergeSystems(systems=[],results=[]){
+  const known=new Set(systems.map(s=>s.id));
+  const extra=[];
+  for(const r of results){
+    if(!r?.id||known.has(r.id))continue;
+    known.add(r.id);
+    extra.push({id:r.id,name:r.name||r.id,kind:r.kind||"service",enabled:true,serverOnly:true});
+  }
+  return [...systems,...extra];
+}
 export function statusClass(status){return status==="healthy"||status==="ok"?"ok":status==="warning"||status==="warn"?"warn":status==="critical"||status==="bad"?"bad":"idle"}
 export function overallStatus(results=[]){if(results.some(r=>["critical","bad"].includes(r.status)))return"bad";if(results.some(r=>["warning","warn"].includes(r.status)))return"warn";if(!results.some(r=>["healthy","ok"].includes(r.status)))return"unknown";return"ok"}

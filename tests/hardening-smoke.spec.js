@@ -74,3 +74,24 @@ test('Der Startvorgang läuft genau einmal, nicht doppelt', async ({ page }) => 
   // verdoppelt sonst jede Startabfrage und damit den Free-Tier-Verbrauch.
   expect(startupCalls.length).toBe(1);
 });
+
+test('Eine neue serverseitige Prüfung erscheint ohne App-Änderung', async ({ page }) => {
+  const payload = {
+    version: 'test', status: 'critical', health: 35, coverage: 100,
+    checkedAt: new Date().toISOString(), duration_ms: 12, recorded: false,
+    results: [
+      { id: 'kc_core', name: 'KC Core · Supabase', kind: 'database', status: 'healthy', health: 100, latency: 42, detail: 'erreichbar' },
+      { id: 'db_security', name: 'Datenbank-Sicherheitslage', kind: 'security', status: 'critical', health: 35, latency: 30, detail: '2 Tabelle(n) ohne RLS: kc_test, kc_demo' }
+    ]
+  };
+  await isolate(page, route =>
+    route.request().url().includes('/kc-system-check?') && route.request().url().includes('systems=')
+      ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) })
+      : route.abort()
+  );
+  await page.goto(URL);
+  await page.locator('#oneTouchBtn').click();
+  await expect(page.locator('#systemCards')).toContainText('Datenbank-Sicherheitslage');
+  await expect(page.locator('#systemCards')).toContainText('ohne RLS');
+  await expect(page.locator('#healthValue')).toHaveText('35');
+});

@@ -24,3 +24,23 @@ test('unbekannte Zustände werden grau, niemals grün', () => {
   assert.equal(statusClass(undefined), 'idle');
   assert.equal(statusClass('healthy'), 'ok');
 });
+
+import { mergeSystems } from '../js/usage.js';
+
+test('serverseitige Prüfungen erscheinen auch ohne lokale Definition', () => {
+  const local = [{ id: 'kc_core', name: 'KC Core', kind: 'database', enabled: true }];
+  const results = [
+    { id: 'kc_core', name: 'KC Core', status: 'healthy' },
+    { id: 'db_security', name: 'Datenbank-Sicherheitslage', kind: 'security', status: 'critical' }
+  ];
+  const merged = mergeSystems(local, results);
+  assert.equal(merged.length, 2);
+  assert.equal(merged[1].id, 'db_security');
+  assert.equal(merged[1].serverOnly, true);
+  assert.equal(merged[1].kind, 'security');
+});
+
+test('mergeSystems dupliziert nichts und überlebt kaputte Einträge', () => {
+  const merged = mergeSystems([{ id: 'a', name: 'A' }], [{ id: 'a' }, null, {}, { id: 'b' }, { id: 'b' }]);
+  assert.deepEqual(merged.map(x => x.id), ['a', 'b']);
+});

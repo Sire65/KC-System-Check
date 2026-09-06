@@ -1,5 +1,5 @@
 {
-  "version": "0.7.0",
-  "note": "LIVE-Leitstand nur noch fuer freigeschaltete Konten; Kassenereignisse nur fuer die Rolle superadmin",
+  "version": "0.7.1",
+  "note": "Neue Pruefungen: RLS- und Rechtelage, Verbindungs- und Sequenzkapazitaet, Endpunkt-Absicherung, Schluessel-Restlaufzeit",
   "channel": "stable"
 }
