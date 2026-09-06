@@ -101,6 +101,31 @@ Auf Neon gibt es weder `anon` noch `authenticated` noch `service_role`. Die
 Datei erkennt das und ueberspringt die entsprechenden Rechte. Genau dieser Fall
 war der Grund fuer den Umbau: dieselbe Datei muss auf beiden Seiten laufen.
 
+## Die Fruehwarnung: die richtige Zahl, und kein Trend aus einer Messumstellung
+
+Direkt nach der Umstellung des Verbrauchs meldete die Fruehwarnung
+"Edge-Function-Aufrufe - steigend +1662 % in 4 Messungen". Es gab keinen
+Anstieg. Zwei Fehler auf einmal:
+
+**Der Sammler las die falsche Zahl.** Er nahm `#usage .card` und
+`#capacity .card` - das sind die umschliessenden Tafeln, nicht die einzelnen
+Kacheln. Gelesen wurde damit die erste Zahl mit Einheit *irgendwo* in der Tafel,
+beschriftet mit der Ueberschrift der *ersten* Kachel. Zahl und Bezeichnung
+gehoerten schlicht nicht zusammen: der Wert stammte aus "Antwortdaten", der Name
+von "Edge-Function-Aufrufe". Jetzt werden `.usage-card` und `.capacity-card`
+gelesen, also die Kacheln selbst.
+
+**Und eine Messumstellung ist kein Trend.** Wechselt die Einheit oder springt
+der Wert um mehr als das Fuenffache, wird nicht anders gemessen als vorher -
+dann beginnt die Reihe neu, statt eine Entwicklung zu behaupten. Der
+Speichername traegt eine neue Fassung, damit die gemischte alte Reihe verworfen
+und nicht weitergerechnet wird.
+
+**Kumulative Zaehler werden gar nicht erst beobachtet.** Laeufe, Requests und
+Antwortdaten der letzten 31 Tage steigen von Natur aus; Steigen ist dort keine
+Auffaelligkeit. Sie tragen `data-kc-trend="off"`. Der Free-Tier-Anteil bleibt
+beobachtet - er ist ein Verhaeltnis, und wenn der steigt, ist das eine Aussage.
+
 ## Was die Oberflaeche nicht beschoenigen darf
 
 Drei Stellen, an denen die App die Lage besser darstellte, als sie war. Alle

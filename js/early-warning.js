@@ -1,11 +1,34 @@
-const STORE='kc-early-warning-v1',MAX=12;
+// Die Frühwarnung liest Zahlen aus der Oberfläche. Das ging zweimal schief:
+//
+// 1. Der Sammler nahm '#usage .card' und '#capacity .card' - das sind die
+//    UMSCHLIESSENDEN Tafeln, nicht die einzelnen Kacheln. Gelesen wurde damit
+//    die erste Zahl mit Einheit irgendwo in der Tafel, beschriftet mit der
+//    Überschrift der ersten Kachel. Zahl und Bezeichnung gehörten nicht
+//    zusammen. Jetzt werden die Kacheln selbst gelesen.
+//
+// 2. Ändert sich, WIE eine Zahl gemessen wird, ist der Sprung kein Trend. Am
+//    2026-09-06 wurde der Verbrauch von der gedeckelten Verlaufsliste auf eine
+//    Zählung in der Datenbank umgestellt; die Frühwarnung meldete daraufhin
+//    "steigend +1662 %". Ein Sprung um mehr als das Fünffache gilt jetzt als
+//    Messumstellung: die Reihe beginnt neu, statt eine Entwicklung zu behaupten.
+//
+// Der Speichername trägt deshalb eine neue Fassung - die alte, gemischte Reihe
+// wird verworfen statt weitergerechnet.
+const STORE='kc-early-warning-v2',MAX=12,SPRUNG=5;
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 function load(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')||{}}catch{return{}}}
 function save(v){try{localStorage.setItem(STORE,JSON.stringify(v))}catch{}}
 function key(el,i){return(el.dataset.system||el.dataset.id||el.querySelector('strong')?.textContent||`metric-${i}`).trim().toLowerCase().slice(0,80)}
 function metric(el){const t=(el.textContent||'').replace(/,/g,'.'),m=t.match(/(\d+(?:\.\d+)?)\s*(ms|%|mb|gb)\b/i);return m?{value:Number(m[1]),unit:m[2].toLowerCase()}:null}
-function collect(){return $$('#live .live-kpi,#live .live-device,#capacity .card,#usage .card,.gauge-card').map((el,i)=>({el,k:key(el,i),m:metric(el)})).filter(x=>x.m&&Number.isFinite(x.m.value))}
-function sample(){const db=load(),now=Date.now();for(const x of collect()){const a=db[x.k]||[];const last=a[a.length-1];if(!last||now-last.t>45000||last.v!==x.m.value)a.push({t:now,v:x.m.value,u:x.m.unit});db[x.k]=a.slice(-MAX)}save(db);return db}
+function collect(){return $$('#live .live-kpi,#live .live-device,#capacity .capacity-card,#usage .usage-card,.gauge-card').filter(el=>el.dataset.kcTrend!=='off').map((el,i)=>({el,k:key(el,i),m:metric(el)})).filter(x=>x.m&&Number.isFinite(x.m.value))}
+function sample(){const db=load(),now=Date.now();for(const x of collect()){let a=db[x.k]||[];const last=a[a.length-1];
+  // Eine andere Einheit oder ein Sprung um mehr als das Fuenffache heisst:
+  // hier wird etwas anderes gemessen als vorher. Dann ist die alte Reihe
+  // wertlos - sie faengt neu an, statt eine Entwicklung zu erfinden.
+  if(last&&(last.u!==x.m.unit||(last.v>0&&(x.m.value/last.v>=SPRUNG||last.v/Math.max(x.m.value,1e-9)>=SPRUNG))))a=[];
+  const neu=a[a.length-1];
+  if(!neu||now-neu.t>45000||neu.v!==x.m.value)a.push({t:now,v:x.m.value,u:x.m.unit});
+  db[x.k]=a.slice(-MAX)}save(db);return db}
 function trend(a){if(!a||a.length<4)return null;const recent=a.slice(-4),first=recent[0].v,last=recent.at(-1).v;if(first===0)return null;const pct=(last-first)/Math.abs(first)*100;const rising=recent.every((x,i)=>i===0||x.v>=recent[i-1].v);if(rising&&pct>=20)return{level:'warn',text:`steigend +${Math.round(pct)} % in ${recent.length} Messungen`};if(pct>=10)return{level:'watch',text:`Tendenz +${Math.round(pct)} %`};return null}
 function warnings(db){return collect().map(x=>({x,t:trend(db[x.k])})).filter(v=>v.t).sort((a,b)=>(a.t.level==='warn'?0:1)-(b.t.level==='warn'?0:1))}
 function styles(){if($('#kcEarlyStyles'))return;const s=document.createElement('style');s.id='kcEarlyStyles';s.textContent='.kc-early{margin:8px 0;padding:8px 10px;border:1px solid #a77a25;border-radius:10px;background:#19170f}.kc-early-row{padding:4px 0}.kc-early-warn{color:#ffd166;font-weight:800}';document.head.appendChild(s)}

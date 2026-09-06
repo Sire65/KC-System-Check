@@ -1,6 +1,6 @@
 {
-  "version": "0.7.25",
-  "note": "Abdeckung, Verlauf und Verbrauch sagen die Wahrheit; Bericht als Datei ladbar",
+  "version": "0.7.26",
+  "note": "Die Fruehwarnung liest die richtige Zahl und haelt eine Messumstellung nicht fuer einen Trend",
   "channel": "stable",
   "installSekunden": 5
 }
