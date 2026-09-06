@@ -1,5 +1,6 @@
 {
   "version": "0.7.6",
   "note": "Fernschutz und Alarmierung verlangen Anmeldung oder Automatik-Kennung; Alarme werden auch serverseitig entprellt",
-  "channel": "stable"
+  "channel": "stable",
+  "installSekunden": 5
 }
