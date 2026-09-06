@@ -132,3 +132,57 @@ Hostnamen, mit und ohne Pooler.
 Was bleibt, ist die Trennung der Kennungen: `kc_monitor` ist nicht die Kennung
 der Spiegelung. Faellt sie auf, laesst sie sich einzeln loeschen, ohne dass die
 Spiegelung stehenbleibt.
+
+## Die GitHub-Kachel: Eigenschaft oder Mangel
+
+Bis v0.7.14 meldete die Kachel "Repository ist oeffentlich" als Dauerwarnung.
+Damit stand sie gelb, seit es sie gibt, und der Gesamtzustand ebenfalls. Das
+ist dieselbe Sorte Fehlalarm wie die 244 vermeintlich ungedeckten Rechte und
+der vermeintliche Vacuum-Rueckstand: gemeldet wurde eine **Eigenschaft**, kein
+Mangel.
+
+Oeffentlich zu sein schadet nicht. Was schadet, ist ein Geheimnis in einer
+weltweit lesbaren Datei. Genau das wird ab v0.7.15 geprueft, an der Datei, die
+die App tatsaechlich mitliefert - `config/runtime.public.json` im Hauptzweig,
+abgeleitet aus der API-Antwort und nicht fest eingetragen.
+
+Gesucht wird nach Form, nicht nach Inhalt:
+
+| Muster | warum |
+| --- | --- |
+| `sb_secret_...` | Supabase-Geheimschluessel im neuen Format |
+| `service_role` im Klartext | der Dienstschluessel umgeht jede RLS |
+| JWT, dessen Rumpf eine andere Rolle als `anon` traegt | im JWT steht die Rolle base64-kodiert und damit nicht im Klartext - der Rumpf wird entschluesselt |
+| `schema://nutzer:passwort@host` | Verbindungszeichenkette mit Passwort |
+| `-----BEGIN ... PRIVATE KEY-----` | privater Schluessel |
+
+Ein Fund nennt nur seine Art. Der gefundene Wert taucht in keiner Antwort auf -
+sonst stuende das Geheimnis anschliessend im Pruefverlauf, in der Push-Nachricht
+und in der E-Mail. Ein eigener Test wacht darueber.
+
+Die Zustaende:
+
+- **rot** - ein Fund. Unabhaengig davon, ob das Repository oeffentlich ist: wer
+  ein Geheimnis eincheckt, checkt es auch in ein privates Repository ein.
+- **gelb** - Repository archiviert. Das ist ein echtes Betriebssignal.
+- **grau (unknown)** - oeffentlich, aber die Datei war nicht abrufbar. Ungeprueft
+  ist nicht gruen (Regel 11).
+- **gruen** - nicht oeffentlich, oder oeffentlich und nichts gefunden. Im Text
+  steht dann, dass das eine bewusste Entscheidung ist.
+
+### Was das nicht leistet
+
+Geprueft wird die Datei, die die App ausliefert - nicht jede Datei im
+Repository und nicht der Verlauf. Vollstaendiges Durchsuchen nach Geheimnissen
+ist GitHubs Aufgabe: Secret Scanning ist fuer oeffentliche Repositories
+kostenlos und gehoert in den Repository-Einstellungen eingeschaltet. Diese
+Pruefung ersetzt es nicht, sie deckt den Weg ab, auf dem ein Geheimnis hier
+tatsaechlich nach draussen gelangen wuerde.
+
+### Warum nicht privat schalten
+
+Die App wird ueber GitHub Pages ausgeliefert. Pages aus einem privaten
+Repository setzt einen bezahlten GitHub-Plan voraus - auf dem freien Plan
+verschwindet damit die App. Das verstiesse gegen die Nulltarif-Regel und
+beseitigt nichts: die Laufzeitkonfiguration wird von der veroeffentlichten App
+ohnehin ausgeliefert, ob das Repository nun privat ist oder nicht.

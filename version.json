@@ -1,6 +1,6 @@
 {
-  "version": "0.7.14",
-  "note": "Die Alarmierung benutzt endlich das Alarmregelwerk: entprellt, abhaengigkeitsbewusst, keine stuendlichen Warnungen",
+  "version": "0.7.15",
+  "note": "Oeffentliches Repository ist keine Dauerwarnung mehr - geprueft wird, ob etwas Geheimes darin steht",
   "channel": "stable",
   "installSekunden": 5
 }
