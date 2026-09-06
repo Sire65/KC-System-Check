@@ -28,7 +28,11 @@ export function normalizeStatus(status){
   return"unknown";
 }
 
-function emptyEntry(now){return{confirmed:null,candidate:null,streak:0,since:now,lastNotifiedAt:0}}
+// confirmedSeen ist bewusst getrennt von streak: streak zaehlt im
+// Wechselfall die Messungen des Kandidaten, confirmedSeen die des
+// bestaetigten Zustands. Beides in einem Zaehler zu fuehren meldet auf dem
+// Weg zur Erholung noch einmal die alte Warnung nach.
+function emptyEntry(now){return{confirmed:null,candidate:null,streak:0,confirmedSeen:0,since:now,lastNotifiedAt:0}}
 
 // Schritt 1: Entprellung. Ein neuer Zustand gilt erst nach mehreren Messungen.
 function debounce(signals,memory,policy,now){
@@ -36,16 +40,22 @@ function debounce(signals,memory,policy,now){
   for(const signal of signals){
     const status=normalizeStatus(signal.status);
     const previous={...emptyEntry(now),...(memory[signal.id]||{})};
-    let{confirmed,candidate,streak,since,lastNotifiedAt}=previous;
-    if(confirmed===null){confirmed=status;since=now;candidate=null;streak=0;changed.add(signal.id)}
-    else if(status===confirmed){candidate=null;streak=0}
+    let{confirmed,candidate,streak,confirmedSeen,since,lastNotifiedAt}=previous;
+    // Beim ersten Sehen gibt es keine Vorgeschichte. Der Zustand wird
+    // uebernommen, aber NICHT gemeldet - eine einzelne Messung ist genau das,
+    // was confirmAfter ausschliessen soll. Gemeldet wird er, sobald er oft
+    // genug bestaetigt ist (siehe unten, faelligOhneMeldung).
+    if(confirmed===null){confirmed=status;since=now;candidate=null;streak=0;confirmedSeen=1}
+    // streak zaehlt hier, wie oft der bestaetigte Zustand in Folge gesehen
+    // wurde - das ist die Bestaetigung, die ein neues Signal noch braucht.
+    else if(status===confirmed){candidate=null;streak=0;confirmedSeen=confirmedSeen+1}
     else{
       streak=status===candidate?streak+1:1;
       candidate=status;
       const needed=Number(policy.confirmAfter?.[status]??2);
-      if(streak>=needed){confirmed=status;since=now;candidate=null;streak=0;changed.add(signal.id)}
+      if(streak>=needed){confirmed=status;since=now;candidate=null;streak=0;confirmedSeen=1;changed.add(signal.id)}
     }
-    next[signal.id]={confirmed,candidate,streak,since,lastNotifiedAt};
+    next[signal.id]={confirmed,candidate,streak,confirmedSeen,since,lastNotifiedAt};
   }
   return{next,changed};
 }
@@ -102,7 +112,12 @@ export function evaluateAlarms({signals=[],memory={},policy=DEFAULT_POLICY,maint
     const quietMinutes=minutesSince(entry.lastNotifiedAt,now);
     const renotifyFor=Array.isArray(merged.renotifyStatuses)?merged.renotifyStatuses:DEFAULT_POLICY.renotifyStatuses;
     const dueAgain=entry.lastNotifiedAt>0&&renotifyFor.includes(status)&&quietMinutes>=Number(merged.renotifyAfterMinutes);
-    if(alarm.isNew||dueAgain){notify.push(alarm);next[signal.id]={...entry,lastNotifiedAt:now}}
+    // Ein Zustand, der noch nie gemeldet wurde, wird faellig, sobald er so oft
+    // bestaetigt ist wie ein Wechsel es waere. Damit meldet auch ein Signal,
+    // das von Anfang an gestoert ist - nur eben nicht nach einer Messung.
+    const noetig=Number(merged.confirmAfter?.[status]??2);
+    const faelligOhneMeldung=!(entry.lastNotifiedAt>0)&&Number(entry.confirmedSeen||0)>=noetig;
+    if(alarm.isNew||faelligOhneMeldung||dueAgain){notify.push(alarm);next[signal.id]={...entry,lastNotifiedAt:now}}
   }
 
   alarms.sort((a,b)=>SEVERITY[b.status]-SEVERITY[a.status]||b.openMinutes-a.openMinutes);

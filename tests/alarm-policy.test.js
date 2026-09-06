@@ -15,11 +15,28 @@ function run(steps, { policy, maintenance, start = 1_000_000 } = {}) {
   return out;
 }
 
-test('der erste gemessene Zustand gilt sofort', () => {
+test('der erste gemessene Zustand gilt sofort, gemeldet wird er noch nicht', () => {
+  // Der Zustand gilt ab der ersten Messung - daran aendert sich nichts.
+  // Gemeldet wird er aber nicht: eine einzelne Messung ist genau das, was
+  // confirmAfter ausschliessen soll.
+  //
+  // Aus dem Betrieb gelernt am 2026-09-06: beim ersten scharfen Lauf war die
+  // Neon-Kachel brandneu und stand fuer genau eine Messung auf "1 Tabelle mit
+  // Vacuum-Rueckstand". Beim naechsten Lauf war sie wieder gruen - die Meldung
+  // war da schon raus, weil ein neues Signal die Entprellung uebersprang.
   const out = run(['critical']);
-  assert.equal(out.alarms.length, 1);
+  assert.equal(out.alarms.length, 1, 'der Zustand gilt');
   assert.equal(out.alarms[0].status, 'critical');
-  assert.equal(out.notify.length, 1, 'ein neuer Alarm wird gemeldet');
+  assert.equal(out.notify.length, 0, 'nach einer einzigen Messung wird nicht gemeldet');
+});
+
+test('ein von Anfang an gestoertes System meldet - nur eine Messung spaeter', () => {
+  // Die Gegenprobe zum Test darueber: wer beim Start schon kaputt ist, darf
+  // nicht dauerhaft stumm bleiben.
+  const out = run(['critical', 'critical']);
+  assert.equal(out.notify.length, 1, 'zweimal bestaetigt wird gemeldet');
+  const drei = run(['critical', 'critical', 'critical']);
+  assert.equal(drei.notify.length, 0, 'danach nicht bei jeder weiteren Messung');
 });
 
 test('ein einzelner Ausreißer löst keinen Alarm aus', () => {
@@ -55,8 +72,12 @@ test('Entwarnung braucht mehr Bestätigung als Alarm', () => {
 
 test('ein bestehender Alarm wird nicht bei jeder Messung erneut gemeldet', () => {
   let memory = {}, now = 1_000_000;
+  // Zwei Messungen, damit der Alarm bestaetigt und einmal gemeldet ist.
   let out = evaluateAlarms({ signals: sig('critical'), memory, now }); memory = out.memory;
-  assert.equal(out.notify.length, 1);
+  assert.equal(out.notify.length, 0, 'die erste Messung meldet noch nicht');
+  now += MIN;
+  out = evaluateAlarms({ signals: sig('critical'), memory, now }); memory = out.memory;
+  assert.equal(out.notify.length, 1, 'die zweite meldet');
   for (let i = 0; i < 10; i++) {
     now += MIN;
     out = evaluateAlarms({ signals: sig('critical'), memory, now });
@@ -159,4 +180,24 @@ test("renotifyStatuses ist Konfiguration, nicht fest verdrahtet",()=>{
     memory:{gelb:{confirmed:"warning",candidate:null,streak:0,since:alt,lastNotifiedAt:alt}},
     policy:{...DEFAULT_POLICY,renotifyStatuses:["critical","warning"]},now:jetzt});
   assert.deepEqual(ergebnis.notify.map(x=>x.id),["gelb"],"wer Warnungen wiedervorlegen will, kann das einstellen");
+});
+
+test('auf dem Weg zur Erholung wird die alte Warnung nicht nachgemeldet', () => {
+  // Der erste Versuch des Erstmess-Fixes benutzte streak als Zaehler fuer den
+  // bestaetigten Zustand. streak zaehlt im Wechselfall aber die Messungen des
+  // Kandidaten - ein Signal, das gerade von warning nach healthy wechselte,
+  // meldete dadurch unterwegs seine alte Warnung nach. Gefunden vom SQL-Test.
+  let memory = {}, now = 1_000_000;
+  const messe = status => {
+    const out = evaluateAlarms({ signals: [{ id: 's', name: 'S', status }], memory, now });
+    memory = out.memory; now += MIN; return out;
+  };
+  messe('warning');                       // angelegt, nicht gemeldet
+  const a = messe('healthy');             // Kandidat healthy, streak 1
+  const b = messe('healthy');             // streak 2 - hier meldete es faelschlich
+  assert.deepEqual(a.notify, [], 'unterwegs wird nichts gemeldet');
+  assert.deepEqual(b.notify, [], 'auch nicht, wenn der Kandidat zweimal gemessen wurde');
+  const c = messe('healthy');             // bestaetigt healthy
+  assert.deepEqual(c.alarms, [], 'am Ende ist nichts mehr offen');
+  assert.deepEqual(c.notify, []);
 });

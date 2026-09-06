@@ -1,6 +1,6 @@
 {
-  "version": "0.7.15",
-  "note": "Oeffentliches Repository ist keine Dauerwarnung mehr - geprueft wird, ob etwas Geheimes darin steht",
+  "version": "0.7.16",
+  "note": "Ein neues Signal meldet nicht mehr nach einer einzigen Messung - die Entprellung gilt jetzt auch beim ersten Mal",
   "channel": "stable",
   "installSekunden": 5
 }

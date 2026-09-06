@@ -108,3 +108,29 @@ Signal, die bewusste GitHub-Warnung. Danach ist Ruhe, weil Warnungen nicht
 wiedervorgelegt werden. Der Alternativweg waere gewesen, den Zustand still
 vorzubelegen; dann haette das System beim Start alles Kaputte als bekannt
 abgehakt. Eine ehrliche Meldung ist besser.
+
+## 7. Der erste Blick zaehlt noch nicht
+
+Am 2026-09-06 um 10:00 lief die neue Alarmierung zum ersten Mal scharf. Sie
+meldete zwei Signale: die bewusst offene GitHub-Warnung - vorhergesagt - und
+die Neon-Kachel mit "1 Tabelle mit echtem Vacuum-Rueckstand". Beim naechsten
+Lauf fuenfzehn Minuten spaeter war Neon wieder gruen. Die Spiegeldatenbank wird
+staendig beschrieben; dass eine Tabelle fuer einen Moment ueber die
+Ausloeseschwelle rutscht, ist Normalbetrieb.
+
+Genau davor soll die Entprellung schuetzen - sie griff hier nicht. Grund: beim
+allerersten Sehen eines Signals gab es keine Vorgeschichte, der gemessene
+Zustand galt sofort als bestaetigt, und "bestaetigt" meldet. Fuer ein neues
+Signal genuegte damit **eine einzige Messung** - das Gegenteil dessen, was
+`confirmAfter` zusichert.
+
+Seit v0.7.16 gilt: der erste gemessene Zustand wird uebernommen, aber nicht
+gemeldet. Gemeldet wird er, sobald er so oft bestaetigt ist, wie ein Wechsel es
+brauchen wuerde. Ein System, das von Anfang an gestoert ist, meldet damit
+weiterhin - nur eine Messung spaeter. Dauerhaft stumm bleibt nichts.
+
+Gezaehlt wird das in einer eigenen Spalte `confirmed_seen`. Der erste Versuch
+benutzte dafuer `streak`, das im Wechselfall aber die Messungen des
+**Kandidaten** zaehlt: ein Signal auf dem Weg von gelb nach gruen meldete
+dadurch unterwegs noch einmal seine alte Warnung nach. Aufgefallen ist das dem
+SQL-Test, nicht dem Betrieb - beide Seiten haben jetzt einen Test dafuer.

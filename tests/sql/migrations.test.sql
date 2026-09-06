@@ -26,6 +26,7 @@ revoke all on table public.kc_core_user_links from anon, authenticated;
 \i supabase/migrations/202609060012_kc_externe_zugaenge.sql
 \i supabase/migrations/202609060013_db_monitor_paket_v2.sql
 \i supabase/migrations/202609060014_kc_alarmregelwerk_gemeinsam.sql
+\i supabase/migrations/202609060015_kc_erste_messung_meldet_nicht.sql
 
 -- 1. Sauberer Zustand: keine Sicherheitsbefunde
 do $$
@@ -184,9 +185,14 @@ begin
   assert jsonb_array_length(v -> 'recovered') = 0, 'Ohne vorherige Meldung gibt es keine Entwarnung';
 
   -- Ein bestaetigter und gemeldeter Alarm muss entwarnt werden.
-  -- Die erste Messung eines noch unbekannten Signals gilt sofort.
+  -- Der erste Zustand eines unbekannten Signals gilt sofort, gemeldet wird er
+  -- aber erst, wenn er bestaetigt ist. Bis 0.7.15 stand hier "muss gemeldet
+  -- werden" - das hat am 2026-09-06 eine einzelne Messung der brandneuen
+  -- Neon-Kachel als Alarm verschickt.
   v := public.kc_system_check_alarm_apply('[{"id":"kc_core","name":"KC Core","status":"critical"}]'::jsonb);
-  assert jsonb_array_length(v -> 'notify') = 1, 'Der erste bekannte Zustand muss gemeldet werden';
+  assert jsonb_array_length(v -> 'notify') = 0, 'Die erste Messung meldet noch nicht';
+  v := public.kc_system_check_alarm_apply('[{"id":"kc_core","name":"KC Core","status":"critical"}]'::jsonb);
+  assert jsonb_array_length(v -> 'notify') = 1, 'Die zweite Messung bestaetigt und meldet';
   v := public.kc_system_check_alarm_apply('[{"id":"kc_core","name":"KC Core","status":"critical"}]'::jsonb);
   assert jsonb_array_length(v -> 'notify') = 0, 'Derselbe Alarm darf nicht erneut gemeldet werden';
   v := public.kc_system_check_alarm_apply('[{"id":"kc_core","status":"healthy"}]'::jsonb);
@@ -448,8 +454,7 @@ do $$
 declare v jsonb := public.kc_system_check_alarm_apply(
   '[{"id":"kc_core","name":"KC Core","status":"critical"},{"id":"mirror","name":"Spiegelung","status":"critical"}]'::jsonb);
 begin
-  assert jsonb_array_length(v -> 'notify') = 1, 'Es darf nur die Ursache melden: ' || (v ->> 'notify');
-  assert v -> 'notify' @> '[{"id":"kc_core"}]'::jsonb, 'Gemeldet werden muss die Ursache: ' || (v ->> 'notify');
+  assert v -> 'notify' = '[]'::jsonb, 'Die erste Messung meldet nichts: ' || (v ->> 'notify');
   assert v -> 'suppressed' @> '[{"id":"mirror","reason":"abhaengigkeit","causedBy":"kc_core"}]'::jsonb,
     'Die Abhaengigkeit aus dem hinterlegten Regelwerk greift nicht: ' || (v ->> 'suppressed');
 end $$;
@@ -459,6 +464,9 @@ do $$
 declare v jsonb;
 begin
   delete from public.kc_system_check_alarm_state;
+  v := public.kc_system_check_alarm_apply(
+    '[{"id":"kc_core","name":"KC Core","status":"critical"},{"id":"mirror","name":"Spiegelung","status":"critical"}]'::jsonb,
+    '{"dependencies":{}}'::jsonb);
   v := public.kc_system_check_alarm_apply(
     '[{"id":"kc_core","name":"KC Core","status":"critical"},{"id":"mirror","name":"Spiegelung","status":"critical"}]'::jsonb,
     '{"dependencies":{}}'::jsonb);
@@ -476,6 +484,38 @@ begin
   assert v -> 'notify' = '[]'::jsonb, 'Ein einzelner Ausschlag darf nicht melden: ' || (v ->> 'notify');
   v := public.kc_system_check_alarm_apply('[{"id":"probe","name":"Probe","status":"critical"}]'::jsonb);
   assert jsonb_array_length(v -> 'notify') = 1, 'Zweimal kritisch muss melden: ' || (v ->> 'notify');
+end $$;
+
+-- Ein brandneues Signal meldet nicht nach einer einzigen Messung.
+-- Genau daran ist der erste scharfe Lauf am 2026-09-06 gescheitert: die neue
+-- Neon-Kachel stand fuer eine Messung auf Vacuum-Rueckstand und meldete.
+do $$
+declare v jsonb;
+begin
+  delete from public.kc_system_check_alarm_state;
+  v := public.kc_system_check_alarm_apply('[{"id":"neuprobe","name":"Neuprobe","status":"warning"}]'::jsonb);
+  assert v -> 'notify' = '[]'::jsonb,
+    'Ein neues Signal darf nach einer Messung nicht melden: ' || (v ->> 'notify');
+  assert jsonb_array_length(v -> 'alarms') = 1, 'Der Zustand gilt trotzdem';
+  -- Und wieder gruen, ohne dass je gemeldet wurde: keine Entwarnung
+  v := public.kc_system_check_alarm_apply('[{"id":"neuprobe","name":"Neuprobe","status":"healthy"}]'::jsonb);
+  v := public.kc_system_check_alarm_apply('[{"id":"neuprobe","name":"Neuprobe","status":"healthy"}]'::jsonb);
+  v := public.kc_system_check_alarm_apply('[{"id":"neuprobe","name":"Neuprobe","status":"healthy"}]'::jsonb);
+  assert v -> 'recovered' = '[]'::jsonb,
+    'Ohne Meldung gibt es auch keine Entwarnung: ' || (v ->> 'recovered');
+end $$;
+
+-- Ein von Anfang an gestoertes System meldet - nur eine Messung spaeter
+do $$
+declare v jsonb;
+begin
+  delete from public.kc_system_check_alarm_state;
+  v := public.kc_system_check_alarm_apply('[{"id":"kaputtprobe","name":"Kaputtprobe","status":"critical"}]'::jsonb);
+  assert v -> 'notify' = '[]'::jsonb, 'erste Messung meldet nicht';
+  v := public.kc_system_check_alarm_apply('[{"id":"kaputtprobe","name":"Kaputtprobe","status":"critical"}]'::jsonb);
+  assert jsonb_array_length(v -> 'notify') = 1, 'zweite Messung meldet: ' || (v ->> 'notify');
+  v := public.kc_system_check_alarm_apply('[{"id":"kaputtprobe","name":"Kaputtprobe","status":"critical"}]'::jsonb);
+  assert v -> 'notify' = '[]'::jsonb, 'danach nicht bei jeder weiteren Messung';
 end $$;
 
 -- Wiedervorlage nur fuer die Zustaende aus renotifyStatuses
