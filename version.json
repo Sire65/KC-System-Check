@@ -1,5 +1,5 @@
 {
-  "version": "0.7.3",
-  "note": "Sicherheitspruefung kalibriert: nur ungedeckter Zugriff ist ein Befund, Views die RLS umgehen werden erkannt",
+  "version": "0.7.4",
+  "note": "Oeffentlicher Schluessel wird in jeder Form abgewiesen; Schluessel ohne Ablaufdatum wird als solcher erkannt",
   "channel": "stable"
 }

@@ -61,7 +61,11 @@ async function exposureResult(own:string){
 function keyLifetimeResult(){
   const token=Deno.env.get("SUPABASE_ANON_KEY")||"";
   const parts=token.split(".");
-  if(parts.length!==3)return{id:"key_lifetime",name:"Schluessel-Restlaufzeit",kind:"security",status:"unknown",health:null,latency:null,usage:null,capacityLabel:"Nicht auswertbar",detail:"Der oeffentliche Schluessel liegt nicht als JWT vor",metrics:{}};
+  // Neues Supabase-Format: Schluessel ohne Ablaufdatum. Das ist kein
+  // unbekannter Zustand, sondern ein bekannter - Rotation ist Handarbeit.
+  if(token.startsWith("sb_publishable_")||token.startsWith("sb_secret_"))
+    return{id:"key_lifetime",name:"Schluessel-Restlaufzeit",kind:"security",status:"healthy",health:100,latency:null,usage:null,capacityLabel:"Kein Ablaufdatum",detail:"Neues Schluesselformat ohne Ablauf - kein automatisches Auslaufen, Rotation bleibt Handarbeit",metrics:{format:"publishable",days_left:null,expires_at:null}};
+  if(parts.length!==3)return{id:"key_lifetime",name:"Schluessel-Restlaufzeit",kind:"security",status:"unknown",health:null,latency:null,usage:null,capacityLabel:"Nicht auswertbar",detail:"Der oeffentliche Schluessel liegt weder als JWT noch im neuen Format vor",metrics:{}};
   let exp=0,iat=0;
   try{const body=JSON.parse(atob(parts[1].replace(/-/g,"+").replace(/_/g,"/")));exp=Number(body.exp||0);iat=Number(body.iat||0)}catch{}
   if(!exp)return{id:"key_lifetime",name:"Schluessel-Restlaufzeit",kind:"security",status:"unknown",health:null,latency:null,usage:null,capacityLabel:"Nicht auswertbar",detail:"Kein Ablaufdatum im Schluessel gefunden",metrics:{}};
@@ -78,7 +82,12 @@ async function callerRole(req:Request,own:string,service:string){
   const token=(req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"").trim();
   const anon=Deno.env.get("SUPABASE_ANON_KEY")||"";
   if(!token)return{role:null,reason:"kein_zugangstoken"};
+  // Der oeffentliche Schluessel wird direkt abgewiesen - egal ob als neues
+  // Format konfiguriert oder als aelterer anon-JWT mitgeschickt. Das spart
+  // zugleich die Rueckfrage bei /auth/v1/user.
   if(anon&&token===anon)return{role:null,reason:"nur_oeffentlicher_schluessel"};
+  if(token.startsWith("sb_publishable_"))return{role:null,reason:"nur_oeffentlicher_schluessel"};
+  try{const b=JSON.parse(atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));if(b?.role==="anon")return{role:null,reason:"nur_oeffentlicher_schluessel"}}catch{}
   let user:any=null;
   try{const r=await fetch(`${own}/auth/v1/user`,{headers:{apikey:anon||service,Authorization:`Bearer ${token}`}});if(r.ok)user=await r.json()}catch{}
   if(!user?.id)return{role:null,reason:"anmeldung_ungueltig"};
