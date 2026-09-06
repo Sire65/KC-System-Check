@@ -5,6 +5,16 @@ Mobiler, modularer System-Leitstand als installierbare PWA.
 Der aktuelle Stand steht in `version.json`. Was geprüft wird, steht in
 [`docs/PRUEFKATALOG.md`](docs/PRUEFKATALOG.md).
 
+## In einer eigenen Umgebung einsetzen
+
+Das Programm ist nicht mehr an diese eine Umgebung geschraubt: Repository und
+zweites Projekt stehen in `kc_external_credentials`, nicht im Quelltext, und
+was fehlt, meldet sich als „nicht eingerichtet" statt rot zu werden. Ein
+Testlauf spielt die Migrationen bei jedem Commit in eine **leere** Datenbank
+ein und prüft, dass nichts abbricht.
+
+Anleitung: [`docs/EINRICHTUNG.md`](docs/EINRICHTUNG.md).
+
 ## Die SQL-Überwachung weitergeben
 
 Die Sicherheits- und Kapazitätsprüfung steckt nicht im Programm fest, sondern in

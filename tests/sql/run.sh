@@ -14,3 +14,10 @@ PAKET="${DB}_db_monitor"
 psql -v ON_ERROR_STOP=1 -q -c "drop database if exists ${PAKET};" -d postgres
 psql -v ON_ERROR_STOP=1 -q -c "create database ${PAKET};" -d postgres
 psql -v ON_ERROR_STOP=1 -q -d "${PAKET}" -f tests/sql/db-monitor.test.sql
+
+# Der Portabilitaetsbeweis: eine leere Datenbank, in der NUR die Migrationen
+# dieses Programms liegen - so wie bei jemandem, der es uebernimmt.
+FREMD="${DB}_fremd"
+psql -v ON_ERROR_STOP=1 -q -c "drop database if exists ${FREMD};" -d postgres
+psql -v ON_ERROR_STOP=1 -q -c "create database ${FREMD};" -d postgres
+psql -v ON_ERROR_STOP=1 -q -d "${FREMD}" -f tests/sql/fremde-umgebung.test.sql

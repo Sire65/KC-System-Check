@@ -41,6 +41,8 @@ create table if not exists public.kicc_program_heartbeats(
 alter table public.kicc_program_heartbeats enable row level security;
 revoke all on table public.kicc_program_heartbeats from anon, authenticated;
 \i supabase/migrations/202609060017_kc_lebenszeichen_anbindung.sql
+\i supabase/migrations/202609060018_kc_alarmregelwerk_programme.sql
+\i supabase/migrations/202609060019_kc_portabilitaet_zugaenge.sql
 
 -- 1. Sauberer Zustand: keine Sicherheitsbefunde
 do $$
@@ -417,20 +419,19 @@ drop table public.kc_kapazitaet_probe;
 insert into public.kc_external_credentials (name, kind, endpoint, secret)
 values ('probe_zugang', 'postgres_http', 'beispiel.example', 'geheim-123');
 do $$
-declare v jsonb := public.kc_external_credential('probe_zugang');
+declare v jsonb := public.kc_external_credentials();
 begin
-  assert v ->> 'secret' = 'geheim-123', 'Der Zugang wird nicht zurueckgegeben';
-  assert v ->> 'endpoint' = 'beispiel.example', 'Die Adresse fehlt';
+  assert v -> 'probe_zugang' ->> 'secret' = 'geheim-123', 'Der Zugang wird nicht zurueckgegeben';
+  assert v -> 'probe_zugang' ->> 'endpoint' = 'beispiel.example', 'Die Adresse fehlt';
   assert (select last_used_at is not null from public.kc_external_credentials where name='probe_zugang'),
     'Die Nutzung wird nicht vermerkt';
-  assert public.kc_external_credential('gibt_es_nicht') is null,
-    'Ein unbekannter Name muss leer bleiben, nicht raten';
+  assert v -> 'gibt_es_nicht' is null, 'Ein unbekannter Name darf nicht erfunden werden';
 end $$;
 
 -- Abgeschaltet heisst abgeschaltet
 update public.kc_external_credentials set active = false where name = 'probe_zugang';
 do $$ begin
-  assert public.kc_external_credential('probe_zugang') is null,
+  assert public.kc_external_credentials() -> 'probe_zugang' is null,
     'Ein abgeschalteter Zugang wird weiter herausgegeben';
 end $$;
 
@@ -442,9 +443,9 @@ begin
   from information_schema.role_table_grants g
   where g.table_name = 'kc_external_credentials' and g.grantee in ('anon','authenticated');
   assert offen = '{}', 'Rechte fuer Clientrollen auf kc_external_credentials: ' || array_to_string(offen, ', ');
-  assert not has_function_privilege('anon', 'public.kc_external_credential(text)', 'execute'),
+  assert not has_function_privilege('anon', 'public.kc_external_credentials()', 'execute'),
     'anon darf den Zugang abrufen';
-  assert not has_function_privilege('authenticated', 'public.kc_external_credential(text)', 'execute'),
+  assert not has_function_privilege('authenticated', 'public.kc_external_credentials()', 'execute'),
     'authenticated darf den Zugang abrufen';
   assert (select relrowsecurity from pg_class where oid = 'public.kc_external_credentials'::regclass),
     'RLS ist auf kc_external_credentials nicht aktiv';

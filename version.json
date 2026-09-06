@@ -1,6 +1,6 @@
 {
-  "version": "0.7.18",
-  "note": "Lebenszeichen: Programmkachel und ein Anbindungspaket - Schweigen ist kein Ausfall, gemeldete Fehler zaehlen immer",
+  "version": "0.7.19",
+  "note": "Portabel: Repository und Zweitprojekt sind Konfiguration, eine fehlende KC-Funktion legt nicht mehr den ganzen Lauf lahm",
   "channel": "stable",
   "installSekunden": 5
 }
