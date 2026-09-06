@@ -1,6 +1,6 @@
 {
-  "version": "0.7.7",
-  "note": "Anwesenheitsdaten nur noch serverseitig lesbar; kein Client-Zugriff mehr auf personenbezogene Ereignisse",
+  "version": "0.7.8",
+  "note": "Automatischer Lauf prueft wieder alle Pruefungen; deutsche Texte mit richtigen Umlauten",
   "channel": "stable",
   "installSekunden": 5
 }
