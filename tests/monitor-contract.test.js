@@ -92,3 +92,10 @@ test('die Kachelliste hat keine Luecke',()=>{const e=fs.readFileSync('supabase/f
 test('die Auswahlangabe ueberlebt den Laufabschluss',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/selection:payload\.selection\|\|null/);assert.match(a,/function auswahlHinweis/)});
 
 test('der Bericht enthaelt die Messreihen der Fruehwarnung',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/fruehwarnung:\{zustand:/);assert.match(a,/kc-early-warning-v3/)});
+
+// Eine Aufraeumfunktion, die niemand aufruft, raeumt nichts auf.
+test('das Aufraeumen der Lebenszeichen ist eingeplant',()=>{const sql=fs.readFileSync('supabase/migrations/202609060024_kc_verbrauch_und_lebenszeichen_aufraeumen.sql','utf8');assert.match(sql,/cron\.schedule\('kc-lebenszeichen-aufraeumen-daily'/);assert.match(sql,/where extname = 'pg_cron'/,'ohne pg_cron muss die Migration trotzdem durchlaufen')});
+
+// Die Verbrauchszaehlung braucht nur kc_system_check_history - sie gehoert in
+// die Pflichtliste, sonst rechnet eine fremde Umgebung wieder aus 40 Zeilen.
+test('die Einrichtung nennt die Verbrauchsmigration als Pflicht',()=>{const d=fs.readFileSync('docs/EINRICHTUNG.md','utf8'),block=d.slice(d.indexOf('## 1. Migrationen einspielen'),d.indexOf('Genau diese Reihenfolge'));assert.match(block,/202609060024_kc_verbrauch_und_lebenszeichen_aufraeumen\.sql/)});

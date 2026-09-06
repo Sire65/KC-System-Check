@@ -35,15 +35,23 @@ Im SQL Editor deines Projekts, in dieser Reihenfolge:
 202609060015_kc_erste_messung_meldet_nicht.sql
 202609060016_kc_alarmregelwerk_sicherung.sql
 202609060019_kc_portabilitaet_zugaenge.sql
+202609060024_kc_verbrauch_und_lebenszeichen_aufraeumen.sql
 ```
 
 Genau diese Reihenfolge wird bei jedem Testlauf gegen eine **leere** Datenbank
 geprüft (`tests/sql/fremde-umgebung.test.sql`). Läuft sie dort durch, läuft sie
 auch bei dir.
 
-Die übrigen Migrationen (`…0004` bis `…0010`, `…0017`, `…0018`) setzen
-KC-eigene Tabellen voraus — Spiegelung, Sicherung, Anwendungsregistrierung.
-Spiel sie nur ein, wenn du diese Tabellen hast.
+Die übrigen Migrationen (`…0004` bis `…0010`, `…0017`, `…0018`, `…0020` bis
+`…0023`) setzen KC-eigene Tabellen voraus — Spiegelung, Sicherung,
+Anwendungsregistrierung. Spiel sie nur ein, wenn du diese Tabellen hast.
+
+`…0024` steht bewusst in der Pflichtliste: die Verbrauchszählung braucht nur
+`kc_system_check_history`, und ohne sie rechnet die Verbrauchsseite aus den
+letzten 40 Verlaufszeilen — das war bei uns um den Faktor elf zu niedrig. Die
+zweite Funktion darin räumt alte Lebenszeichen weg; sie schadet nicht, wenn du
+gar keine hast. Wo `pg_cron` vorhanden ist, plant die Migration sie täglich um
+03:40 ein.
 
 **Danach unbedingt:** die beiden Zugänge aus `…0019` gehören *dir*, nicht uns.
 Ändere sie:

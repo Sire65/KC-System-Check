@@ -72,3 +72,16 @@ $function$;
 
 revoke all on function public.kc_lebenszeichen_aufraeumen(int) from public, anon, authenticated;
 grant execute on function public.kc_lebenszeichen_aufraeumen(int) to service_role;
+
+-- Eine Aufraeumfunktion, die niemand aufruft, raeumt nichts auf. Wo pg_cron
+-- vorhanden ist, wird sie hier gleich eingeplant; wo nicht, schadet der Block
+-- nichts und die Funktion bleibt von Hand aufrufbar.
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule('kc-lebenszeichen-aufraeumen-daily')
+      where exists (select 1 from cron.job where jobname = 'kc-lebenszeichen-aufraeumen-daily');
+    perform cron.schedule('kc-lebenszeichen-aufraeumen-daily', '40 3 * * *',
+      'select public.kc_lebenszeichen_aufraeumen(30);');
+  end if;
+end $$;
