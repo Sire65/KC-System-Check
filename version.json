@@ -1,6 +1,6 @@
 {
-  "version": "0.7.24",
-  "note": "Ein blockierter Meldeweg nennt seinen Grund, statt wie Schweigen auszusehen",
+  "version": "0.7.25",
+  "note": "Abdeckung, Verlauf und Verbrauch sagen die Wahrheit; Bericht als Datei ladbar",
   "channel": "stable",
   "installSekunden": 5
 }

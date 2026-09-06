@@ -101,6 +101,38 @@ Auf Neon gibt es weder `anon` noch `authenticated` noch `service_role`. Die
 Datei erkennt das und ueberspringt die entsprechenden Rechte. Genau dieser Fall
 war der Grund fuer den Umbau: dieselbe Datei muss auf beiden Seiten laufen.
 
+## Was die Oberflaeche nicht beschoenigen darf
+
+Drei Stellen, an denen die App die Lage besser darstellte, als sie war. Alle
+drei am 2026-09-06 an Bildschirmfotos aus dem Betrieb gefunden, alle drei mit
+Zahlen aus der Datenbank belegt.
+
+**1. Prueffabdeckung 100 % bei einer Auswahlpruefung.** Der Nenner war die
+Auswahl, nicht die Zahl der bekannten Pruefungen. Zehn von zehn ausgewaehlten
+sind 100 % - auch wenn vier Kacheln nie gelaufen sind, darunter die einzige mit
+einem offenen Befund. Seit v0.7.25 ist der Nenner `all.length`, und die Antwort
+traegt `selection` mit `known`, `run` und `skipped`; die Kopfzeile schreibt
+"N von M Pruefungen nicht enthalten" dazu.
+
+**2. "Aktuell keine Fehler oder Warnungen" bei 46 auffaelligen Laeufen.** Die
+Befundliste zeigte nur den juengsten Lauf. War das eine Auswahlpruefung ohne die
+auffaellige Kachel, stand dort Ruhe. Jetzt wird, wenn der juengste Lauf ohne
+Befund bleibt, der juengste Lauf MIT Befund gezeigt - mit Uhrzeit - und darunter
+die Bilanz der letzten 31 Tage.
+
+**3. Der Verbrauch war bei 40 gedeckelt.** Er wurde im Browser aus der
+Verlaufsliste gerechnet, und die holt nur die letzten 40 Laeufe. Tatsaechlich:
+464 Laeufe, 1.08 MB Antwortdaten. Der Free-Tier-Anteil war um das Elffache zu
+niedrig - genau die Richtung, in die eine Verbrauchsanzeige nicht irren darf.
+Gezaehlt wird seit v0.7.25 in der Datenbank (`kc_system_check_usage()`).
+Faellt die Zaehlung aus, steht dort ein Strich und kein geschaetzter Wert.
+
+Dazu zwei Kleinigkeiten aus derselben Sitzung: die LIVE-Geraeteliste stellt
+Aktive voran und legt alles Historische hinter einen Aufklapper (sie war eine
+Halde aus 27 Sitzungen, davon zwei aktiv), und ein Knopf im Kopf laedt den
+gesamten Stand als JSON-Datei herunter - Kennzahlen und Befunde, keine
+Zugangsdaten.
+
 ## Die Programm-Kachel: wann gemeldet?
 
 `kicc_program_heartbeats` haelt **eine Zeile je Browser-Sitzung**

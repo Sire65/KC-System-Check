@@ -2,7 +2,23 @@ import test from'node:test';import assert from'node:assert/strict';import fs fro
 test('release exposes version in header',()=>{const h=fs.readFileSync('index.html','utf8');assert.match(h,/id="appVersion"/);assert.match(h,/id="runtimeMode"/)});
 test('mirror UI is mismatch based, not fake zero latency',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/mismatch_count/);assert.doesNotMatch(a,/gaugeMirror[^\n]+latency\|\|0/)});
 test('daily automation is at most daily and no storage write',()=>{const y=fs.readFileSync('.github/workflows/daily-check.yml','utf8');assert.match(y,/cron: '20 5 \* \* \*'/);assert.doesNotMatch(y,/upload/i)});
-test('free tier invocation estimate uses runs not provider requests',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/runs=Number\(u\.runs_31d/);assert.match(a,/providerRequests=Number\(u\.requests_31d/)});
+test('free tier invocation estimate uses runs not provider requests',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/runs=gezaehlt\?Number\(u\.runs_31d\)/);assert.match(a,/providerRequests=gezaehlt\?Number\(u\.requests_31d/);assert.match(a,/p=gezaehlt\?runs\/limit/,'die Free-Tier-Quote rechnet mit Laeufen, nicht mit Provider-Requests')});
+
+// Der Verbrauch war bei 40 gedeckelt: er wurde aus der Verlaufsliste abgeleitet,
+// und die holt nur die letzten 40 Laeufe. In 31 Tagen waren es 464.
+test('der Verbrauch wird in der Datenbank gezaehlt, nicht aus 40 Verlaufszeilen',()=>{const e=fs.readFileSync('supabase/functions/kc-system-check/index.ts','utf8');assert.match(e,/rpc\/kc_system_check_usage/);assert.doesNotMatch(e,/async function usage\(url:string\)\{const rows=await history/,'die Ableitung aus der gekappten Liste darf nicht zurueckkehren');const sql=fs.readFileSync('supabase/migrations/202609060024_kc_verbrauch_und_lebenszeichen_aufraeumen.sql','utf8');assert.match(sql,/'runs_31d'/);assert.match(sql,/'non_green_31d'/)});
+
+test('ohne Zaehlung wird keine Null erfunden',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/counted_in_database!==false/);assert.match(a,/Verbrauch nicht abrufbar/)});
+
+// 100 Prozent Abdeckung, obwohl vier Pruefungen nicht gelaufen sind - dieselbe
+// Beschoenigung wie ein Waechter mit zu kurzer Liste.
+test('eine Auswahlpruefung sagt, was sie ausgelassen hat',()=>{const e=fs.readFileSync('supabase/functions/kc-system-check/index.ts','utf8');assert.match(e,/coverage=Math\.round\(messbar\/Math\.max\(1,bekanntePruefungen\)/,'der Nenner sind alle bekannten Pruefungen, nicht die Auswahl');assert.match(e,/selection:\{selected:/);const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/Pr\u00fcfungen nicht enthalten/)});
+
+test('der Verlauf verschweigt gespeicherte Befunde nicht',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/letzterLaufMitBefund/);assert.match(a,/nicht gr\u00fcn/);const ohneKommentar=a.split('\n').filter(z=>!z.trimStart().startsWith('//')).join('\n');assert.doesNotMatch(ohneKommentar,/Aktuell keine Fehler oder Warnungen/,'der alte Satz behauptete Ruhe, die es nicht gab')});
+
+test('die Geraeteliste stellt Aktive voran',()=>{const l=fs.readFileSync('js/leitstand.js','utf8');assert.match(l,/const aktuell=sorted\.filter/);assert.match(l,/\u00e4ltere Sitzung\(en\) einblenden/)});
+
+test('ein Bericht laesst sich herunterladen',()=>{const a=fs.readFileSync('js/app.js','utf8'),h=fs.readFileSync('index.html','utf8');assert.match(h,/id="downloadBtn"/);assert.match(a,/function berichtLaden/);assert.match(a,/a\.download=`kc-system-check-/);assert.doesNotMatch(a.slice(a.indexOf('function berichtLaden'),a.indexOf('async function showVersion')),/apikey|token|secret/i,'in den Bericht gehoeren keine Zugangsdaten')});
 test('capacity has 1 7 30 day windows',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/growthLabel\(hist,s\.id,1\)/);assert.match(a,/growthLabel\(hist,s\.id,7\)/);assert.match(a,/growthLabel\(hist,s\.id,30\)/)});
 test('pages bundle contains every imported runtime module',()=>{const y=fs.readFileSync('.github/workflows/pages.yml','utf8');for(const f of['usage','diagnostics','diagnostics-runtime','leitstand'])assert.match(y,new RegExp(`js\\/${f}\\.js`));assert.match(y,/test -f dist\/js\/leitstand\.js/)});
 test('service worker is network first and purges old app caches',()=>{const s=fs.readFileSync('sw.js','utf8');assert.match(s,/cache:\"no-store\"/);assert.match(s,/purgeOldCaches/);assert.match(s,/APP_PREFIX/);assert.match(s,/networkFirst/)});
