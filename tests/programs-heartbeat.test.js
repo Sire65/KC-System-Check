@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 
 const quelle = readFileSync("supabase/functions/kc-system-check/index.ts", "utf8");
 const abschnitt = quelle
-  .slice(quelle.indexOf("function programResult"), quelle.indexOf("// --- Neon-Spiegeldatenbank"))
+  .slice(quelle.indexOf("function seit("), quelle.indexOf("// --- Neon-Spiegeldatenbank"))
   .replace(/:\s*string\[\]/g, "").replace(/:\s*any/g, "").replace(/:\s*string/g, "");
 const notDeployed = (id, name, kind, status) => ({ id, name, kind, status: "not_configured", health: null, metrics: { deployed: false, status } });
 const programResult = new Function("notDeployed", `${abschnitt}; return programResult;`)(notDeployed);
@@ -53,9 +53,9 @@ test("Ein selbst gemeldeter Fehler zaehlt auch ohne Scharfstellung", () => {
   // haette das verschluckt, weil sie bei ueberwacht===0 sofort
   // "nicht eingerichtet" zurueckgab. Die Scharfstellung regelt, ob SCHWEIGEN
   // ein Befund ist - wer von sich aus Fehler meldet, hat gesprochen.
-  const r = mit({ ueberwacht: 0, meldet_stoerung: [{ name: "KC Dienstplan", status: "ONLINE", fehler: 3 }] });
+  const r = mit({ ueberwacht: 0, meldet_stoerung: [{ name: "KC Dienstplan", status: "ONLINE", fehler: 3, alter_minuten: 397 }] });
   assert.equal(r.status, "warning");
-  assert.match(r.detail, /meldet Fehler: KC Dienstplan \(3\)/);
+  assert.match(r.detail, /meldet Fehler: KC Dienstplan \(3, zuletzt vor 7 h\)/);
 });
 
 test("Ein gemeldeter Fehler ist eine Warnung, kein Ausfall", () => {
@@ -91,4 +91,25 @@ test("Fremde Melder gehen nicht verloren", () => {
 test("Ohne eingespielte Serverfunktion wird nichts behauptet", () => {
   const r = programResult({ ok: false, status: 404 });
   assert.equal(r.status, "not_configured");
+});
+
+// Anlass: am 2026-09-06 stand "KC Dienstplan (3)" in der Kachel. Der Satz liest
+// sich als Gegenwart; gezaehlt hatte das eine Browser-Sitzung, die sechs
+// Stunden vorher aufgehoert hatte zu senden.
+test("Ein selbst gemeldeter Fehler nennt sein Alter", () => {
+  const r = mit({ meldet_stoerung: [{ name: "KC Dienstplan", fehler: 3, status: "ONLINE", alter_minuten: 397 }] });
+  assert.equal(r.status, "warning");
+  assert.match(r.detail, /KC Dienstplan \(3, zuletzt vor 7 h\)/);
+});
+
+test("Frische Meldungen stehen in Minuten, alte in Tagen", () => {
+  const min = mit({ meldet_stoerung: [{ name: "A", fehler: 1, alter_minuten: 12 }] });
+  assert.match(min.detail, /A \(1, zuletzt vor 12 min\)/);
+  const tage = mit({ meldet_stoerung: [{ name: "B", fehler: 1, alter_minuten: 4400 }] });
+  assert.match(tage.detail, /B \(1, zuletzt vor 3 Tagen\)/);
+});
+
+test("Ohne Altersangabe wird keines erfunden", () => {
+  const r = mit({ meldet_stoerung: [{ name: "C", fehler: 2 }] });
+  assert.match(r.detail, /C \(2, Alter unbekannt\)/);
 });

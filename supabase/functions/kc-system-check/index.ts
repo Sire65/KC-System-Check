@@ -221,6 +221,13 @@ function mirrorDetail(mh:any,snap:any,snapFehlt:boolean){
 // Solange kein einziges Programm so scharfgestellt ist, meldet die Kachel
 // "nicht eingerichtet" - und faellt damit aus der Abdeckung heraus, statt eine
 // Zahl zu beschoenigen, hinter der zwoelf ungeprueft Anwendungen stehen.
+// Ein selbst gemeldeter Zaehler gilt fuer den Zeitpunkt seiner Meldung, nicht
+// fuer jetzt. Ohne das Alter liest sich "meldet 3 Fehler" als Gegenwart - auch
+// wenn die Browser-Sitzung, die das gezaehlt hat, seit Stunden vorbei ist.
+function seit(m:any){const n=Number(m);if(!Number.isFinite(n))return "Alter unbekannt";
+  if(n<90)return `zuletzt vor ${n} min`;
+  if(n<2880)return `zuletzt vor ${Math.round(n/60)} h`;
+  return `zuletzt vor ${Math.round(n/1440)} Tagen`;}
 function programResult(res:any){
   const id="programs",name="Programme · Lebenszeichen",kind="service";
   if(!res.ok)return notDeployed(id,name,kind,res.status);
@@ -235,7 +242,7 @@ function programResult(res:any){
   // Programm scharfgestellt hat. Die Scharfstellung regelt nur, ob SCHWEIGEN
   // ein Befund ist; ein Programm, das von sich aus Fehler meldet, hat
   // gesprochen.
-  if(stoerung.length)teile.push(`${stoerung.length} meldet Fehler: ${stoerung.slice(0,3).map((x:any)=>`${x.name} (${x.fehler})`).join(", ")}`);
+  if(stoerung.length)teile.push(`${stoerung.length} meldet Fehler: ${stoerung.slice(0,3).map((x:any)=>`${x.name} (${x.fehler}, ${seit(x.alter_minuten)})`).join(", ")}`);
   if(ueberwacht===0){
     if(!stoerung.length)teile.push(`${angebunden} von ${gesamt} Anwendungen senden Lebenszeichen, keine davon ist als Pflicht scharfgestellt`);
     if(ohne.length)teile.push(`${ohne.length} ohne Anbindung: ${ohne.slice(0,4).join(", ")}${ohne.length>4?" …":""}`);

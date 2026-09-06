@@ -1,6 +1,6 @@
 {
-  "version": "0.7.22",
-  "note": "Die Spiegel-Kachel faerbt nach dem jetzigen Zustand; der Waechter überwacht alle gespiegelten Tabellen",
+  "version": "0.7.23",
+  "note": "Ein selbst gemeldeter Programmfehler nennt sein Alter, statt als Gegenwart zu erscheinen",
   "channel": "stable",
   "installSekunden": 5
 }

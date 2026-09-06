@@ -101,6 +101,27 @@ Auf Neon gibt es weder `anon` noch `authenticated` noch `service_role`. Die
 Datei erkennt das und ueberspringt die entsprechenden Rechte. Genau dieser Fall
 war der Grund fuer den Umbau: dieselbe Datei muss auf beiden Seiten laufen.
 
+## Die Programm-Kachel: wann gemeldet?
+
+`kicc_program_heartbeats` haelt **eine Zeile je Browser-Sitzung**
+(`program_id` + `instance_id`) und schreibt sie fort; die Kachel nimmt je
+Programm die juengste. Ein selbst gemeldeter Fehlerzaehler beschreibt damit den
+Endstand einer Sitzung - die auch seit Stunden vorbei sein kann.
+
+Am 2026-09-06 stand deshalb "KC Dienstplan meldet 3 Fehler" in der Kachel,
+gezaehlt um 05:24, gelesen um 11:50. Seit v0.7.23 steht das Alter dabei:
+"KC Dienstplan (3, zuletzt vor 7 h)". Unter 90 Minuten in Minuten, darueber in
+Stunden, ab zwei Tagen in Tagen; fehlt die Angabe, heisst es "Alter unbekannt"
+und nicht "gerade eben".
+
+**Was der Zaehler zaehlt, weiss nur das Programm.** Die aeltere Anbindung des
+Dienstplans (`src/core/kicc-heartbeat.js`) zaehlt drei verschiedene Dinge in
+einer Zahl: `window.error`, `unhandledrejection` **und fehlgeschlagene
+Sendeversuche des Lebenszeichens selbst**. Ein Wert von 3 kann also heissen,
+dass das Programm dreimal nicht senden konnte - ein Netzproblem, kein
+Programmfehler. Das tragbare Paket in `share/heartbeat` macht das anders und
+ueberlaesst die Zahl vollstaendig dem Programm.
+
 ## Die Spiegel-Kachel: welche Tabelle?
 
 Ein Warnhinweis, der nicht sagt, worueber er warnt, kostet genau die Zeit, die
