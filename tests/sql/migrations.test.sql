@@ -27,6 +27,20 @@ revoke all on table public.kc_core_user_links from anon, authenticated;
 \i supabase/migrations/202609060013_db_monitor_paket_v2.sql
 \i supabase/migrations/202609060014_kc_alarmregelwerk_gemeinsam.sql
 \i supabase/migrations/202609060015_kc_erste_messung_meldet_nicht.sql
+\i supabase/migrations/202609060016_kc_alarmregelwerk_sicherung.sql
+-- Wie in der Produktion: Registrierung und Lebenszeichen liegen bereits vor
+create table if not exists public.kc_core_app_registry(
+  app_id text primary key, name text, category text, active boolean default true);
+alter table public.kc_core_app_registry enable row level security;
+revoke all on table public.kc_core_app_registry from anon, authenticated;
+create table if not exists public.kicc_program_heartbeats(
+  program_id text, instance_id text, version text, build text, status text,
+  measured_at timestamptz, received_at timestamptz, latency_ms int,
+  traffic_rx bigint, traffic_tx bigint, queue_depth int, error_count int,
+  source_id text, trust text);
+alter table public.kicc_program_heartbeats enable row level security;
+revoke all on table public.kicc_program_heartbeats from anon, authenticated;
+\i supabase/migrations/202609060017_kc_lebenszeichen_anbindung.sql
 
 -- 1. Sauberer Zustand: keine Sicherheitsbefunde
 do $$
@@ -577,5 +591,91 @@ begin
 end $$;
 
 delete from public.kc_system_check_alarm_state;
+
+-- Lebenszeichen: die Registrierung wird erweitert, keine neue Liste angelegt
+do $$ begin
+  assert (select count(*) from information_schema.columns
+          where table_schema='public' and table_name='kc_core_app_registry'
+            and column_name in ('heartbeat_program_id','heartbeat_expected','heartbeat_max_age_minutes')) = 3,
+    'Die Registrierung hat die Lebenszeichen-Spalten nicht bekommen';
+  assert not exists (select 1 from information_schema.tables
+                     where table_schema='public' and table_name like '%program_watch%'),
+    'Es darf keine zweite Programmliste geben';
+end $$;
+
+insert into public.kc_core_app_registry (app_id, name, category, active) values
+  ('PROBE_STUMM','Probe Stumm','test',true),
+  ('PROBE_ANGEBUNDEN','Probe Angebunden','test',true),
+  ('PROBE_SCHARF','Probe Scharf','test',true)
+on conflict (app_id) do nothing;
+
+update public.kc_core_app_registry set heartbeat_program_id='probe-angebunden' where app_id='PROBE_ANGEBUNDEN';
+update public.kc_core_app_registry set heartbeat_program_id='probe-scharf', heartbeat_expected=true,
+       heartbeat_max_age_minutes=60 where app_id='PROBE_SCHARF';
+
+-- Ohne Lebenszeichen: das scharfgestellte Programm ist ueberfaellig, das nur
+-- angebundene nicht - und das stumme taucht als "ohne Anbindung" auf.
+do $$
+declare v jsonb := public.kc_system_check_programs();
+begin
+  assert v -> 'ueberfaellig' @> '[{"name":"Probe Scharf"}]'::jsonb,
+    'Ein scharfgestelltes Programm ohne Lebenszeichen muss ueberfaellig sein: ' || (v ->> 'ueberfaellig');
+  assert not (v -> 'ueberfaellig' @> '[{"name":"Probe Angebunden"}]'::jsonb),
+    'Nur angebunden heisst nicht ueberwacht - ein Ausbleiben ist dort kein Befund';
+  assert v -> 'ohne_anbindung' @> '["Probe Stumm"]'::jsonb,
+    'Das nicht angebundene Programm fehlt in der Aufstellung';
+end $$;
+
+-- Mit frischem Lebenszeichen ist nichts mehr offen
+insert into public.kicc_program_heartbeats (program_id, status, version, received_at, measured_at, error_count)
+values ('probe-scharf','ONLINE','1.0.0', now(), now(), 0);
+do $$
+declare v jsonb := public.kc_system_check_programs();
+begin
+  assert v -> 'ueberfaellig' = '[]'::jsonb, 'Ein frisches Lebenszeichen muss zaehlen: ' || (v ->> 'ueberfaellig');
+  assert v -> 'meldet_stoerung' = '[]'::jsonb, 'ONLINE ohne Fehler ist keine Stoerung';
+end $$;
+
+-- Ein Fenster im Hintergrund meldet DEGRADED. Das ist Normalbetrieb und darf
+-- kein Befund sein - sonst meldet jeder Tabwechsel eine Stoerung.
+insert into public.kicc_program_heartbeats (program_id, status, version, received_at, measured_at, error_count)
+values ('probe-scharf','DEGRADED','1.0.0', now(), now(), 0);
+do $$
+declare v jsonb := public.kc_system_check_programs();
+begin
+  assert v -> 'meldet_stoerung' = '[]'::jsonb,
+    'DEGRADED heisst Hintergrund, nicht Stoerung: ' || (v ->> 'meldet_stoerung');
+end $$;
+
+-- Meldet das Programm selbst Fehler, ist das ein Befund
+insert into public.kicc_program_heartbeats (program_id, status, version, received_at, measured_at, error_count)
+values ('probe-scharf','ONLINE','1.0.0', now(), now(), 3);
+do $$
+declare v jsonb := public.kc_system_check_programs();
+begin
+  assert v -> 'meldet_stoerung' @> '[{"name":"Probe Scharf","fehler":3}]'::jsonb,
+    'Ein selbst gemeldeter Fehler muss durchkommen: ' || (v ->> 'meldet_stoerung');
+end $$;
+
+-- Ein Melder ohne Registrierung geht nicht verloren
+insert into public.kicc_program_heartbeats (program_id, status, received_at, measured_at)
+values ('probe-unbekannt','ONLINE', now(), now());
+do $$
+declare v jsonb := public.kc_system_check_programs();
+begin
+  assert v -> 'nicht_registriert' @> '["probe-unbekannt"]'::jsonb,
+    'Was sich meldet, ohne registriert zu sein, gehoert gesehen: ' || (v ->> 'nicht_registriert');
+end $$;
+
+-- Weder anon noch authenticated duerfen die Aufstellung abrufen
+do $$ begin
+  assert not has_function_privilege('anon', 'public.kc_system_check_programs()', 'execute'),
+    'anon darf die Programmaufstellung abrufen';
+  assert not has_function_privilege('authenticated', 'public.kc_system_check_programs()', 'execute'),
+    'authenticated darf die Programmaufstellung abrufen';
+end $$;
+
+delete from public.kicc_program_heartbeats where program_id like 'probe-%';
+delete from public.kc_core_app_registry where app_id like 'PROBE_%';
 
 \echo 'ALLE SQL-PRUEFUNGEN BESTANDEN'

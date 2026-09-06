@@ -1,6 +1,6 @@
 {
-  "version": "0.7.17",
-  "note": "Die taegliche Sicherung hat eine eigene Kachel: Alter, Pruefergebnis und haengende Laeufe getrennt bewertet",
+  "version": "0.7.18",
+  "note": "Lebenszeichen: Programmkachel und ein Anbindungspaket - Schweigen ist kein Ausfall, gemeldete Fehler zaehlen immer",
   "channel": "stable",
   "installSekunden": 5
 }

@@ -248,3 +248,77 @@ Kapazitaets- und Sicherheitswerte der Spiegeldatenbank kommen trotzdem.
 Im Alarmregelwerk haengt `backup` an `neon`: ist die Spiegeldatenbank nicht
 erreichbar, ist auch der Zustand der Sicherung nicht lesbar - dann meldet die
 Ursache und nicht beides.
+
+## Lebenszeichen der Programme
+
+Ausgangslage, nachgesehen statt vermutet: es gab **drei** Listen, die nicht
+zusammenpassen.
+
+| Liste | Umfang | IDs |
+| --- | --- | --- |
+| `kc_core_app_registry` (Datenbank) | 13 aktive Anwendungen | `KC_MARKTKASSE` |
+| `kicc_program_heartbeats` (Datenbank) | 3 meldende Programme | `kc-dp2` |
+| KICC-Produktkatalog (JavaScript) | 18 Eintraege | `kc-bilderkasse` |
+
+Eine vierte anzulegen waere derselbe Fehler noch einmal. Deshalb hat die
+vorhandene Registrierung drei Spalten bekommen: `heartbeat_program_id`,
+`heartbeat_expected`, `heartbeat_max_age_minutes`.
+
+### Was ein Lebenszeichen belegt - und was nicht
+
+**Es belegt:** dieses Programm war zu diesem Zeitpunkt in Benutzung, in dieser
+Version, mit diesen Kennzahlen.
+
+**Es belegt nicht:** dass ein Dienst laeuft. Die Lebenszeichen kommen aus dem
+Browser. Hat niemand die Anwendung offen, kommt nichts - nachts, am Wochenende,
+in der Mittagspause. Das ist kein Ausfall.
+
+Daraus folgt die wichtigste Regel dieser Kachel: **Schweigen ist kein Befund**,
+solange nicht jemand ausdruecklich entschieden hat, dass sich ein Programm in
+einem Zeitfenster melden MUSS. `heartbeat_expected` steht deshalb ab Werk auf
+falsch. Waere es anders, stuenden zwoelf Anwendungen ohne Grund auf Rot.
+
+Solange kein Programm scharfgestellt ist, meldet die Kachel **nicht
+eingerichtet** und faellt aus der Abdeckung heraus - statt eine Zahl zu
+beschoenigen, hinter der zwoelf ungeprueft Anwendungen stehen.
+
+### Was sehr wohl zaehlt
+
+Ein Programm, das **von sich aus Fehler meldet**, hat gesprochen. Das zaehlt
+immer, auch ohne Scharfstellung. Die erste Fassung dieser Kachel hat genau das
+verschluckt: sie gab bei "nichts scharfgestellt" sofort zurueck und uebersah
+dabei, dass KC Dienstplan drei Fehler gemeldet hatte. Gefunden beim ersten Lauf
+gegen die echten Daten.
+
+Gewertet wird allein `errorCount`. **`DEGRADED` ist keine Stoerung** - die
+Melder setzen es, sobald das Fenster in den Hintergrund geht. Als Befund
+gewertet meldete jeder Tabwechsel einen.
+
+Ein gemeldeter Fehler ist eine **Warnung, kein Ausfall**: der Zaehler ist selbst
+gemeldet und heisst in jedem Programm etwas anderes.
+
+### Ein Programm anbinden
+
+Das Paket `share/heartbeat/` ist eine Datei und eine Zeile Einbau. Danach
+erscheint das Programm als "angebunden". Ueberwacht wird es erst, wenn jemand
+das ausdruecklich einträgt:
+
+```sql
+update public.kc_core_app_registry
+   set heartbeat_program_id      = 'kc-bilderkasse',
+       heartbeat_expected        = true,
+       heartbeat_max_age_minutes = 60
+ where app_id = 'KC_MARKTKASSE';
+```
+
+Nur `KC_DP` ist zugeordnet, weil `kc-dp2` sich nachweislich meldet. Alle
+uebrigen Zuordnungen waeren geraten gewesen, und eine geratene Zuordnung
+ueberwacht das falsche Programm.
+
+### Was das nicht leistet
+
+Das Lebenszeichen ist selbstgemeldet. Ein abgestuerztes Programm meldet nicht,
+dass es abgestuerzt ist - es meldet gar nichts. Fuer einen echten
+Verfuegbarkeitsnachweis braucht es eine Pruefung von aussen. Diese Kachel
+beantwortet die kleinere, aber nuetzliche Frage: laeuft die Version, die ich
+erwarte, und meldet sie Fehler?

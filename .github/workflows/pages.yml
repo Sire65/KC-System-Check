@@ -29,6 +29,8 @@ jobs:
           cp config/runtime.public.json dist/config/runtime.json
           cp config/alarm-policy.json dist/config/alarm-policy.json
           cp share/db-monitor/install.sql share/db-monitor/README.md dist/db-monitor/
+          mkdir -p dist/heartbeat
+          cp share/heartbeat/kc-heartbeat.js share/heartbeat/README.md dist/heartbeat/
           test -f dist/js/safe-html.js
           test -f dist/js/session.js
           test -f dist/js/alarm-policy.js
@@ -54,6 +56,7 @@ jobs:
           test -f dist/diagnose.html
           test -f dist/config/runtime.json
           test -f dist/db-monitor/install.sql
+          test -f dist/heartbeat/kc-heartbeat.js
       - uses: actions/configure-pages@v5
         with:
           enablement: true
