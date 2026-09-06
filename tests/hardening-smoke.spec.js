@@ -29,6 +29,7 @@ test('Eingeschleustes HTML aus Fremddaten wird als Text angezeigt, nicht ausgefÃ
     flows: [], apps: [], communication: {}, backup: {},
     thresholds: { heartbeat_warn_seconds: 90, heartbeat_critical_seconds: 180 }
   };
+  await page.addInitScript(() => sessionStorage.setItem('kc-system-check-admin-jwt', 'test-token'));
   await isolate(page, route =>
     route.request().url().includes('leitstand=1')
       ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) })
@@ -44,6 +45,7 @@ test('Eingeschleustes HTML aus Fremddaten wird als Text angezeigt, nicht ausgefÃ
 
 test('Fernschutz fragt erst beim Ã–ffnen des LIVE-Tabs nach', async ({ page }) => {
   let opsCalls = 0;
+  await page.addInitScript(() => sessionStorage.setItem('kc-system-check-admin-jwt', 'test-token'));
   await isolate(page, route => {
     const req = route.request();
     // Der CORS-Preflight ist keine eigene Abfrage und wird nicht mitgezaehlt.

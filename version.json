@@ -1,5 +1,5 @@
 {
-  "version": "0.6.15",
-  "note": "Aufraeumen: ein gemeinsamer Konfigurationslader, Zustand statt Oberflaeche als Datenquelle, tote Parallel-Backends entfernt",
+  "version": "0.7.0",
+  "note": "LIVE-Leitstand nur noch fuer freigeschaltete Konten; Kassenereignisse nur fuer die Rolle superadmin",
   "channel": "stable"
 }
