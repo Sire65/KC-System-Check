@@ -28,6 +28,38 @@ test("Eine Warnung nennt Tabelle und Meldung", () => {
   assert.match(text, /letzter Lauf danach vor 2 min/, "der Verlauf seit dem Befund gehoert dazu");
 });
 
+test("Ein Lauf ohne Tabelle erfindet keine", () => {
+  // Laeufe ueber den Gesamtzustand ("47/48 Tabellen frisch") tragen keine
+  // Tabelle. Die Kachel schrieb dafuer "unbenannte Tabelle: ..." - ein Name,
+  // den es nicht gibt, vor einer Meldung, die fuer sich steht.
+  const text = mirrorDetail(
+    { status: "warning", age_min: 4 },
+    { mirror: { mismatch_count: 0 },
+      last_issue: { tabelle: null, status: "warning", started_at: vorMinuten(4),
+                    veraltete_tabellen: [{ tabelle: "kc_core_app_registry", status: "warning" }],
+                    message: "Privacy-Spiegelung unvollständig/frisch: 47/48 Tabellen innerhalb 65 Minuten fehlerfrei gespiegelt." } },
+    false);
+  assert.doesNotMatch(text, /unbenannte Tabelle/);
+  assert.match(text, /^Privacy-Spiegelung unvollständig\/frisch: 47\/48 Tabellen/);
+  assert.match(text, /betroffen: kc_core_app_registry/, "welche der 48 fehlt, ist die eigentliche Frage");
+});
+
+test("Ohne Namensliste bleibt der Text ohne leeres 'betroffen:'", () => {
+  const text = mirrorDetail(
+    { status: "warning", age_min: 4 },
+    { mirror: {}, last_issue: { tabelle: null, status: "warning", message: "Sammelbefund", veraltete_tabellen: [] } },
+    false);
+  assert.doesNotMatch(text, /betroffen/);
+});
+
+test("Die Momentaufnahme nennt die veralteten Tabellen", () => {
+  const sql = readFileSync("supabase/migrations/202609060021_kc_spiegel_welche_tabelle.sql", "utf8");
+  assert.match(sql, /'veraltete_tabellen'/);
+  assert.match(sql, /interval '65 minutes'/);
+  const ohneKommentar = sql.split("\n").filter(z => !z.trimStart().startsWith("--")).join("\n");
+  assert.doesNotMatch(ohneKommentar, /kc_db_mirror_table_rules/, "die Liste darf keine fremde Nebentabelle voraussetzen");
+});
+
 test("Ohne Befund bleibt es beim alten Text", () => {
   const text = mirrorDetail({ status: "warning", age_min: 200 }, { mirror: {}, last_issue: null }, false);
   assert.equal(text, "Spiegelung mit Warnhinweis");
@@ -58,4 +90,10 @@ test("Die Diagnose nennt die Schemaaenderung als erste Spur", () => {
   assert.match(d, /Der Spiegel zieht Schemaänderungen NICHT automatisch nach/);
   assert.match(d, /ALTER TABLE nachziehen/);
   assert.match(d, /befund\?\.tabelle/);
+});
+
+test("Die Diagnose nennt die betroffenen Tabellen statt 'Status unbekannt'", () => {
+  const d = readFileSync("js/diagnostics.js", "utf8");
+  assert.match(d, /veraltete_tabellen/);
+  assert.match(d, /Betroffen: \$\{namen\.join\(", "\)\}/);
 });

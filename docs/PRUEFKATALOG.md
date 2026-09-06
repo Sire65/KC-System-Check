@@ -101,6 +101,30 @@ Auf Neon gibt es weder `anon` noch `authenticated` noch `service_role`. Die
 Datei erkennt das und ueberspringt die entsprechenden Rechte. Genau dieser Fall
 war der Grund fuer den Umbau: dieselbe Datei muss auf beiden Seiten laufen.
 
+## Die Spiegel-Kachel: welche Tabelle?
+
+Ein Warnhinweis, der nicht sagt, worueber er warnt, kostet genau die Zeit, die
+eine Ueberwachung sparen soll. Zwei Ausbaustufen:
+
+* seit v0.7.20 liefert `kc_system_check_snapshot()` den juengsten auffaelligen
+  Lauf mit - Tabelle, Meldung, Zeitpunkt.
+* seit v0.7.21 nennt sie zusaetzlich die betroffenen Tabellen beim Namen.
+  Noetig wurde das, weil die Sammelbefunde der Waechter ("35/36 Tabellen
+  frisch") gar keine Tabelle tragen: sie pruefen den Gesamtzustand. Massstab
+  ist derselbe wie dort - der juengste abgeschlossene Lauf einer Tabelle ist
+  entweder nicht `ok` oder aelter als 65 Minuten. Hoechstens fuenf Namen.
+
+Die Liste entsteht aus `kc_db_mirror_runs` selbst und nicht aus
+`kc_db_mirror_table_rules`: eine fremde Umgebung fuehrt keine identischen
+Nebentabellen.
+
+**Der haeufigste Grund fuer eine Abweichung ist eine Schemaaenderung.** Die
+Verifikation vergleicht ganze Zeilen als JSON. Kommt in der Quelle eine Spalte
+dazu, gehen die Pruefsummen auseinander, bis der Spiegel dieselbe Spalte hat -
+und der Spiegel zieht das **nicht** automatisch nach. Genau das passierte am
+2026-09-06: drei neue Spalten in `kc_core_app_registry` um 10:44, Abweichung im
+Lauf um 11:00, still um 11:30, nachdem die Spalten in Neon nachgezogen waren.
+
 ## Die Neon-Kachel
 
 Seit v0.7.13 fragt der Server die Spiegeldatenbank selbst. Neon spricht SQL

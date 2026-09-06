@@ -65,3 +65,8 @@ test('Keine fremde Adresse steckt mehr im Quelltext',()=>{const e=fs.readFileSyn
 test('Ohne hinterlegten Zugang wird nichts behauptet',()=>{const e=fs.readFileSync('supabase/functions/kc-system-check/index.ts','utf8');assert.match(e,/if\(!gh\)return\{id,name,kind,status:"not_configured"/,'kein Repository hinterlegt = graue Kachel, nicht die eines Fremden');assert.match(e,/function secondProjectResult/);assert.match(e,/if\(!cfg\?\.endpoint\)return\{id,name,kind,status:"not_configured"/)});
 test('Eine fehlende Momentaufnahme legt nicht den ganzen Lauf lahm',()=>{const e=fs.readFileSync('supabase/functions/kc-system-check/index.ts','utf8');assert.doesNotMatch(e,/throw new Error\(`snapshot_http_/,'eine einzige KC-Funktion darf nicht alles abbrechen');assert.match(e,/const snapFehlt=!sr\?\.r\?\.ok/);assert.match(e,/Momentaufnahme fehlt/)});
 test('Der Portabilitaetsbeweis laeuft in CI mit',()=>{const sh=fs.readFileSync('tests/sql/run.sh','utf8');assert.match(sh,/fremde-umgebung\.test\.sql/);const t=fs.readFileSync('tests/sql/fremde-umgebung.test.sql','utf8');assert.doesNotMatch(t,/kc_db_mirror|kc_backup_sets|kc_core_app_registry/,'der Beweis darf keine KC-Tabelle voraussetzen')});
+
+// Ein Komma zu viel im Kachelfeld erzeugt eine Luecke: JSON.stringify macht
+// daraus null, die Kachelliste bekommt einen leeren Eintrag und die Abdeckung
+// rechnet mit einem Nenner, den es nicht gibt.
+test('die Kachelliste hat keine Luecke',()=>{const e=fs.readFileSync('supabase/functions/kc-system-check/index.ts','utf8');assert.doesNotMatch(e,/,\s*,/,'ein doppeltes Komma erzeugt einen leeren Platz im Ergebnisfeld')});

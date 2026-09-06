@@ -1,6 +1,6 @@
 {
-  "version": "0.7.20",
-  "note": "Die Spiegelkachel nennt Tabelle und Meldung, statt nur 'Warnhinweis' zu sagen",
+  "version": "0.7.21",
+  "note": "Die Spiegelkachel nennt die betroffene Tabelle, auch bei Sammelbefunden ohne Tabellenangabe",
   "channel": "stable",
   "installSekunden": 5
 }
