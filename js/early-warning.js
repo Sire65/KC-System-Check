@@ -14,13 +14,24 @@
 //
 // Der Speichername trägt deshalb eine neue Fassung - die alte, gemischte Reihe
 // wird verworfen statt weitergerechnet.
-const STORE='kc-early-warning-v2',MAX=12,SPRUNG=5;
+const STORE='kc-early-warning-v3',MAX=12,SPRUNG=5;
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 function load(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')||{}}catch{return{}}}
 function save(v){try{localStorage.setItem(STORE,JSON.stringify(v))}catch{}}
-function key(el,i){return(el.dataset.system||el.dataset.id||el.querySelector('strong')?.textContent||`metric-${i}`).trim().toLowerCase().slice(0,80)}
-function metric(el){const t=(el.textContent||'').replace(/,/g,'.'),m=t.match(/(\d+(?:\.\d+)?)\s*(ms|%|mb|gb)\b/i);return m?{value:Number(m[1]),unit:m[2].toLowerCase()}:null}
-function collect(){return $$('#live .live-kpi,#live .live-device,#capacity .capacity-card,#usage .usage-card,.gauge-card').filter(el=>el.dataset.kcTrend!=='off').map((el,i)=>({el,k:key(el,i),m:metric(el)})).filter(x=>x.m&&Number.isFinite(x.m.value))}
+// Ein Reihenname wie "metric-1" ist als Warnung wertlos, und er haengt am
+// Platz im Baum: verschiebt sich die Reihenfolge, wandert die Messreihe auf ein
+// anderes Feld. Ohne erkennbaren Namen wird deshalb gar nicht beobachtet.
+function key(el){const n=el.dataset.system||el.dataset.id||el.querySelector('strong')?.textContent||el.querySelector('h3')?.textContent||'';const k=n.trim().toLowerCase().slice(0,80);return k||null}
+// Die ausgezeichnete Zahl geht vor. Ohne sie wurde aus "210.4 / 500 MB" die
+// 500 gelesen - die Freigrenze, nicht die Belegung. Eine Konstante kann keinen
+// Trend zeigen; beobachtet wurde also nichts.
+function metric(el){
+  const av=Number(el.dataset.kcMetric);
+  if(Number.isFinite(av))return{value:av,unit:(el.dataset.kcUnit||'').toLowerCase()||'?'};
+  const t=(el.textContent||'').replace(/,/g,'.'),m=t.match(/(\d+(?:\.\d+)?)\s*(ms|%|mb|gb)\b/i);
+  return m?{value:Number(m[1]),unit:m[2].toLowerCase()}:null;
+}
+function collect(){return $$('#live .live-kpi,#live .live-device,#capacity .capacity-card,#usage .usage-card,.gauge-card').filter(el=>el.dataset.kcTrend!=='off').map(el=>({el,k:key(el),m:metric(el)})).filter(x=>x.k&&x.m&&Number.isFinite(x.m.value))}
 function sample(){const db=load(),now=Date.now();for(const x of collect()){let a=db[x.k]||[];const last=a[a.length-1];
   // Eine andere Einheit oder ein Sprung um mehr als das Fuenffache heisst:
   // hier wird etwas anderes gemessen als vorher. Dann ist die alte Reihe

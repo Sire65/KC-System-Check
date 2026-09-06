@@ -1,6 +1,6 @@
 {
-  "version": "0.7.27",
-  "note": "Die Kopfzeile nennt die ausgelassenen Pruefungen; der Bericht enthaelt die Fruehwarn-Messreihen",
+  "version": "0.7.28",
+  "note": "Die Fruehwarnung beobachtet die Belegung statt der Freigrenze und nennt jedes Feld beim Namen",
   "channel": "stable",
   "installSekunden": 5
 }

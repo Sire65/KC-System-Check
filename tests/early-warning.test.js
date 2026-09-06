@@ -10,7 +10,7 @@ let karten=[];
 globalThis.document={querySelector:()=>null,querySelectorAll:()=>karten};
 const bau=new Function(`${teil}; return {sample,trend,load};`)();
 
-const karte=(titel,text,aus=false)=>({dataset:aus?{kcTrend:"off"}:{},textContent:`${titel} ${text}`,querySelector:()=>({textContent:titel})});
+const karte=(titel,text,aus=false,zusatz={})=>({dataset:{...(aus?{kcTrend:"off"}:{}),...zusatz},textContent:`${titel} ${text}`,querySelector:s=>s==="strong"?{textContent:titel}:null});
 
 test("eine Messumstellung ist kein Trend", () => {
   karten=[karte("Antwortdaten","8 ms")];
@@ -54,4 +54,30 @@ test("kumulative Zaehler sind in der Oberflaeche als solche gekennzeichnet", () 
     assert.match(a.slice(Math.max(0, i - 220), i), /data-kc-trend="off"/,
       `${titel} zaehlt ueber 31 Tage hoch - Steigen ist dort keine Auffaelligkeit`);
   }
+});
+
+// Aus dem Bericht vom 2026-09-06: die Kapazitaetsreihen standen konstant auf
+// 500mb / 512mb - das ist die Freigrenze aus "210.4 / 500 MB", nicht die
+// Belegung. Eine Konstante kann keinen Trend zeigen, es wurde also nichts
+// beobachtet. Jetzt zeichnet die Kachel den Belegungsanteil aus.
+test("die ausgezeichnete Zahl geht vor dem Text", () => {
+  speicher.clear();
+  karten=[karte("KC Core · Supabase","210.4 / 500 MB",false,{kcMetric:"42.1",kcUnit:"%"})];
+  const db=bau.sample();
+  const reihe=db["kc core · supabase"];
+  assert.equal(reihe[0].v,42.1,"die Belegung, nicht die Grenze");
+  assert.equal(reihe[0].u,"%");
+});
+
+// "metric-1" ist als Warnung wertlos und haengt am Platz im Baum.
+test("ohne erkennbaren Namen wird nicht beobachtet", () => {
+  speicher.clear();
+  karten=[{dataset:{},textContent:"irgendwas 120 ms",querySelector:()=>null}];
+  assert.equal(Object.keys(bau.sample()).length,0);
+});
+
+test("eine Ueberschrift reicht als Name", () => {
+  speicher.clear();
+  karten=[{dataset:{},textContent:"KC Core 120 ms",querySelector:s=>s==="h3"?{textContent:"KC Core"}:null}];
+  assert.deepEqual(Object.keys(bau.sample()),["kc core"]);
 });

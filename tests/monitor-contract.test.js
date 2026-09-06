@@ -91,4 +91,4 @@ test('die Kachelliste hat keine Luecke',()=>{const e=fs.readFileSync('supabase/f
 // die Kopfzeile konnte deshalb nie sagen, WELCHE Pruefungen fehlten.
 test('die Auswahlangabe ueberlebt den Laufabschluss',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/selection:payload\.selection\|\|null/);assert.match(a,/function auswahlHinweis/)});
 
-test('der Bericht enthaelt die Messreihen der Fruehwarnung',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/fruehwarnung:\{zustand:/);assert.match(a,/kc-early-warning-v2/)});
+test('der Bericht enthaelt die Messreihen der Fruehwarnung',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/fruehwarnung:\{zustand:/);assert.match(a,/kc-early-warning-v3/)});

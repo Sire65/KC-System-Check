@@ -101,6 +101,29 @@ Auf Neon gibt es weder `anon` noch `authenticated` noch `service_role`. Die
 Datei erkennt das und ueberspringt die entsprechenden Rechte. Genau dieser Fall
 war der Grund fuer den Umbau: dieselbe Datei muss auf beiden Seiten laufen.
 
+## Die Fruehwarnung beobachtete Konstanten
+
+Der heruntergeladene Bericht enthaelt seit v0.7.27 die Messreihen. Der erste
+zeigte, dass der Melder das Falsche ansah:
+
+    kc core · supabase           500mb -> 500mb -> 500mb -> 500mb
+    neon · spiegel-datenbank     512mb -> 512mb -> 512mb -> 512mb
+    metric-1                      59ms -> 53ms -> 59ms -> 53ms
+
+Die Kapazitaetskacheln zeigen "210.4 / 500 MB". Gelesen wurde die erste Zahl mit
+Einheit - also **500, die Freigrenze**, nicht 210.4, die Belegung. Eine
+Konstante kann keinen Trend zeigen; genau das Wachstum, das eine Fruehwarnung
+sehen soll, war unsichtbar. Die Kachel zeichnet den Belegungsanteil jetzt
+ausdruecklich aus (`data-kc-metric`), und die ausgezeichnete Zahl geht dem Text
+vor.
+
+Die beiden `metric-1`/`metric-2` waren die Messuhren: sie haben keine
+`<strong>`-Ueberschrift, also fiel der Name auf den Platz im Baum zurueck. Ein
+solcher Name ist als Warnung wertlos ("metric-1 steigend +40 %") und wandert bei
+jeder Umsortierung auf ein anderes Feld. Die Uhren tragen jetzt `data-id`, die
+Namenssuche kennt auch `<h3>`, und **ohne erkennbaren Namen wird gar nicht
+beobachtet**.
+
 ## Die Fruehwarnung: die richtige Zahl, und kein Trend aus einer Messumstellung
 
 Direkt nach der Umstellung des Verbrauchs meldete die Fruehwarnung
