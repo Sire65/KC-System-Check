@@ -1,6 +1,6 @@
 {
-  "version": "0.7.16",
-  "note": "Ein neues Signal meldet nicht mehr nach einer einzigen Messung - die Entprellung gilt jetzt auch beim ersten Mal",
+  "version": "0.7.17",
+  "note": "Die taegliche Sicherung hat eine eigene Kachel: Alter, Pruefergebnis und haengende Laeufe getrennt bewertet",
   "channel": "stable",
   "installSekunden": 5
 }

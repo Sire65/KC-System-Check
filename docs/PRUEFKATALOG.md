@@ -186,3 +186,65 @@ Repository setzt einen bezahlten GitHub-Plan voraus - auf dem freien Plan
 verschwindet damit die App. Das verstiesse gegen die Nulltarif-Regel und
 beseitigt nichts: die Laufzeitkonfiguration wird von der veroeffentlichten App
 ohnehin ausgeliefert, ob das Repository nun privat ist oder nicht.
+
+## Die Sicherung
+
+Seit v0.7.17 hat die taegliche Sicherung eine eigene Kachel. Vorher war sie im
+Programm nicht sichtbar - nicht weil sie fehlte, sondern weil an der falschen
+Stelle gesucht wurde: `kc_backup_machine_telemetry` in KC Core ist leer und
+war es immer. Das ist die Telemetrie des Sicherungsrechners, nicht die
+Datenbanksicherung.
+
+Die Datenbanksicherung liegt in der Neon-Spiegeldatenbank, in eigenen Tabellen:
+
+| Tabelle | Inhalt |
+| --- | --- |
+| `kc_backup_sets` | ein Satz je Lauf: Beginn, Abschluss, Status, Tabellen, Zeilen, Bytes |
+| `kc_backup_snapshots` | die gesicherten Inhalte je Tabelle mit Pruefsumme |
+| `kc_backup_verifications` | das Ergebnis der taeglichen Pruefung |
+
+Zwei Zeitplaene fuellen sie: `kc-db-immutable-backup-daily` um 03:30 und
+`kc-db-backup-verify-daily` um 04:00. Beide loesen ueber pg_net eine Anfrage an
+den Sicherungsdienst aus. **Wichtig fuer das Verstaendnis der Luecke:** der
+Zeitplan gilt als erfolgreich, sobald pg_net die Anfrage angenommen hat. Ob der
+Dienst danach etwas geschrieben hat, erfaehrt er nie - und die Antwort von
+pg_net wird nach wenigen Stunden geloescht. Der einzige dauerhafte Nachweis
+steht in den Tabellen oben. Genau die liest die Kachel.
+
+### Wie bewertet wird
+
+Eine Sicherung ist erst dann eine Sicherung, wenn sie **frisch** ist UND
+**geprueft**. Beides getrennt:
+
+- **rot** - kein einziger erfolgreicher Satz; oder der letzte ist ueber 48 h
+  alt; oder die Pruefung meldet einen anderen Status als ok; oder Tabellen
+  haben die Pruefung nicht bestanden.
+- **gelb** - der letzte Satz ist ueber 26 h alt (taeglich erwartet); oder es
+  wurde nie geprueft; oder die letzte Pruefung ist ueber 48 h alt; oder ein
+  Lauf haengt seit ueber zwei Stunden; oder der juengste Versuch schlug fehl,
+  waehrend ein aelterer Satz gueltig ist.
+- **grau** - der Zustand war nicht abrufbar. Ungeprueft ist nicht gruen.
+- **gruen** - frisch und geprueft.
+
+Ein frischer, aber ungepruefter Satz ist **gelb**, nicht gruen: eine
+ungepruefte Sicherung ist eine Vermutung, keine Zusage.
+
+**Nicht** gefaerbt wird von alten, nie abgeschlossenen Saetzen. In der
+Produktion liegen ein `running` von vor neun Tagen und ein `error` von vor
+neunzehn - Ueberbleibsel aus der Einrichtung. Sie stehen im Text, faerben aber
+nichts; sonst stuende die Kachel fuer immer gelb. Dieselbe Entscheidung wie bei
+den 244 Rechten, beim Vacuum-Rueckstand und beim oeffentlichen Repository.
+
+Ein haengender Lauf faerbt nur, wenn er in den letzten 48 Stunden begonnen hat -
+dann koennte er noch etwas bedeuten.
+
+### Warum getrennt von db_monitor
+
+Die Abfrage laeuft als zweite Anfrage an dieselbe Neon-Datenbank, nicht als
+Anhaengsel an `db_monitor.report()`. Das tragbare Paket darf nichts von KC
+wissen. Faellt die Sicherungsabfrage aus, betrifft das nur diese Kachel; die
+Kapazitaets- und Sicherheitswerte der Spiegeldatenbank kommen trotzdem.
+
+Im Alarmregelwerk haengt `backup` an `neon`: ist die Spiegeldatenbank nicht
+erreichbar, ist auch der Zustand der Sicherung nicht lesbar - dann meldet die
+Ursache und nicht beides.

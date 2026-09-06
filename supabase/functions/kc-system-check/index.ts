@@ -174,20 +174,97 @@ async function credential(own:string,service:string,name:string){
     return await r.json();
   }catch{return null}
 }
-async function neonQuery(cred:any){
+async function neonSql(cred:any,query:string,feld:string){
   const host=String(cred?.endpoint||"");
   if(!host||!cred?.secret)return{ok:false,reason:"kein_zugang",ms:null,data:null,host:null};
   const s=Date.now();
   try{
-    const r=await fetch(`https://${host}/sql`,{method:"POST",cache:"no-store",headers:{"Neon-Connection-String":String(cred.secret),"Content-Type":"application/json"},body:JSON.stringify({query:"select db_monitor.report() as bericht",params:[]})});
+    const r=await fetch(`https://${host}/sql`,{method:"POST",cache:"no-store",headers:{"Neon-Connection-String":String(cred.secret),"Content-Type":"application/json"},body:JSON.stringify({query,params:[]})});
     const ms=Date.now()-s;
     if(!r.ok){let msg="";try{msg=(await r.json())?.message||""}catch{}return{ok:false,reason:msg||`http_${r.status}`,ms,data:null,host}}
     const body=await r.json();
-    let bericht=body?.rows?.[0]?.bericht??null;
-    if(typeof bericht==="string"){try{bericht=JSON.parse(bericht)}catch{bericht=null}}
-    if(!bericht)return{ok:false,reason:"leere_antwort",ms,data:null,host};
-    return{ok:true,reason:null,ms,data:bericht,host};
+    let wert=body?.rows?.[0]?.[feld]??null;
+    if(typeof wert==="string"){try{wert=JSON.parse(wert)}catch{wert=null}}
+    if(!wert)return{ok:false,reason:"leere_antwort",ms,data:null,host};
+    return{ok:true,reason:null,ms,data:wert,host};
   }catch(e){return{ok:false,reason:String((e as Error)?.message||e),ms:Date.now()-s,data:null,host}}
+}
+const neonQuery=(cred:any)=>neonSql(cred,"select db_monitor.report() as bericht","bericht");
+// --- Sicherung ---------------------------------------------------------------
+// Die taegliche Sicherung liegt in derselben Neon-Datenbank wie die Spiegelung,
+// aber sie ist etwas anderes: die Spiegelung haelt den aktuellen Stand, die
+// Sicherung haelt den Stand von gestern und laesst sich zurueckspielen.
+//
+// Getrennt gefragt statt an db_monitor angehaengt: db_monitor ist das tragbare
+// Paket und darf nichts von KC wissen. Faellt diese Abfrage aus, betrifft das
+// nur diese Kachel.
+const BACKUP_SQL=`
+with letzter as (
+  select * from public.kc_backup_sets where status='ok' order by completed_at desc nulls last limit 1
+), neuester as (
+  select * from public.kc_backup_sets order by started_at desc limit 1
+), pruefung as (
+  select * from public.kc_backup_verifications order by verified_at desc limit 1
+)
+select jsonb_build_object(
+  'letzter_ok_am', (select completed_at from letzter),
+  'letzter_ok_alter_stunden', (select round(extract(epoch from now()-completed_at)/3600, 1) from letzter),
+  'tabellen', (select table_count from letzter),
+  'tabellen_ok', (select ok_count from letzter),
+  'zeilen', (select total_rows from letzter),
+  'bytes', (select total_bytes from letzter),
+  'neuester_status', (select status from neuester),
+  'pruefung_status', (select status from pruefung),
+  'pruefung_alter_stunden', (select round(extract(epoch from now()-verified_at)/3600, 1) from pruefung),
+  'pruefung_tabellen', (select checked_tables from pruefung),
+  'pruefung_fehler', (select failed_tables from pruefung),
+  -- Haengend heisst: koennte noch laufen und tut es nicht. Ein 'running' von
+  -- vor neun Tagen ist kein laufendes Problem, sondern ein Ueberbleibsel -
+  -- das faerbt die Ampel nicht, sonst steht sie fuer immer gelb.
+  'haengende_saetze', (select count(*) from public.kc_backup_sets
+     where status='running' and started_at < now() - interval '2 hours'
+       and started_at > now() - interval '48 hours'),
+  'altlasten', (select count(*) from public.kc_backup_sets
+     where status in ('running','error') and started_at < now() - interval '48 hours'),
+  'saetze_8_tage', (select count(*) from public.kc_backup_sets where status='ok' and started_at > now() - interval '8 days')
+) as sicherung`;
+const backupQuery=(cred:any)=>neonSql(cred,BACKUP_SQL,"sicherung");
+// Eine Sicherung ist erst dann eine Sicherung, wenn sie frisch ist UND geprueft.
+// Beides getrennt bewertet: ein frischer, aber ungepruefter Satz ist kein
+// Ausfall, aber auch keine Zusage.
+function backupResult(res:any){
+  const id="backup",name="Sicherung · täglich nach Neon",kind="backup";
+  if(res.reason==="kein_zugang")return{id,name,kind,status:"not_configured",health:null,latency:null,usage:null,capacityLabel:"Kein Zugang hinterlegt",detail:"Ohne Zugang zur Spiegeldatenbank ist der Zustand der Sicherung nicht abrufbar",metrics:{}};
+  if(!res.ok)return{id,name,kind,status:"unknown",health:null,latency:res.ms,usage:null,capacityLabel:"Nicht prüfbar",detail:`Der Zustand der Sicherung war nicht abrufbar: ${res.reason}`,metrics:{error:res.reason}};
+  const d=res.data||{};
+  const alter=d.letzter_ok_alter_stunden===null||d.letzter_ok_alter_stunden===undefined?null:Number(d.letzter_ok_alter_stunden);
+  const pAlter=d.pruefung_alter_stunden===null||d.pruefung_alter_stunden===undefined?null:Number(d.pruefung_alter_stunden);
+  const fehler=Number(d.pruefung_fehler??0),haengend=Number(d.haengende_saetze??0);
+  const kritisch:string[]=[],warnungen:string[]=[];
+  if(alter===null)kritisch.push("Es gibt keine erfolgreiche Sicherung");
+  else if(alter>48)kritisch.push(`Die letzte erfolgreiche Sicherung ist ${alter} h alt`);
+  else if(alter>26)warnungen.push(`Die letzte Sicherung ist ${alter} h alt · täglich erwartet`);
+  if(d.pruefung_status&&d.pruefung_status!=="ok")kritisch.push(`Die Prüfung meldet ${d.pruefung_status}`);
+  if(fehler>0)kritisch.push(`${fehler} Tabelle(n) haben die Prüfung nicht bestanden`);
+  if(!d.pruefung_status)warnungen.push("Die Sicherung wurde noch nie geprüft");
+  else if(pAlter!==null&&pAlter>48)warnungen.push(`Die letzte Prüfung ist ${pAlter} h alt`);
+  if(haengend>0)warnungen.push(`${haengend} Sicherungslauf/-läufe hängen seit über zwei Stunden`);
+  if(d.neuester_status==="error"&&!kritisch.length)warnungen.push("Der jüngste Versuch ist fehlgeschlagen, ein älterer Satz ist aber gültig");
+  // Alte, nie abgeschlossene Saetze sind Datenmuell, kein Vorfall - sie stehen
+  // im Text, faerben aber nichts.
+  const altlasten=Number(d.altlasten??0);
+  const status=kritisch.length?"critical":warnungen.length?"warning":"healthy";
+  const teile=[...kritisch,...warnungen];
+  if(!teile.length)teile.push(`vor ${alter} h gesichert und geprüft · ${d.tabellen_ok}/${d.tabellen} Tabellen, ${d.zeilen} Zeilen`);
+  else if(alter!==null)teile.push(`${d.tabellen_ok}/${d.tabellen} Tabellen im letzten gültigen Satz`);
+  if(d.saetze_8_tage!==null&&d.saetze_8_tage!==undefined)teile.push(`${d.saetze_8_tage} Sätze in acht Tagen`);
+  if(altlasten>0)teile.push(`${altlasten} alte(r) Satz/Sätze ohne Abschluss · Datenrest, kein Vorfall`);
+  return{id,name,kind,status,health:status==="critical"?35:status==="warning"?72:100,latency:res.ms,usage:null,
+    capacityLabel:alter===null?"Keine Sicherung":`vor ${alter} h · ${mb(Number(d.bytes||0))} MB`,
+    detail:teile.join(" · "),
+    metrics:{last_ok_at:d.letzter_ok_am,age_hours:alter,tables:d.tabellen,tables_ok:d.tabellen_ok,rows:d.zeilen,bytes:d.bytes,
+      verification_status:d.pruefung_status,verification_age_hours:pAlter,verification_tables:d.pruefung_tabellen,
+      verification_failed:fehler,stuck_runs:haengend,stale_sets:altlasten,sets_8d:d.saetze_8_tage,newest_status:d.neuester_status}};
 }
 function neonResult(res:any,fallback:any){
   // Kein Zugang hinterlegt: die vorbereitete Kachel bleibt, wie sie war.
@@ -216,8 +293,10 @@ Deno.serve(async(req:Request)=>{if(req.method==="OPTIONS")return new Response(nu
 let neon=endpointResult("neon","Neon · Direktcheck","database",neonDirect,"Direktcheck vorbereitet; die Supabase→Neon-Spiegelung wird separat geprüft");if(!neonDirect&&tele?.neon_status){const t=telemetryState(tele.neon_status);neon={...neon,status:t.status,health:t.health,capacityLabel:"PC Backup Vault Telemetrie",detail:`Neon-Telemetrie: ${tele.neon_status}`,metrics:{direct_check:false,telemetry:true,measured_at:tele.measured_at}}}
 // Liegt ein Zugang zur Spiegeldatenbank bereit, wird sie selbst befragt statt
 // nur ueber Dritte beurteilt. Ohne Zugang bleibt die bisherige Kachel stehen.
-const neonCred=await credential(own,service,"neon_mirror");if(neonCred){const nq=await neonQuery(neonCred);requests++;neon=neonResult(nq,neon)}
+const neonCred=await credential(own,service,"neon_mirror");
+let sicherung=backupResult({ok:false,reason:"kein_zugang"});
+if(neonCred){const [nq,bq]=await Promise.all([neonQuery(neonCred),backupQuery(neonCred)]);requests+=2;neon=neonResult(nq,neon);sicherung=backupResult(bq)}
 let b2=endpointResult("b2","Backblaze B2","storage",b2Direct,"Adapter bereit; noch keine B2-Telemetrie oder sichere Read-only-Verbindung");if(!b2Direct&&tele?.b2_status){const t=telemetryState(tele.b2_status),age=tele.measured_at?Math.round((Date.now()-Date.parse(tele.measured_at))/60000):null;b2={...b2,status:t.status,health:t.health,capacityLabel:tele.last_backup_stored_bytes?`${mb(Number(tele.last_backup_stored_bytes))} MB letzter Backup-Satz`:"PC Backup Vault Telemetrie",detail:`B2 ${tele.b2_status} · letzter Backup-Status ${tele.last_backup_status||"unbekannt"}${age!==null?` · Telemetrie vor ${age} min`:""}`,metrics:{direct_check:false,telemetry:true,measured_at:tele.measured_at,last_backup_at:tele.last_backup_at,last_backup_status:tele.last_backup_status,last_backup_stored_bytes:tele.last_backup_stored_bytes,storage_target:tele.storage_target}}}
 const r2=endpointResult("r2","Cloudflare R2","storage",r2Direct,"Als Backup-/Failback-Anbieter vorbereitet; Scharfstellung nach Zugangseinrichtung"),oci=endpointResult("oci","Oracle OCI Object Storage","storage",ociDirect,"Als Reserve-Anbieter vorbereitet; Scharfstellung nach Zugangseinrichtung");
 const [securityRes,capacityRes,exposure]=await Promise.all([rpc(own,service,"kc_system_check_security_audit"),rpc(own,service,"kc_system_check_db_capacity"),exposureResult(own)]);requests+=4;const dbSecurity=securityResult(securityRes),dbCapacity=capacityResult(capacityRes),keyLifetime=keyLifetimeResult();
-const all:any[]=[{id:"kc_core",name:"KC Core · Supabase",kind:"database",status:coreStatus,health:coreHealth,latency:coreMs,usage:cu,capacityLabel:`${mb(coreBytes)} / 500 MB`,detail:coreOk?(coreMs!==null&&coreMs>3000?"Erreichbar, aber langsam":"KC Core erreichbar"):"KC Core nicht erreichbar",metrics:{database_bytes:coreBytes,free_tier_database_bytes:FREE_DB_BYTES,usage_percent:cu,latency_ms:coreMs,snapshot_latency_ms:sr.ms,probe_http_status:core?.r?.status??null}},{id:"future_academy",name:"Future Academy · Supabase",kind:"database",status:fr?.r?.ok?(fr.ms>3000?"warning":"healthy"):"warning",health:fr?.r?.ok?(fr.ms>3000?82:100):75,latency:fr?.ms??null,usage:fr?.r?.ok?fu:null,capacityLabel:fr?.r?.ok?`${mb(futureBytes)} / 500 MB`:"Kapazität nicht verfügbar",detail:fr?.r?.ok?"Future Academy erreichbar":"Future Academy nicht erreichbar",metrics:{database_bytes:futureBytes||null,public_tables:fd?.public_tables??null,http_status:fr?.r?.status??null,usage_percent:fr?.r?.ok?fu:null,latency_ms:fr?.ms??null}},{id:"mirror",name:"Spiegelung · Supabase → Neon",kind:"replication",status:mh.status,health:mh.health,latency:null,usage:null,capacityLabel:`${snap?.runs_24h??0} Läufe / 24 h`,detail:mh.status==="healthy"?`${snap?.mirror?.mismatch_count??0} Abweichungen · letzter Lauf vor ${mh.age_min??"?"} min`:mh.status==="warning"?"Spiegelung mit Warnhinweis":mh.status==="unknown"?"Noch kein Spiegellauf erfasst · Zustand unbekannt":"Aktive Spiegelabweichung oder Fehler",metrics:{...snap?.mirror,age_min:mh.age_min,runs_24h:snap?.runs_24h,non_ok_24h:snap?.non_ok_24h,mismatches_24h:snap?.mismatches_24h,snapshot_latency_ms:sr.ms}},neon,repoResult(gh,gd,repoConfig),b2,r2,oci,dbSecurity,dbCapacity,exposure,keyLifetime];const aliases:any={supabase:["kc_core","future_academy"],sicherheit:["db_security","endpoint_exposure","key_lifetime"]},raw=u.searchParams.get("systems")?.split(",").filter(Boolean)||[],wanted=[...new Set(raw.flatMap(x=>aliases[x]||[x]))],results=wanted.length?all.filter(x=>wanted.includes(x.id)):all,status=worst(results),h=health(results),coverage=Math.round(results.filter(x=>["healthy","warning","critical"].includes(x.status)).length/Math.max(1,results.length)*100),duration=Date.now()-started,payload:any={version:"0.4.0-live",status,health:h,coverage,checkedAt:new Date().toISOString(),duration_ms:duration,capacity:{kc_core_database_bytes:coreBytes,future_academy_database_bytes:futureBytes||null,free_database_bytes:FREE_DB_BYTES},resource_usage:{request_count:requests,estimated:true},provider_registry:{source:"PC Backup Vault",prepared:["b2","r2","oci"],no_test_uploads:true},results};const bytes=enc.encode(JSON.stringify(payload)).byteLength;payload.resource_usage.response_bytes=bytes;let recorded=false;if(u.searchParams.get("record")!=="0"){const who=await callerRole(req,own,service);let allowed=!!who.role;if(!allowed){let lastAt:any=null;try{const rows=await core?.r?.json();lastAt=rows?.[0]?.checked_at??null}catch{}const age=lastAt?Date.now()-Date.parse(lastAt):Number.POSITIVE_INFINITY;allowed=!(Number.isFinite(age)&&age<10*60*1000)}if(allowed){recorded=true;const trigger=["auto","selected"].includes(u.searchParams.get("trigger")||"")?u.searchParams.get("trigger"):"manual";await fetch(`${own}/rest/v1/kc_system_check_history`,{method:"POST",headers:{apikey:service,Authorization:`Bearer ${service}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({trigger_type:trigger,overall_status:status,health:h,duration_ms:duration,request_count:requests,response_bytes:bytes,results})}).catch(()=>null)}}payload.recorded=recorded;return new Response(JSON.stringify(payload),{headers:CORS})}catch(e){return new Response(JSON.stringify({version:"0.4.0-live",status:"critical",health:0,checkedAt:new Date().toISOString(),error:String((e as Error)?.message||e)}),{status:500,headers:CORS})}});
+const all:any[]=[{id:"kc_core",name:"KC Core · Supabase",kind:"database",status:coreStatus,health:coreHealth,latency:coreMs,usage:cu,capacityLabel:`${mb(coreBytes)} / 500 MB`,detail:coreOk?(coreMs!==null&&coreMs>3000?"Erreichbar, aber langsam":"KC Core erreichbar"):"KC Core nicht erreichbar",metrics:{database_bytes:coreBytes,free_tier_database_bytes:FREE_DB_BYTES,usage_percent:cu,latency_ms:coreMs,snapshot_latency_ms:sr.ms,probe_http_status:core?.r?.status??null}},{id:"future_academy",name:"Future Academy · Supabase",kind:"database",status:fr?.r?.ok?(fr.ms>3000?"warning":"healthy"):"warning",health:fr?.r?.ok?(fr.ms>3000?82:100):75,latency:fr?.ms??null,usage:fr?.r?.ok?fu:null,capacityLabel:fr?.r?.ok?`${mb(futureBytes)} / 500 MB`:"Kapazität nicht verfügbar",detail:fr?.r?.ok?"Future Academy erreichbar":"Future Academy nicht erreichbar",metrics:{database_bytes:futureBytes||null,public_tables:fd?.public_tables??null,http_status:fr?.r?.status??null,usage_percent:fr?.r?.ok?fu:null,latency_ms:fr?.ms??null}},{id:"mirror",name:"Spiegelung · Supabase → Neon",kind:"replication",status:mh.status,health:mh.health,latency:null,usage:null,capacityLabel:`${snap?.runs_24h??0} Läufe / 24 h`,detail:mh.status==="healthy"?`${snap?.mirror?.mismatch_count??0} Abweichungen · letzter Lauf vor ${mh.age_min??"?"} min`:mh.status==="warning"?"Spiegelung mit Warnhinweis":mh.status==="unknown"?"Noch kein Spiegellauf erfasst · Zustand unbekannt":"Aktive Spiegelabweichung oder Fehler",metrics:{...snap?.mirror,age_min:mh.age_min,runs_24h:snap?.runs_24h,non_ok_24h:snap?.non_ok_24h,mismatches_24h:snap?.mismatches_24h,snapshot_latency_ms:sr.ms}},neon,sicherung,repoResult(gh,gd,repoConfig),b2,r2,oci,dbSecurity,dbCapacity,exposure,keyLifetime];const aliases:any={supabase:["kc_core","future_academy"],sicherheit:["db_security","endpoint_exposure","key_lifetime"]},raw=u.searchParams.get("systems")?.split(",").filter(Boolean)||[],wanted=[...new Set(raw.flatMap(x=>aliases[x]||[x]))],results=wanted.length?all.filter(x=>wanted.includes(x.id)):all,status=worst(results),h=health(results),coverage=Math.round(results.filter(x=>["healthy","warning","critical"].includes(x.status)).length/Math.max(1,results.length)*100),duration=Date.now()-started,payload:any={version:"0.4.0-live",status,health:h,coverage,checkedAt:new Date().toISOString(),duration_ms:duration,capacity:{kc_core_database_bytes:coreBytes,future_academy_database_bytes:futureBytes||null,free_database_bytes:FREE_DB_BYTES},resource_usage:{request_count:requests,estimated:true},provider_registry:{source:"PC Backup Vault",prepared:["b2","r2","oci"],no_test_uploads:true},results};const bytes=enc.encode(JSON.stringify(payload)).byteLength;payload.resource_usage.response_bytes=bytes;let recorded=false;if(u.searchParams.get("record")!=="0"){const who=await callerRole(req,own,service);let allowed=!!who.role;if(!allowed){let lastAt:any=null;try{const rows=await core?.r?.json();lastAt=rows?.[0]?.checked_at??null}catch{}const age=lastAt?Date.now()-Date.parse(lastAt):Number.POSITIVE_INFINITY;allowed=!(Number.isFinite(age)&&age<10*60*1000)}if(allowed){recorded=true;const trigger=["auto","selected"].includes(u.searchParams.get("trigger")||"")?u.searchParams.get("trigger"):"manual";await fetch(`${own}/rest/v1/kc_system_check_history`,{method:"POST",headers:{apikey:service,Authorization:`Bearer ${service}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({trigger_type:trigger,overall_status:status,health:h,duration_ms:duration,request_count:requests,response_bytes:bytes,results})}).catch(()=>null)}}payload.recorded=recorded;return new Response(JSON.stringify(payload),{headers:CORS})}catch(e){return new Response(JSON.stringify({version:"0.4.0-live",status:"critical",health:0,checkedAt:new Date().toISOString(),error:String((e as Error)?.message||e)}),{status:500,headers:CORS})}});
