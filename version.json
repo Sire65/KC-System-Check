@@ -1,6 +1,6 @@
 {
-  "version": "0.7.10",
-  "note": "Datenvertrag nur noch serverseitig lesbar; Sicherheitspruefung ohne offenen Befund",
+  "version": "0.7.11",
+  "note": "Kapazitaetspruefung kalibriert: echter Vacuum-Rueckstand statt Normalbetrieb, dazu Leerraum und ungenutzte Indexe",
   "channel": "stable",
   "installSekunden": 5
 }

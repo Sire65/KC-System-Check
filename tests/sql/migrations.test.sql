@@ -14,6 +14,7 @@ end $$;
 \i supabase/migrations/202609010516_kc_system_check_history_explicit_deny.sql
 \i supabase/migrations/202609060001_kc_system_check_operators.sql
 \i supabase/migrations/202609060002_kc_system_check_audit.sql
+\i supabase/migrations/202609060010_kc_kapazitaet_kalibrierung.sql
 \i supabase/migrations/202609060003_kc_alarm_quality.sql
 \i supabase/migrations/202609060004_kc_security_audit_calibration.sql
 create table if not exists public.kc_core_user_links(user_id uuid, core_role text, active boolean default true);
@@ -340,5 +341,52 @@ begin
      and jsonb_array_length(v -> 'permissive_policies') = 0,
     'Nach beiden Einschraenkungen darf kein Sicherheitsbefund mehr offen sein';
 end $$;
+
+-- 16. Kapazitaet: Normalbetrieb ist kein Rueckstand, echter Rueckstand schon
+create table public.kc_kapazitaet_probe(id bigserial primary key, wert text);
+alter table public.kc_kapazitaet_probe enable row level security;
+revoke all on table public.kc_kapazitaet_probe from anon, authenticated;
+alter table public.kc_kapazitaet_probe set (autovacuum_enabled = false);
+insert into public.kc_kapazitaet_probe(wert)
+  select md5(random()::text) || repeat('y', 200) from generate_series(1,60000);
+create index kc_kapazitaet_probe_idx on public.kc_kapazitaet_probe(wert);
+analyze public.kc_kapazitaet_probe;
+
+do $$
+declare v jsonb := public.kc_system_check_db_capacity();
+begin
+  assert jsonb_array_length(v -> 'vacuum_backlog') = 0,
+    'Eine frisch gefuellte Tabelle ist kein Vacuum-Rueckstand';
+  assert (v ->> 'bloat') not like '%kc_kapazitaet_probe%',
+    'Ohne Aenderungen gibt es keinen Leerraum zu melden';
+end $$;
+
+-- Jede Zeile einmal aendern: alle alten Versionen werden tot
+update public.kc_kapazitaet_probe set wert = wert;
+analyze public.kc_kapazitaet_probe;
+
+do $$
+declare v jsonb := public.kc_system_check_db_capacity();
+  r jsonb; b jsonb; i jsonb;
+begin
+  select x into r from jsonb_array_elements(v -> 'vacuum_backlog') x
+   where x ->> 'table' = 'kc_kapazitaet_probe';
+  assert r is not null, 'Ein echter Rueckstand muss gemeldet werden';
+  assert (r ->> 'dead_tuples')::bigint > (r ->> 'trigger_at')::bigint,
+    'Gemeldet wird nur, was ueber der Ausloeseschwelle liegt';
+
+  select x into b from jsonb_array_elements(v -> 'bloat') x
+   where x ->> 'table' = 'kc_kapazitaet_probe';
+  assert b is not null, 'Der Leerraum muss gemeldet werden';
+  assert (b ->> 'free_percent')::numeric between 30 and 99,
+    format('Leerraum unplausibel: %s %% - Ganzzahldivision?', b ->> 'free_percent');
+
+  select x into i from jsonb_array_elements(v -> 'unused_indexes') x
+   where x ->> 'index' = 'kc_kapazitaet_probe_idx';
+  assert i is not null, 'Ein grosser, nie benutzter Index muss gemeldet werden';
+  assert (i ->> 'scans')::bigint < 50, 'Nur kaum benutzte Indexe werden gemeldet';
+end $$;
+
+drop table public.kc_kapazitaet_probe;
 
 \echo 'ALLE SQL-PRUEFUNGEN BESTANDEN'

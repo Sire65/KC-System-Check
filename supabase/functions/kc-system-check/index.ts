@@ -42,13 +42,21 @@ function capacityResult(res:any){
   const d=res.data||{},conn=d.connections||{},used=Number(conn.used||0),limit=Number(conn.limit_total||0);
   const pct=limit>0?Math.round(used/limit*1000)/10:null;
   const seq=d.sequences_near_limit||[],vac=d.vacuum_backlog||[],largest=d.largest_tables||[];
-  const status=(pct!==null&&pct>=90)||seq.length?"critical":(pct!==null&&pct>=70)||vac.length?"warning":"healthy";
+  const bloat=d.bloat||[],idx=d.unused_indexes||[];
+  const mb=(b:any)=>Math.round(Number(b||0)/1048576*10)/10;
+  // Nur echte Kapazitaetsrisiken faerben die Ampel. Leerraum durch staendiges
+  // Aendern ist Normalbetrieb und wird wiederverwendet; ungenutzte Indexe sind
+  // ein Sparhinweis, keine Stoerung. Sonst stuende die Kachel dauerhaft gelb.
+  const schwererLeerraum=bloat.filter((x:any)=>Number(x.free_percent)>=50&&Number(x.heap_bytes)>50*1048576);
+  const status=(pct!==null&&pct>=90)||seq.length?"critical":(pct!==null&&pct>=70)||vac.length||schwererLeerraum.length?"warning":"healthy";
   const top=largest[0];
   const parts=[pct!==null?`${used}/${limit} Verbindungen (${pct} %)`:`${used} Verbindungen`];
-  if(top)parts.push(`größte Tabelle ${top.table} ${Math.round(Number(top.bytes||0)/1048576*10)/10} MB`);
+  if(top)parts.push(`größte Tabelle ${top.table} ${mb(top.bytes)} MB`);
   if(seq.length)parts.push(`${seq.length} Sequenz(en) über 70 % ausgeschöpft`);
-  if(vac.length)parts.push(`${vac.length} Tabelle(n) mit Vacuum-Rückstand`);
-  return{id:"db_capacity",name:"Datenbank-Kapazität",kind:"database",status,health:status==="critical"?35:status==="warning"?72:100,latency:res.ms,usage:pct,capacityLabel:pct!==null?`${used} / ${limit} Verbindungen`:"Verbindungslimit unbekannt",detail:parts.join(" · "),metrics:{connections:conn,largest_tables:largest,sequences_near_limit:seq,vacuum_backlog:vac}};
+  if(vac.length)parts.push(`${vac.length} Tabelle(n) mit echtem Vacuum-Rückstand`);
+  if(bloat.length)parts.push(`${bloat[0].table} ${bloat[0].free_percent} % Leerraum${schwererLeerraum.length?" · aufräumen lohnt":" · normal bei ständigem Ändern"}`);
+  if(idx.length)parts.push(`${idx.length} kaum genutzte(r) Index (${mb(idx.reduce((n:number,x:any)=>n+Number(x.bytes||0),0))} MB frei machbar): ${idx[0].index} bei ${idx[0].scans} Zugriffen`);
+  return{id:"db_capacity",name:"Datenbank-Kapazität",kind:"database",status,health:status==="critical"?35:status==="warning"?72:100,latency:res.ms,usage:pct,capacityLabel:pct!==null?`${used} / ${limit} Verbindungen`:"Verbindungslimit unbekannt",detail:parts.join(" · "),metrics:{connections:conn,largest_tables:largest,sequences_near_limit:seq,vacuum_backlog:vac,bloat,unused_indexes:idx}};
 }
 async function exposureResult(own:string){
   const base=`${own}/functions/v1/kc-system-check`;
