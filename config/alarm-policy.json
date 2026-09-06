@@ -1,5 +1,5 @@
 {
-  "note": "Alarmregeln als Konfiguration, nicht als Code. dependencies nennt je Signal die Voraussetzungen: faellt eine davon aus, ist das Signal ein Folgealarm und wird unterdrueckt.",
+  "note": "Alarmregeln als Konfiguration, nicht als Code. dependencies nennt je Signal die Voraussetzungen: faellt eine davon aus, ist das Signal ein Folgealarm und wird unterdrueckt. renotifyStatuses bestimmt, welche Zustaende nach renotifyAfterMinutes erneut gemeldet werden - eine offene Warnung ist eine Aufgabe, kein Vorfall, und wird nicht stuendlich wiederholt.",
   "confirmAfter": {
     "critical": 2,
     "warning": 2,
@@ -7,6 +7,9 @@
     "healthy": 3
   },
   "renotifyAfterMinutes": 60,
+  "renotifyStatuses": [
+    "critical"
+  ],
   "escalateAfterMinutes": 15,
   "dependencies": {
     "mirror": [

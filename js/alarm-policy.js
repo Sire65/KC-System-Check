@@ -9,6 +9,9 @@ export const DEFAULT_POLICY={
   confirmAfter:{critical:2,warning:2,unknown:3,healthy:3},
   // Erneute Meldung eines weiterhin bestehenden Alarms.
   renotifyAfterMinutes:60,
+  // ...aber nur fuer diese Zustaende. Eine offene Warnung ist eine Aufgabe,
+  // kein Vorfall - stuendlich wiederholt wuerde sie niemand mehr lesen.
+  renotifyStatuses:["critical"],
   // Ab wann ein bestaetigter Alarm als eskaliert gilt.
   escalateAfterMinutes:15,
   // signalId -> Liste von Signalen, ohne die dieses Signal nicht bewertbar ist.
@@ -97,7 +100,8 @@ export function evaluateAlarms({signals=[],memory={},policy=DEFAULT_POLICY,maint
     alarms.push(alarm);
 
     const quietMinutes=minutesSince(entry.lastNotifiedAt,now);
-    const dueAgain=entry.lastNotifiedAt>0&&quietMinutes>=Number(merged.renotifyAfterMinutes);
+    const renotifyFor=Array.isArray(merged.renotifyStatuses)?merged.renotifyStatuses:DEFAULT_POLICY.renotifyStatuses;
+    const dueAgain=entry.lastNotifiedAt>0&&renotifyFor.includes(status)&&quietMinutes>=Number(merged.renotifyAfterMinutes);
     if(alarm.isNew||dueAgain){notify.push(alarm);next[signal.id]={...entry,lastNotifiedAt:now}}
   }
 

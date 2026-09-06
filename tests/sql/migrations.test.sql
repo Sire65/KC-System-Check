@@ -25,6 +25,7 @@ revoke all on table public.kc_core_user_links from anon, authenticated;
 \i supabase/migrations/202609060011_db_monitor_paket.sql
 \i supabase/migrations/202609060012_kc_externe_zugaenge.sql
 \i supabase/migrations/202609060013_db_monitor_paket_v2.sql
+\i supabase/migrations/202609060014_kc_alarmregelwerk_gemeinsam.sql
 
 -- 1. Sauberer Zustand: keine Sicherheitsbefunde
 do $$
@@ -437,5 +438,104 @@ begin
   assert v like '%geprüften Client-Rollen%', 'Die Meldung steht noch mit ASCII-Umlauten in der Datenbank';
   assert v not like '%geprueften Client-Rollen%', 'Die alte Fassung ist noch aktiv';
 end $$;
+
+-- Das hinterlegte Regelwerk gilt, wenn der Aufrufer keins mitgibt.
+-- kc_core faellt aus, die Spiegelung ebenfalls. Laut config/alarm-policy.json
+-- haengt mirror an kc_core - es darf also EINE Meldung geben, nicht zwei.
+-- Vor der Migration war dependencies serverseitig leer und es kamen zwei.
+delete from public.kc_system_check_alarm_state;
+do $$
+declare v jsonb := public.kc_system_check_alarm_apply(
+  '[{"id":"kc_core","name":"KC Core","status":"critical"},{"id":"mirror","name":"Spiegelung","status":"critical"}]'::jsonb);
+begin
+  assert jsonb_array_length(v -> 'notify') = 1, 'Es darf nur die Ursache melden: ' || (v ->> 'notify');
+  assert v -> 'notify' @> '[{"id":"kc_core"}]'::jsonb, 'Gemeldet werden muss die Ursache: ' || (v ->> 'notify');
+  assert v -> 'suppressed' @> '[{"id":"mirror","reason":"abhaengigkeit","causedBy":"kc_core"}]'::jsonb,
+    'Die Abhaengigkeit aus dem hinterlegten Regelwerk greift nicht: ' || (v ->> 'suppressed');
+end $$;
+
+-- Ein mitgegebenes Regelwerk hat weiter Vorrang
+do $$
+declare v jsonb;
+begin
+  delete from public.kc_system_check_alarm_state;
+  v := public.kc_system_check_alarm_apply(
+    '[{"id":"kc_core","name":"KC Core","status":"critical"},{"id":"mirror","name":"Spiegelung","status":"critical"}]'::jsonb,
+    '{"dependencies":{}}'::jsonb);
+  assert jsonb_array_length(v -> 'notify') = 2,
+    'Ein ausdruecklich mitgegebenes Regelwerk muss Vorrang haben: ' || (v ->> 'notify');
+end $$;
+
+-- Entprellung: ein einzelner Aussetzer ist kein Alarm
+delete from public.kc_system_check_alarm_state;
+do $$
+declare v jsonb;
+begin
+  v := public.kc_system_check_alarm_apply('[{"id":"probe","name":"Probe","status":"healthy"}]'::jsonb);
+  v := public.kc_system_check_alarm_apply('[{"id":"probe","name":"Probe","status":"critical"}]'::jsonb);
+  assert v -> 'notify' = '[]'::jsonb, 'Ein einzelner Ausschlag darf nicht melden: ' || (v ->> 'notify');
+  v := public.kc_system_check_alarm_apply('[{"id":"probe","name":"Probe","status":"critical"}]'::jsonb);
+  assert jsonb_array_length(v -> 'notify') = 1, 'Zweimal kritisch muss melden: ' || (v ->> 'notify');
+end $$;
+
+-- Wiedervorlage nur fuer die Zustaende aus renotifyStatuses
+do $$
+declare v jsonb;
+begin
+  delete from public.kc_system_check_alarm_state;
+  -- Eine offene Warnung, vor zwei Stunden gemeldet
+  insert into public.kc_system_check_alarm_state (signal_id, confirmed, since, last_notified_at)
+  values ('warnprobe', 'warning', now() - interval '3 hours', now() - interval '2 hours');
+  v := public.kc_system_check_alarm_apply('[{"id":"warnprobe","name":"Warnprobe","status":"warning"}]'::jsonb);
+  assert v -> 'notify' = '[]'::jsonb,
+    'Eine offene Warnung darf nicht stuendlich wiederholt werden: ' || (v ->> 'notify');
+  assert jsonb_array_length(v -> 'alarms') = 1, 'Offen bleibt sie trotzdem';
+  -- Dasselbe kritisch: hier ist die Wiedervorlage gewollt
+  insert into public.kc_system_check_alarm_state (signal_id, confirmed, since, last_notified_at)
+  values ('rotprobe', 'critical', now() - interval '3 hours', now() - interval '2 hours');
+  v := public.kc_system_check_alarm_apply('[{"id":"rotprobe","name":"Rotprobe","status":"critical"}]'::jsonb);
+  assert jsonb_array_length(v -> 'notify') = 1,
+    'Eine offene Stoerung muss wiedervorgelegt werden: ' || (v ->> 'notify');
+end $$;
+
+-- Entwarnung nur, wenn vorher alarmiert wurde
+do $$
+declare v jsonb;
+begin
+  delete from public.kc_system_check_alarm_state;
+  -- Fall A: nie gemeldet -> keine Entwarnung
+  insert into public.kc_system_check_alarm_state (signal_id, confirmed, since, last_notified_at)
+  values ('stillprobe', 'warning', now(), null);
+  for i in 1..3 loop
+    v := public.kc_system_check_alarm_apply('[{"id":"stillprobe","name":"Stillprobe","status":"healthy"}]'::jsonb);
+  end loop;
+  assert v -> 'recovered' = '[]'::jsonb,
+    'Entwarnung ohne vorherigen Alarm: ' || (v ->> 'recovered');
+  -- Fall B: gemeldet -> Entwarnung
+  insert into public.kc_system_check_alarm_state (signal_id, confirmed, since, last_notified_at)
+  values ('lautprobe', 'critical', now(), now());
+  for i in 1..3 loop
+    v := public.kc_system_check_alarm_apply('[{"id":"lautprobe","name":"Lautprobe","status":"healthy"}]'::jsonb);
+  end loop;
+  assert v -> 'recovered' @> '[{"id":"lautprobe"}]'::jsonb,
+    'Nach einem gemeldeten Alarm muss die Entwarnung kommen: ' || (v ->> 'recovered');
+  assert (select last_notified_at is null from public.kc_system_check_alarm_state where signal_id='lautprobe'),
+    'Nach der Entwarnung muss der Meldevermerk zurueckgesetzt sein';
+end $$;
+
+-- Wartungsfenster schlaegt alles
+do $$
+declare v jsonb;
+begin
+  delete from public.kc_system_check_alarm_state;
+  insert into public.kc_system_check_alarm_state (signal_id, confirmed, since, suppressed_until)
+  values ('wartungsprobe', 'critical', now(), now() + interval '1 hour');
+  v := public.kc_system_check_alarm_apply('[{"id":"wartungsprobe","name":"Wartungsprobe","status":"critical"}]'::jsonb);
+  assert v -> 'notify' = '[]'::jsonb, 'Im Wartungsfenster wird nicht gemeldet';
+  assert v -> 'suppressed' @> '[{"id":"wartungsprobe","reason":"wartung"}]'::jsonb,
+    'Die Unterdrueckung muss sichtbar sein, nicht stillschweigend';
+end $$;
+
+delete from public.kc_system_check_alarm_state;
 
 \echo 'ALLE SQL-PRUEFUNGEN BESTANDEN'

@@ -138,3 +138,25 @@ test('Statusnamen aus verschiedenen Quellen werden vereinheitlicht', () => {
   assert.equal(normalizeStatus('not_configured'), 'unknown');
   assert.equal(normalizeStatus(undefined), 'unknown');
 });
+
+test("Eine offene Warnung wird nicht stuendlich wiederholt, eine Stoerung schon",()=>{
+  const jetzt=Date.now(),vorZweiStunden=jetzt-2*60*60*1000;
+  const speicher={
+    gelb:{confirmed:"warning",candidate:null,streak:0,since:vorZweiStunden,lastNotifiedAt:vorZweiStunden},
+    rot:{confirmed:"critical",candidate:null,streak:0,since:vorZweiStunden,lastNotifiedAt:vorZweiStunden}
+  };
+  const ergebnis=evaluateAlarms({
+    signals:[{id:"gelb",name:"Gelb",status:"warning"},{id:"rot",name:"Rot",status:"critical"}],
+    memory:speicher,policy:DEFAULT_POLICY,now:jetzt});
+  assert.deepEqual(ergebnis.notify.map(x=>x.id),["rot"],"nur die Stoerung wird wiedervorgelegt");
+  assert.equal(ergebnis.alarms.length,2,"offen bleiben beide");
+});
+
+test("renotifyStatuses ist Konfiguration, nicht fest verdrahtet",()=>{
+  const jetzt=Date.now(),alt=jetzt-2*60*60*1000;
+  const ergebnis=evaluateAlarms({
+    signals:[{id:"gelb",name:"Gelb",status:"warning"}],
+    memory:{gelb:{confirmed:"warning",candidate:null,streak:0,since:alt,lastNotifiedAt:alt}},
+    policy:{...DEFAULT_POLICY,renotifyStatuses:["critical","warning"]},now:jetzt});
+  assert.deepEqual(ergebnis.notify.map(x=>x.id),["gelb"],"wer Warnungen wiedervorlegen will, kann das einstellen");
+});

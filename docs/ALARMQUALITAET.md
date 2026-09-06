@@ -36,14 +36,11 @@ Seit v0.7.13 haengt die Spiegelung ausserdem an `neon`: ist die
 Spiegeldatenbank nicht erreichbar, scheitern auch die Spiegellaeufe. Dann
 soll eine Meldung kommen, nicht zwei.
 
-**Bekannte Luecke, damit sie nicht unbemerkt bleibt:** dieses Regelwerk wirkt
-zurzeit nur in der App. `kc-live-operations-watch` ruft
-`kc_system_check_alarm_apply()` mit `p_policy:{}` auf - serverseitig gelten
-also die eingebauten Vorgaben der Funktion, und `dependencies` ist dort leer.
-Entprellung und Wiedervorlage stimmen zufaellig ueberein, weil die Vorgaben in
-der Funktion dieselben Zahlen tragen; die Abhaengigkeiten aber nicht. Wer das
-schliessen will, muss die Regeln an einen Ort legen, den beide Seiten lesen -
-das ist offen und bewusst nicht nebenbei erledigt worden.
+Seit v0.7.14 gilt das auch serverseitig. Vorher war `dependencies` dort leer,
+weil die Aufrufer `p_policy:{}` uebergeben: das Regelwerk liegt jetzt in
+`kc_system_check_alarm_policy` und wird benutzt, wenn der Aufrufer keins
+mitgibt. Inhaltsgleich mit `config/alarm-policy.json`; ein Test vergleicht
+beide.
 
 ## 3. Wartungsfenster
 
@@ -72,3 +69,42 @@ Serveralarmierung diese Regeln nutzt, muss sie ihre Signale durch
 `kc_system_check_alarm_apply()` schicken und nur noch das versenden, was
 in `notify` zurueckkommt. Solange das nicht geschehen ist, gilt die
 Alarmqualitaet nur in der App.
+
+## 6. Was die Alarmierung wirklich benutzt
+
+Der wichtigste Befund dieser Runde, und der unangenehmste: **die Alarmierung,
+die als Push und E-Mail ankommt, hat dieses Regelwerk nie aufgerufen.**
+`kc-system-check-alerts` entschied allein aus dem Sprung des Gesamtzustands -
+gruen nach gelb, gelb nach rot. Kein Entprellen, keine Abhaengigkeiten, kein
+Wartungsfenster. Ein einzelner Aussetzer genuegte fuer eine Meldung. Der Kopf
+von Migration 202609060003 behauptete bereits seit dem ersten Tag das
+Gegenteil.
+
+Seit v0.7.14 baut die Alarmierung aus den Kachelergebnissen Signale - mit
+demselben Sieb wie die App, `not_configured` und `disabled` fliegen raus - und
+laesst `kc_system_check_alarm_apply()` entscheiden. Verschickt wird nur, was in
+`notify` zurueckkommt. Wieviele Folgealarme unterdrueckt wurden, steht in der
+Nachricht, damit die Unterdrueckung sichtbar bleibt.
+
+Zwei Regeln sind dabei neu:
+
+**`renotifyStatuses`** - nur diese Zustaende werden nach
+`renotifyAfterMinutes` erneut gemeldet, voreingestellt allein `critical`. Eine
+offene Warnung ist eine Aufgabe, kein Vorfall; stuendlich wiederholt liest sie
+niemand mehr. Ohne diese Regel haette die bewusst offene GitHub-Warnung ab
+sofort jede Stunde gemeldet.
+
+**`recovered`** - die Entwarnung gehoert in dieselbe Auswertung wie der Alarm
+und nicht in den Aufrufer. Gemeldet wird sie nur fuer Signale, fuer die vorher
+auch wirklich alarmiert wurde, und erst wenn nichts mehr offen ist. Sonst
+entwarnt das System vor etwas, wovon niemand erfahren hat, oder waehrend eine
+zweite Stoerung weiterlaeuft.
+
+### Beim Umstellen zu erwarten
+
+Der erste Lauf legt fuer jedes Signal einen Zustand an. Was dabei nicht gruen
+ist, meldet einmal - vorher durchgerechnet und wieder zurueckgerollt: genau ein
+Signal, die bewusste GitHub-Warnung. Danach ist Ruhe, weil Warnungen nicht
+wiedervorgelegt werden. Der Alternativweg waere gewesen, den Zustand still
+vorzubelegen; dann haette das System beim Start alles Kaputte als bekannt
+abgehakt. Eine ehrliche Meldung ist besser.

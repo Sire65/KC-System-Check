@@ -1,6 +1,6 @@
 {
-  "version": "0.7.13",
-  "note": "Neon-Kachel angebunden: die Spiegeldatenbank wird jetzt selbst befragt statt nur ueber Dritte beurteilt",
+  "version": "0.7.14",
+  "note": "Die Alarmierung benutzt endlich das Alarmregelwerk: entprellt, abhaengigkeitsbewusst, keine stuendlichen Warnungen",
   "channel": "stable",
   "installSekunden": 5
 }

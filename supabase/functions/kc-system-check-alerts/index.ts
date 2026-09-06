@@ -34,11 +34,72 @@ async function latestDelivery(channel:string){const q=`${BASE}/rest/v1/kc_commun
 async function deliveryState(){const [push,email]=await Promise.all([latestDelivery('push'),latestDelivery('email')]);return{push,email}}
 function publicSettings(s:any,p:any,d:any){return{pushEnabled:!!s.push_enabled,emailEnabled:!!s.email_enabled,pushMinSeverity:s.push_min_severity,emailMinSeverity:s.email_min_severity,checkIntervalMinutes:s.check_interval_minutes,recoveryPushEnabled:!!s.recovery_push_enabled,recoveryEmailEnabled:!!s.recovery_email_enabled,lastFullStatus:s.last_full_status,lastEvaluatedAt:s.last_evaluated_at,lastAlertStatus:s.last_alert_status,lastAlertAt:s.last_alert_at,providers:p,delivery:d}}
 async function patchRule(eventKey:string,channels:string[],mode:string){const r=await fetch(`${BASE}/rest/v1/kc_communication_event_rules?source_program=eq.kc-system-check&event_key=eq.${eventKey}`,{method:"PATCH",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify({channels,channel_mode:mode,updated_at:new Date().toISOString()})});if(!r.ok)throw new Error(`rule_patch_${eventKey}_${r.status}`)}
-async function router(eventKey:string,status:string,payload:any,testLabel:string|null=null){const findings=(payload.results||[]).filter((x:any)=>["warning","critical"].includes(String(x.status))).map((x:any)=>`${x.name}: ${x.detail||x.status}`).slice(0,6);const isTest=!!testLabel;const variables={programName:"KC System Check",eventName:isTest?testLabel:eventKey==="system_error"?"Systemfehler":eventKey==="system_warning"?"Systemwarnung":"Entwarnung",message:isTest?`${testLabel}: Diese Nachricht bestätigt die produktive Alarmstrecke des KC System Check über KC Communicator.`:eventKey==="system_recovered"?"KC System Check meldet Entwarnung: Alle aktuell definierten Prüfungen sind wieder gesund.":`KC System Check meldet ${status==="critical"?"ROT":"GELB"}. ${findings.join(" · ")||"Bitte Leitstand prüfen."}`,status,health:payload.health,coverage:payload.coverage,timestamp:new Date().toISOString()};const rr=await fetch(`${BASE}/functions/v1/kc-communication-router`,{method:"POST",headers:H,body:JSON.stringify({sourceProgram:"kc-system-check",eventKey,recipients:[],variables,priority:isTest?"normal":status==="critical"?"critical":status==="warning"?"high":"normal",testOnly:false,correlationId:`system-check-${isTest?"channel-test":status}-${crypto.randomUUID()}`})});const out=await rr.json().catch(()=>({}));return{http:rr.status,...out}}
-async function send(eventKey:string,channels:string[],status:string,payload:any){if(!channels.length)return{skipped:true,reason:"channels_disabled"};await patchRule(eventKey,channels,eventKey==="system_error"?"all":"fallback");return await router(eventKey,status,payload)}
+async function router(eventKey:string,status:string,payload:any,testLabel:string|null=null,bewertung:any=null){
+  // Gemeldet wird, was das Regelwerk durchgelassen hat - nicht jede gelbe
+  // Kachel. Unterdrueckte Folgealarme stehen als Zahl dabei, damit die
+  // Unterdrueckung sichtbar bleibt und nicht stillschweigend passiert.
+  const namen=(bewertung?.notify||[]).map((x:any)=>{const treffer=(payload.results||[]).find((r:any)=>r.id===x.id);return `${x.name}: ${treffer?.detail||x.status}`});
+  const findings=(namen.length?namen:(payload.results||[]).filter((x:any)=>["warning","critical"].includes(String(x.status))).map((x:any)=>`${x.name}: ${x.detail||x.status}`)).slice(0,6);
+  const unterdrueckt=Number(bewertung?.suppressed?.length||0);const isTest=!!testLabel;const variables={programName:"KC System Check",eventName:isTest?testLabel:eventKey==="system_error"?"Systemfehler":eventKey==="system_warning"?"Systemwarnung":"Entwarnung",message:isTest?`${testLabel}: Diese Nachricht bestätigt die produktive Alarmstrecke des KC System Check über KC Communicator.`:eventKey==="system_recovered"?"KC System Check meldet Entwarnung: Alle aktuell definierten Prüfungen sind wieder gesund.":`KC System Check meldet ${status==="critical"?"ROT":"GELB"}. ${findings.join(" · ")||"Bitte Leitstand prüfen."}${unterdrueckt?` · ${unterdrueckt} Folgealarm(e) unterdrückt`:""}`,status,health:payload.health,coverage:payload.coverage,timestamp:new Date().toISOString()};const rr=await fetch(`${BASE}/functions/v1/kc-communication-router`,{method:"POST",headers:H,body:JSON.stringify({sourceProgram:"kc-system-check",eventKey,recipients:[],variables,priority:isTest?"normal":status==="critical"?"critical":status==="warning"?"high":"normal",testOnly:false,correlationId:`system-check-${isTest?"channel-test":status}-${crypto.randomUUID()}`})});const out=await rr.json().catch(()=>({}));return{http:rr.status,...out}}
+async function send(eventKey:string,channels:string[],status:string,payload:any,bewertung:any=null){if(!channels.length)return{skipped:true,reason:"channels_disabled"};await patchRule(eventKey,channels,eventKey==="system_error"?"all":"fallback");return await router(eventKey,status,payload,null,bewertung)}
 async function testChannel(channel:"push"|"email"){const eventKey=channel==="push"?"communication_test_push":"communication_test_email";const label=`KC System Check · ${channel==="push"?"Push":"E-Mail"}-Test`;const result=await router(eventKey,"healthy",{health:100,coverage:100,results:[]},label);const ok=(result.http===200||result.http===207)&&result.ok===true;if(!ok)throw new Error(result.error||result.code||result.results?.[0]?.attempts?.find((x:any)=>x.result==='failed')?.reason||`KC Communicator HTTP ${result.http}`);return result}
 async function updateState(status:string,alerted:boolean){const body:any={last_full_status:status,last_evaluated_at:new Date().toISOString(),updated_at:new Date().toISOString()};if(alerted){body.last_alert_status=status;body.last_alert_at=new Date().toISOString()}await fetch(`${BASE}/rest/v1/kc_system_check_alert_settings?id=eq.global`,{method:"PATCH",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify(body)})}
-async function run(){const s=await settings();if(s.last_evaluated_at){const age=(Date.now()-Date.parse(s.last_evaluated_at))/60000;if(Number.isFinite(age)&&age+0.5<Number(s.check_interval_minutes||15))return{ok:true,skipped:true,reason:"interval",nextInMinutes:Math.max(1,Math.ceil(Number(s.check_interval_minutes)-age))}}const pr=await fetch(`${BASE}/functions/v1/kc-system-check?record=1&trigger=auto`,{headers:{apikey:SERVICE,Authorization:`Bearer ${SERVICE}`}});const payload=await pr.json().catch(()=>({status:"critical",health:0,coverage:0,error:`HTTP_${pr.status}`}));const status=["healthy","warning","critical"].includes(String(payload.status))?String(payload.status):"critical";const prev=String(s.last_full_status||"");let eventKey="",channels:string[]=[];if((prev==="warning"||prev==="critical")&&status==="healthy"){eventKey="system_recovered";if(s.recovery_push_enabled)channels.push("push");if(s.recovery_email_enabled)channels.push("email")}else if(status==="warning"&&prev!=="warning"&&prev!=="critical"){eventKey="system_warning";if(s.push_enabled&&statusRank(s.push_min_severity)<=1)channels.push("push");if(s.email_enabled&&statusRank(s.email_min_severity)<=1)channels.push("email")}else if(status==="critical"&&prev!=="critical"){eventKey="system_error";if(s.push_enabled)channels.push("push");if(s.email_enabled)channels.push("email")}let dispatch:any=null;if(eventKey&&channels.length)dispatch=await send(eventKey,[...new Set(channels)],status,payload);await updateState(status,!!dispatch);return{ok:pr.ok,status,previousStatus:prev||null,eventKey:eventKey||null,channels,dispatch,health:payload.health,coverage:payload.coverage,checkedAt:payload.checkedAt}}
+// Nur die Signale, die ueberhaupt bewertbar sind - dasselbe Sieb wie
+// signalsFromResults() in js/alarm-policy.js.
+function signalsFromResults(results:any[]){
+  return (results||[])
+    .filter((r:any)=>r&&r.id&&!["not_configured","disabled"].includes(String(r.status)))
+    .map((r:any)=>({id:r.id,name:r.name||r.id,status:r.status}));
+}
+// Bewertet die Rohzustaende mit dem hinterlegten Regelwerk: Entprellung,
+// Wartungsfenster, Folgealarme, Wiedervorlage, Entwarnung. Faellt der Aufruf
+// aus, wird NICHT stillschweigend alarmiert - dann meldet run() den Fehler.
+async function evaluate(results:any[]){
+  const r=await rpc("kc_system_check_alarm_apply",{p_signals:signalsFromResults(results),p_policy:{}});
+  if(!r.ok)throw new Error(`alarm_apply_${r.status}`);
+  const v=await r.json();
+  return{notify:v?.notify||[],alarms:v?.alarms||[],suppressed:v?.suppressed||[],recovered:v?.recovered||[]};
+}
+async function run(){
+  const s=await settings();
+  if(s.last_evaluated_at){
+    const age=(Date.now()-Date.parse(s.last_evaluated_at))/60000;
+    if(Number.isFinite(age)&&age+0.5<Number(s.check_interval_minutes||15))
+      return{ok:true,skipped:true,reason:"interval",nextInMinutes:Math.max(1,Math.ceil(Number(s.check_interval_minutes)-age))};
+  }
+  const pr=await fetch(`${BASE}/functions/v1/kc-system-check?record=1&trigger=auto`,{headers:{apikey:SERVICE,Authorization:`Bearer ${SERVICE}`}});
+  const payload=await pr.json().catch(()=>({status:"critical",health:0,coverage:0,results:[],error:`HTTP_${pr.status}`}));
+  const status=["healthy","warning","critical"].includes(String(payload.status))?String(payload.status):"critical";
+
+  // Ab hier entscheidet das Regelwerk, nicht der Sprung des Gesamtzustands.
+  // Vorher genuegte ein einzelner Aussetzer fuer eine Meldung.
+  const v=await evaluate(payload.results||[]);
+  const schwerste=v.notify.some((x:any)=>x.status==="critical")?"critical":v.notify.length?"warning":null;
+
+  let eventKey="",channels:string[]=[];
+  if(schwerste==="critical"){
+    eventKey="system_error";
+    if(s.push_enabled)channels.push("push");
+    if(s.email_enabled)channels.push("email");
+  }else if(schwerste==="warning"){
+    eventKey="system_warning";
+    if(s.push_enabled&&statusRank(s.push_min_severity)<=1)channels.push("push");
+    if(s.email_enabled&&statusRank(s.email_min_severity)<=1)channels.push("email");
+  }else if(v.recovered.length&&!v.alarms.length){
+    // Entwarnung erst, wenn nichts mehr offen ist - sonst entwarnt das System
+    // waehrend eine andere Stoerung weiterlaeuft.
+    eventKey="system_recovered";
+    if(s.recovery_push_enabled)channels.push("push");
+    if(s.recovery_email_enabled)channels.push("email");
+  }
+
+  let dispatch:any=null;
+  if(eventKey&&channels.length)dispatch=await send(eventKey,[...new Set(channels)],schwerste||"healthy",payload,v);
+  await updateState(status,!!dispatch);
+  return{ok:pr.ok,status,eventKey:eventKey||null,channels,dispatch,
+    alarms:v.alarms.length,notified:v.notify.length,suppressed:v.suppressed.length,recovered:v.recovered.length,
+    health:payload.health,coverage:payload.coverage,checkedAt:payload.checkedAt};
+}
 Deno.serve(async(req:Request)=>{
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:CORS});
   try{
