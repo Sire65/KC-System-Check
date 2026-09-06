@@ -45,3 +45,18 @@ Zeilenzahlen, Restore-Drill, Zertifikatslaufzeiten, Auth-Anomalien,
 synthetische Fachtransaktionen, Geraete- und Standorttelemetrie
 (Akku, Netzqualitaet, Drucker, lokaler Speicher), ehrliche
 Invocation-Zaehlung ueber alle Funktionen.
+
+## Aufbewahrung und Kennzahlen
+
+`kc_internal.kc_db_mirror_retention_cleanup()` loescht taeglich um 03:17
+alle Spiegellaeufe aelter als 14 Tage - das haelt `kc_db_mirror_runs`
+stabil bei rund 149 MB. Gemessen am 2026-09-06: Datenbank 209 von 500 MB,
+in den zwei Tagen davor unveraendert. Die Datenbank waechst also **nicht**
+unbegrenzt.
+
+Verloren gingen dabei bisher aber alle Kennzahlen. Deshalb verdichtet
+`public.kc_db_mirror_daily_rollup()` (taeglich 03:05, also *vor* dem
+Aufraeumen) jeden abgeschlossenen Tag nach
+`kc_db_mirror_runs_daily`: Anzahl Laeufe, auffaellige Laeufe,
+Abweichungen, maximaler und mittlerer Replikationsverzug. Die Funktion
+loescht selbst nichts - es gibt weiterhin genau einen Aufraeumer.

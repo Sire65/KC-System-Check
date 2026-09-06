@@ -164,4 +164,41 @@ begin
   ), 'anon darf keine Rechte auf der Zugangsliste haben';
 end $$;
 
+-- 11. Verdichtung bewahrt die Kennzahlen und loescht selbst nichts
+create table if not exists public.kc_db_mirror_runs(
+  id bigserial primary key, status text, started_at timestamptz, finished_at timestamptz,
+  source_rows bigint, target_rows bigint, replication_lag_sec numeric, mismatch_count int);
+\i supabase/migrations/202609060005_kc_mirror_runs_retention.sql
+insert into public.kc_db_mirror_runs(status, started_at, replication_lag_sec, mismatch_count)
+select case when n % 20 = 0 then 'error' else 'ok' end,
+       now() - make_interval(days => d) + make_interval(mins => n),
+       (n % 7)::numeric,
+       case when n % 50 = 0 then 1 else 0 end
+from generate_series(1,30) d, generate_series(1,100) n;
+do $$
+declare v jsonb; v_vorher bigint; v_nachher bigint;
+begin
+  select count(*) into v_vorher from public.kc_db_mirror_runs;
+  v := public.kc_db_mirror_daily_rollup();
+  select count(*) into v_nachher from public.kc_db_mirror_runs;
+  assert v_vorher = v_nachher, 'Die Verdichtung darf keine einzige Zeile loeschen';
+  assert (v ->> 'aggregated_days')::int = 30, 'Alle abgeschlossenen Tage muessen verdichtet sein';
+  assert (select sum(runs) from public.kc_db_mirror_runs_daily) = 3000, 'Jeder Lauf muss gezaehlt sein';
+  assert (select sum(non_ok) from public.kc_db_mirror_runs_daily) > 0, 'Auffaellige Laeufe duerfen nicht verlorengehen';
+  assert (select sum(mismatches) from public.kc_db_mirror_runs_daily) > 0, 'Abweichungen duerfen nicht verlorengehen';
+
+  -- Zweiter Aufruf darf nichts verdoppeln
+  v := public.kc_db_mirror_daily_rollup();
+  assert (select sum(runs) from public.kc_db_mirror_runs_daily) = 3000, 'Mehrfacher Aufruf darf nicht doppelt zaehlen';
+end $$;
+
+-- 12. Es darf keinen zweiten Aufraeumer geben
+do $$
+begin
+  assert not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'kc_db_mirror_runs_retention'
+  ), 'Ein konkurrierender Aufraeumer neben kc_internal.kc_db_mirror_retention_cleanup ist nicht erlaubt';
+end $$;
+
 \echo 'ALLE SQL-PRUEFUNGEN BESTANDEN'

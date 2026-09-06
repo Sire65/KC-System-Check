@@ -1,5 +1,5 @@
 {
-  "version": "0.7.4",
-  "note": "Oeffentlicher Schluessel wird in jeder Form abgewiesen; Schluessel ohne Ablaufdatum wird als solcher erkannt",
+  "version": "0.7.5",
+  "note": "Tageskennzahlen der Spiegelung bleiben erhalten; Angaben zur Prueffrequenz an den tatsaechlichen Zeitplan angepasst",
   "channel": "stable"
 }
