@@ -259,4 +259,43 @@ begin
   ), 'Die Kennungstabelle darf fuer anon kein Recht haben';
 end $$;
 
+-- 14. Anwesenheiten sind fuer Clients gesperrt, serverseitig weiter lesbar
+create table if not exists public.kc_attendance_events(
+  org_id text, event_id text primary key, person_id text, member_number text);
+alter table public.kc_attendance_events enable row level security;
+grant select, insert, update, delete on public.kc_attendance_events to authenticated;
+grant all on public.kc_attendance_events to service_role;
+drop policy if exists attendance_lesen on public.kc_attendance_events;
+create policy attendance_lesen on public.kc_attendance_events for select to authenticated using (true);
+drop policy if exists attendance_schreiben_dienst on public.kc_attendance_events;
+create policy attendance_schreiben_dienst on public.kc_attendance_events for all to service_role using (true);
+insert into public.kc_attendance_events values ('org1','e1','p1','m1') on conflict do nothing;
+
+do $$
+declare v jsonb := public.kc_system_check_security_audit();
+begin
+  assert (v ->> 'permissive_policies') like '%attendance_lesen%',
+    'Die offene Lese-Policy muss vor der Migration gemeldet werden';
+end $$;
+
+\i supabase/migrations/202609060008_kc_attendance_nur_dienst.sql
+
+do $$
+declare v jsonb := public.kc_system_check_security_audit();
+begin
+  assert (v ->> 'permissive_policies') not like '%attendance_lesen%',
+    'Nach der Migration darf die offene Lese-Policy nicht mehr existieren';
+  assert not exists (
+    select 1 from information_schema.role_table_grants
+    where table_schema = 'public' and table_name = 'kc_attendance_events'
+      and grantee in ('anon','authenticated')
+  ), 'Clients duerfen kein Recht mehr auf den Anwesenheiten haben';
+  assert (select count(*) from public.kc_attendance_events) = 1,
+    'Serverseitig muessen die Daten unveraendert lesbar bleiben';
+  assert exists (
+    select 1 from pg_policies where schemaname='public'
+      and tablename='kc_attendance_events' and policyname='attendance_schreiben_dienst'
+  ), 'Die serverseitige Schreibregel muss erhalten bleiben';
+end $$;
+
 \echo 'ALLE SQL-PRUEFUNGEN BESTANDEN'

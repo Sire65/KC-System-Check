@@ -1,5 +1,5 @@
 {
-  "version": "0.7.6",
-  "note": "Fernschutz und Alarmierung verlangen Anmeldung oder Automatik-Kennung; Alarme werden auch serverseitig entprellt",
+  "version": "0.7.7",
+  "note": "Anwesenheitsdaten nur noch serverseitig lesbar; kein Client-Zugriff mehr auf personenbezogene Ereignisse",
   "channel": "stable"
 }
