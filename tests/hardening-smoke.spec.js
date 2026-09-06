@@ -85,7 +85,7 @@ test('Eine neue serverseitige Prüfung erscheint ohne App-Änderung', async ({ p
     ]
   };
   await isolate(page, route =>
-    route.request().url().includes('/kc-system-check?') && route.request().url().includes('systems=')
+    route.request().url().includes('/kc-system-check?') && route.request().url().includes('trigger=')
       ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) })
       : route.abort()
   );
@@ -104,7 +104,7 @@ test('Ein einzelner Ausreißer erzeugt keinen Alarm, der bestätigte schon', asy
   });
   let next = 'healthy';
   await isolate(page, route =>
-    route.request().url().includes('systems=')
+    route.request().url().includes('/kc-system-check?') && route.request().url().includes('trigger=')
       ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(answer(next)) })
       : route.abort()
   );
@@ -119,4 +119,37 @@ test('Ein einzelner Ausreißer erzeugt keinen Alarm, der bestätigte schon', asy
 
   await page.locator('#oneTouchBtn').click();
   await expect(page.locator('#kcAlarmState')).toContainText('1 bestätigter Alarm');
+});
+
+test('Eine neue serverseitige Prüfung ist ab Werk aktiv und läuft mit', async ({ page }) => {
+  const serverlauf = {
+    checked_at: new Date().toISOString(), overall_status: 'warning', health: 92,
+    results: [
+      { id: 'kc_core', name: 'KC Core · Supabase', kind: 'database', status: 'healthy', health: 100, latency: 85, detail: 'erreichbar' },
+      { id: 'key_lifetime', name: 'Schlüssel-Restlaufzeit', kind: 'security', status: 'healthy', health: 100, latency: null, detail: 'Kein Ablaufdatum' }
+    ]
+  };
+  let laufUrl = '';
+  await isolate(page, route => {
+    const url = route.request().url();
+    if (url.includes('history=1')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ history: [serverlauf], usage: {} }) });
+    }
+    if (url.includes('/kc-system-check?') && url.includes('trigger=')) {
+      laufUrl = url;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'warning', health: 92, coverage: 100, results: serverlauf.results }) });
+    }
+    return route.abort();
+  });
+  await page.goto(URL);
+
+  // Der Server kennt eine Prüfung, die die App nicht mitbringt: sie muss in der
+  // Auswahl auftauchen und dort ab Werk aktiv sein.
+  await page.locator('[data-view="systems"]').click();
+  const kasten = page.locator('#systemSelectors input[data-system="key_lifetime"]');
+  await expect(kasten).toBeChecked();
+
+  await page.locator('[data-view="dashboard"]').click();
+  await page.locator('#oneTouchBtn').click();
+  await expect.poll(() => laufUrl).toContain('key_lifetime');
 });

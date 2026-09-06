@@ -1,6 +1,6 @@
 {
-  "version": "0.7.8",
-  "note": "Automatischer Lauf prueft wieder alle Pruefungen; deutsche Texte mit richtigen Umlauten",
+  "version": "0.7.9",
+  "note": "Neue serverseitige Pruefungen sind ab Werk aktiv, statt stillschweigend abgewaehlt zu bleiben",
   "channel": "stable",
   "installSekunden": 5
 }
