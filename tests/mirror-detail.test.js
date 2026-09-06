@@ -1,0 +1,61 @@
+// Ein Warnhinweis muss sagen, worueber er warnt.
+//
+// Anlass: am 2026-09-06 meldete die Spiegelung "Spiegelung mit Warnhinweis"
+// und sonst nichts. Der Grund - kc_core_app_registry: verification mismatch,
+// weil dem Spiegel drei neu hinzugefuegte Spalten fehlten - stand in den Daten
+// und kam nur nicht in der Kachel an.
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const quelle = readFileSync("supabase/functions/kc-system-check/index.ts", "utf8");
+const abschnitt = quelle
+  .slice(quelle.indexOf("function mirrorDetail"), quelle.indexOf("// --- Lebenszeichen der Programme"))
+  .replace(/:\s*string\[\]/g, "").replace(/:\s*boolean/g, "").replace(/:\s*any/g, "");
+const mirrorDetail = new Function(`${abschnitt}; return mirrorDetail;`)();
+
+const vorMinuten = m => new Date(Date.now() - m * 60000).toISOString();
+
+test("Eine Warnung nennt Tabelle und Meldung", () => {
+  const text = mirrorDetail(
+    { status: "warning", age_min: 2 },
+    { mirror: { mismatch_count: 0 },
+      last_issue: { tabelle: "kc_core_app_registry", message: "kc_core_app_registry: verification mismatch",
+                    status: "warning", started_at: vorMinuten(12) } },
+    false);
+  assert.match(text, /kc_core_app_registry: verification mismatch/);
+  assert.match(text, /vor 12 min/);
+  assert.match(text, /letzter Lauf danach vor 2 min/, "der Verlauf seit dem Befund gehoert dazu");
+});
+
+test("Ohne Befund bleibt es beim alten Text", () => {
+  const text = mirrorDetail({ status: "warning", age_min: 200 }, { mirror: {}, last_issue: null }, false);
+  assert.equal(text, "Spiegelung mit Warnhinweis");
+});
+
+test("Gruen nennt Abweichungen und Alter", () => {
+  const text = mirrorDetail({ status: "healthy", age_min: 1 }, { mirror: { mismatch_count: 0 } }, false);
+  assert.match(text, /0 Abweichungen · letzter Lauf vor 1 min/);
+});
+
+test("Ohne Momentaufnahme wird nichts behauptet", () => {
+  assert.match(mirrorDetail({ status: "unknown" }, null, true), /nicht abrufbar/);
+  assert.match(mirrorDetail({ status: "not_configured" }, null, false), /Keine Spiegelung eingerichtet/);
+});
+
+test("Die Momentaufnahme liefert den Grund mit", () => {
+  const sql = readFileSync("supabase/migrations/202609060020_kc_spiegel_befund_benennen.sql", "utf8");
+  assert.match(sql, /'last_issue'/);
+  assert.match(sql, /metrics ->> 'table' as tabelle/);
+  assert.match(quelle, /last_issue:snap\?\.last_issue\?\?null/, "der Befund gehoert auch in die Kennzahlen");
+});
+
+test("Die Diagnose nennt die Schemaaenderung als erste Spur", () => {
+  // Der haeufigste Grund fuer eine Pruefsummen-Abweichung ist eine Spalte, die
+  // in der Quelle dazukam und im Spiegel fehlt. Genau das ist am 2026-09-06
+  // passiert - und die Diagnose schickte einen vorher zum Mirror-Worker.
+  const d = readFileSync("js/diagnostics.js", "utf8");
+  assert.match(d, /Der Spiegel zieht Schemaänderungen NICHT automatisch nach/);
+  assert.match(d, /ALTER TABLE nachziehen/);
+  assert.match(d, /befund\?\.tabelle/);
+});

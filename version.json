@@ -1,6 +1,6 @@
 {
-  "version": "0.7.19",
-  "note": "Portabel: Repository und Zweitprojekt sind Konfiguration, eine fehlende KC-Funktion legt nicht mehr den ganzen Lauf lahm",
+  "version": "0.7.20",
+  "note": "Die Spiegelkachel nennt Tabelle und Meldung, statt nur 'Warnhinweis' zu sagen",
   "channel": "stable",
   "installSekunden": 5
 }
