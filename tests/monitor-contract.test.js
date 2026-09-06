@@ -86,3 +86,9 @@ test('Der Portabilitaetsbeweis laeuft in CI mit',()=>{const sh=fs.readFileSync('
 // daraus null, die Kachelliste bekommt einen leeren Eintrag und die Abdeckung
 // rechnet mit einem Nenner, den es nicht gibt.
 test('die Kachelliste hat keine Luecke',()=>{const e=fs.readFileSync('supabase/functions/kc-system-check/index.ts','utf8');assert.doesNotMatch(e,/,\s*,/,'ein doppeltes Komma erzeugt einen leeren Platz im Ergebnisfeld')});
+
+// Am Bericht aus dem Betrieb aufgefallen: coverage kam durch, selection nicht -
+// die Kopfzeile konnte deshalb nie sagen, WELCHE Pruefungen fehlten.
+test('die Auswahlangabe ueberlebt den Laufabschluss',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/selection:payload\.selection\|\|null/);assert.match(a,/function auswahlHinweis/)});
+
+test('der Bericht enthaelt die Messreihen der Fruehwarnung',()=>{const a=fs.readFileSync('js/app.js','utf8');assert.match(a,/fruehwarnung:\{zustand:/);assert.match(a,/kc-early-warning-v2/)});

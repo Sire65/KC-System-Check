@@ -1,6 +1,6 @@
 {
-  "version": "0.7.26",
-  "note": "Die Fruehwarnung liest die richtige Zahl und haelt eine Messumstellung nicht fuer einen Trend",
+  "version": "0.7.27",
+  "note": "Die Kopfzeile nennt die ausgelassenen Pruefungen; der Bericht enthaelt die Fruehwarn-Messreihen",
   "channel": "stable",
   "installSekunden": 5
 }
