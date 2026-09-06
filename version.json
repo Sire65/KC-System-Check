@@ -1,6 +1,6 @@
 {
-  "version": "0.7.11",
-  "note": "Kapazitaetspruefung kalibriert: echter Vacuum-Rueckstand statt Normalbetrieb, dazu Leerraum und ungenutzte Indexe",
+  "version": "0.7.12",
+  "note": "SQL-Ueberwachung als tragbares Paket db_monitor - laeuft auch auf Neon und fremden PostgreSQL-Instanzen",
   "channel": "stable",
   "installSekunden": 5
 }

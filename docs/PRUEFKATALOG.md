@@ -60,3 +60,32 @@ Aufraeumen) jeden abgeschlossenen Tag nach
 `kc_db_mirror_runs_daily`: Anzahl Laeufe, auffaellige Laeufe,
 Abweichungen, maximaler und mittlerer Replikationsverzug. Die Funktion
 loescht selbst nichts - es gibt weiterhin genau einen Aufraeumer.
+
+## Woher die Datenbankpruefungen kommen
+
+Die Sicherheits- und die Kapazitaetspruefung stehen seit v0.7.12 nicht mehr als
+SQL-Text in den KC-Funktionen, sondern in einem eigenstaendigen, tragbaren
+Paket: `share/db-monitor/install.sql`. Es legt das Schema `db_monitor` mit drei
+Funktionen an - `security_audit`, `capacity` und `report` - und laeuft auf jeder
+PostgreSQL-Datenbank ab Version 13, auch ohne die Supabase-Rollen.
+
+`kc_system_check_security_audit()` und `kc_system_check_db_capacity()` rufen es
+seither nur noch auf. Ihre Felder heissen unveraendert, damit die Edge Function
+gleich bleibt; einzig `uncovered_grants` traegt fuer KC weiter den alten Namen
+`public_grants`.
+
+Der Umbau hat zwei Fehler sichtbar gemacht, die in der doppelten Fassung nicht
+auffielen:
+
+- **Klammerfehler in `views_bypassing_rls`.** Es stand
+  `where (relkind='v' and not invoker) or relkind='m' and exists (...)`. `and`
+  bindet staerker als `or`, die Rechtepruefung galt also nur fuer
+  materialisierte Views. Eine View mit Eigentuemerrechten, die niemand erreichen
+  kann, wurde dadurch als Loch gemeldet.
+- **Fehlende Typangabe im Hinweis-Zweig.** `hinweise || 'Text'` ohne `::text`
+  bricht zur Laufzeit ab, weil PostgreSQL den Text fuer eine Array-Angabe haelt.
+  Gefunden hat das erst der erste Lauf gegen die echte Datenbank; seither loest
+  `tests/sql/db-monitor.test.sql` diesen Zweig gezielt aus.
+
+Ein Test wacht darueber, dass Paket und Migration nicht auseinanderlaufen
+(`tests/db-monitor-package.test.js`).

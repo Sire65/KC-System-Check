@@ -22,6 +22,7 @@ alter table public.kc_core_user_links enable row level security;
 revoke all on table public.kc_core_user_links from anon, authenticated;
 \i supabase/migrations/202609060006_kc_automation_und_rollen.sql
 \i supabase/migrations/202609060007_kc_alarm_entwarnung.sql
+\i supabase/migrations/202609060011_db_monitor_paket.sql
 
 -- 1. Sauberer Zustand: keine Sicherheitsbefunde
 do $$
