@@ -89,3 +89,19 @@ auffielen:
 
 Ein Test wacht darueber, dass Paket und Migration nicht auseinanderlaufen
 (`tests/db-monitor-package.test.js`).
+
+## Wo das Paket ueberall liegt
+
+| Datenbank | Stand | Ergebnis beim Einspielen |
+| --- | --- | --- |
+| KC Core (Supabase, PostgreSQL 17) | Migration `202609060011` | gruen, keine Befunde |
+| KC Core Mirror (Neon, PostgreSQL 18.6) | von Hand eingespielt am 2026-09-06 | gruen; 64 Tabellen ohne RLS, aber keine Client-Rolle vorhanden - deshalb Hinweis statt Alarm |
+
+Auf Neon gibt es weder `anon` noch `authenticated` noch `service_role`. Die
+Datei erkennt das und ueberspringt die entsprechenden Rechte. Genau dieser Fall
+war der Grund fuer den Umbau: dieselbe Datei muss auf beiden Seiten laufen.
+
+Die Neon-Seite wird vom KC System Check bisher nur auf Erreichbarkeit geprueft.
+Die Funktionen liegen jetzt dort bereit; damit die Kachel sie auch liest, braucht
+die Edge Function einen Neon-Zugang. Das ist noch offen und bewusst nicht mit
+erledigt worden.
