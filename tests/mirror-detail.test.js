@@ -13,6 +13,10 @@ const abschnitt = quelle
   .slice(quelle.indexOf("function mirrorDetail"), quelle.indexOf("// --- Lebenszeichen der Programme"))
   .replace(/:\s*string\[\]/g, "").replace(/:\s*boolean/g, "").replace(/:\s*any/g, "");
 const mirrorDetail = new Function(`${abschnitt}; return mirrorDetail;`)();
+const gesundAbschnitt = quelle
+  .slice(quelle.indexOf("function mirrorHealth"), quelle.indexOf("const worst="))
+  .replace(/:\s*any/g, "");
+const mirrorHealth = new Function(`${gesundAbschnitt}; return mirrorHealth;`)();
 
 const vorMinuten = m => new Date(Date.now() - m * 60000).toISOString();
 
@@ -60,9 +64,9 @@ test("Die Momentaufnahme nennt die veralteten Tabellen", () => {
   assert.doesNotMatch(ohneKommentar, /kc_db_mirror_table_rules/, "die Liste darf keine fremde Nebentabelle voraussetzen");
 });
 
-test("Ohne Befund bleibt es beim alten Text", () => {
+test("Ein zu alter Lauf sagt, dass er zu alt ist", () => {
   const text = mirrorDetail({ status: "warning", age_min: 200 }, { mirror: {}, last_issue: null }, false);
-  assert.equal(text, "Spiegelung mit Warnhinweis");
+  assert.equal(text, "Seit 200 min kein Spiegellauf");
 });
 
 test("Gruen nennt Abweichungen und Alter", () => {
@@ -96,4 +100,33 @@ test("Die Diagnose nennt die betroffenen Tabellen statt 'Status unbekannt'", () 
   const d = readFileSync("js/diagnostics.js", "utf8");
   assert.match(d, /veraltete_tabellen/);
   assert.match(d, /Betroffen: \$\{namen\.join\(", "\)\}/);
+});
+
+
+// Eine Kachel, die aus Gewohnheit gelb steht, verdeckt den Tag darauf einen
+// echten Befund. Anlass: am 2026-09-06 war die Abweichung um 11:30 behoben -
+// die Kachel waere trotzdem bis zum naechsten Vormittag gelb geblieben.
+test("Ein behobener Befund faerbt nicht mehr", () => {
+  const frisch = new Date(Date.now() - 60000).toISOString();
+  const mh = mirrorHealth({ mirror: { status: "ok", mismatch_count: 0, finished_at: frisch },
+                            non_ok_24h: 3, last_issue: { veraltete_tabellen: [] } });
+  assert.equal(mh.status, "healthy", "der jetzige Zustand entscheidet, nicht die Vorgeschichte");
+  assert.equal(mh.open_tables, 0);
+  const text = mirrorDetail(mh, { mirror: { mismatch_count: 0 }, non_ok_24h: 3 }, false);
+  assert.match(text, /3 behobene\(r\) Befund\(e\) in 24 h/, "verschwinden darf die Zahl nicht");
+});
+
+test("Eine offene Tabelle faerbt sehr wohl", () => {
+  const frisch = new Date(Date.now() - 60000).toISOString();
+  const mh = mirrorHealth({ mirror: { status: "ok", mismatch_count: 0, finished_at: frisch },
+                            non_ok_24h: 1,
+                            last_issue: { veraltete_tabellen: [{ tabelle: "kc_core_app_registry", status: "warning" }] } });
+  assert.equal(mh.status, "warning");
+  assert.equal(mh.open_tables, 1);
+});
+
+test("Der jüngste Lauf selbst bleibt ausschlaggebend", () => {
+  const frisch = new Date(Date.now() - 60000).toISOString();
+  const mh = mirrorHealth({ mirror: { status: "warning", mismatch_count: 1, finished_at: frisch }, non_ok_24h: 1 });
+  assert.equal(mh.status, "critical");
 });

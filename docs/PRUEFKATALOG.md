@@ -125,6 +125,36 @@ und der Spiegel zieht das **nicht** automatisch nach. Genau das passierte am
 2026-09-06: drei neue Spalten in `kc_core_app_registry` um 10:44, Abweichung im
 Lauf um 11:00, still um 11:30, nachdem die Spalten in Neon nachgezogen waren.
 
+### Die Farbe folgt dem jetzigen Zustand
+
+Bis v0.7.21 faerbte jeder nicht fehlerfreie Lauf der letzten 24 Stunden die
+Kachel gelb (`non_ok_24h > 0`). Ein einziger Ausrutscher hielt sie damit einen
+Tag lang gelb, auch wenn der naechste Lauf 15 Minuten spaeter wieder sauber war
+- und eine Kachel, die aus Gewohnheit gelb steht, verdeckt den Tag darauf einen
+echten Befund. Genau das drohte am 2026-09-06: behoben um 11:30, gelb bis zum
+naechsten Vormittag.
+
+Seit v0.7.22 entscheidet, ob **gerade** eine Tabelle haengt (`open_tables` aus
+den `veraltete_tabellen` der Momentaufnahme). Behobene Befunde verschwinden
+nicht, sie stehen als Zahl im Text: "3 behobene(r) Befund(e) in 24 h". Der
+juengste Lauf selbst bleibt ausschlaggebend: ist er nicht `ok` oder meldet er
+Abweichungen, ist die Kachel rot.
+
+### Der Waechter fuehrte eine handgeschriebene Liste
+
+`kc_internal.kc_db_mirror_watchdog()` hatte 36 Tabellennamen fest im Quelltext,
+gespiegelt werden 48. Die zwoelf `kc_communication_*` kamen spaeter dazu und
+standen nie darin. Ungeprueft waren sie nicht - der zweite Waechter
+(`kc_db_mirror_source_check`, alle 15 Minuten) liest die Regeltabelle -, aber
+eine zu kurze Liste meldet immer "alles frisch", und niemand merkt es.
+
+Seit v0.7.22 (Migration 202609060022) liest der Waechter dieselbe Quelle wie
+das Spiegeln selbst: `kc_db_mirror_table_rules` mit `mirror_enabled`. Eine neue
+gespiegelte Tabelle ist ab dem ersten Lauf ueberwacht. Seine Meldung nennt jetzt
+die betroffenen Tabellen (hoechstens fuenf), und eine leere Regeltabelle meldet
+nicht mehr "0/0 frisch, alles gut" - wer nichts ueberwacht, hat nichts
+bestaetigt.
+
 ## Die Neon-Kachel
 
 Seit v0.7.13 fragt der Server die Spiegeldatenbank selbst. Neon spricht SQL

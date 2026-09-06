@@ -1,6 +1,6 @@
 {
-  "version": "0.7.21",
-  "note": "Die Spiegelkachel nennt die betroffene Tabelle, auch bei Sammelbefunden ohne Tabellenangabe",
+  "version": "0.7.22",
+  "note": "Die Spiegel-Kachel faerbt nach dem jetzigen Zustand; der Waechter überwacht alle gespiegelten Tabellen",
   "channel": "stable",
   "installSekunden": 5
 }
