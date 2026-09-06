@@ -1,12 +1,24 @@
 {
   "note": "Alarmregeln als Konfiguration, nicht als Code. dependencies nennt je Signal die Voraussetzungen: faellt eine davon aus, ist das Signal ein Folgealarm und wird unterdrueckt.",
-  "confirmAfter": { "critical": 2, "warning": 2, "unknown": 3, "healthy": 3 },
+  "confirmAfter": {
+    "critical": 2,
+    "warning": 2,
+    "unknown": 3,
+    "healthy": 3
+  },
   "renotifyAfterMinutes": 60,
   "escalateAfterMinutes": 15,
   "dependencies": {
-    "mirror": ["kc_core"],
-    "db_security": ["kc_core"],
-    "db_capacity": ["kc_core"],
+    "mirror": [
+      "kc_core",
+      "neon"
+    ],
+    "db_security": [
+      "kc_core"
+    ],
+    "db_capacity": [
+      "kc_core"
+    ],
     "future_academy": [],
     "neon": [],
     "b2": [],

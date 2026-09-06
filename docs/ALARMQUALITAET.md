@@ -32,6 +32,19 @@ Faellt KC Core aus, meldet der Leitstand die Ursache - nicht zusaetzlich
 Spiegelung, Sicherheitsaudit und Kapazitaet. Die Unterdrueckung ist
 sichtbar ("2 Folgealarme unterdrueckt"), nicht stillschweigend.
 
+Seit v0.7.13 haengt die Spiegelung ausserdem an `neon`: ist die
+Spiegeldatenbank nicht erreichbar, scheitern auch die Spiegellaeufe. Dann
+soll eine Meldung kommen, nicht zwei.
+
+**Bekannte Luecke, damit sie nicht unbemerkt bleibt:** dieses Regelwerk wirkt
+zurzeit nur in der App. `kc-live-operations-watch` ruft
+`kc_system_check_alarm_apply()` mit `p_policy:{}` auf - serverseitig gelten
+also die eingebauten Vorgaben der Funktion, und `dependencies` ist dort leer.
+Entprellung und Wiedervorlage stimmen zufaellig ueberein, weil die Vorgaben in
+der Funktion dieselben Zahlen tragen; die Abhaengigkeiten aber nicht. Wer das
+schliessen will, muss die Regeln an einen Ort legen, den beide Seiten lesen -
+das ist offen und bewusst nicht nebenbei erledigt worden.
+
 ## 3. Wartungsfenster
 
 `suppressed_until` je Signal schaltet befristet stumm. Ein abgelaufenes
