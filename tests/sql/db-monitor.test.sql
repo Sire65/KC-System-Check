@@ -26,7 +26,7 @@ begin
   -- aufgefuehrt schon, aber kein Alarm: niemand kann sie erreichen
   assert jsonb_array_length(v -> 'critical') = 0,
     'Ohne erreichbare Rolle darf nichts kritisch sein: ' || (v ->> 'critical');
-  assert v ->> 'notes' like '%keine der geprueften Client-Rollen existiert%',
+  assert v ->> 'notes' like '%keine der geprüften Client-Rollen existiert%',
     'Der Grund fuer die Entwarnung fehlt im Bericht: ' || (v ->> 'notes');
 end $$;
 
@@ -69,7 +69,7 @@ grant select on public.probe_sicht to anon;
 do $$
 declare v jsonb := db_monitor.security_audit();
 begin
-  assert v -> 'views_bypassing_rls' @> '["probe_sicht (View mit Eigentuemerrechten)"]'::jsonb,
+  assert v -> 'views_bypassing_rls' @> '["probe_sicht (View mit Eigentümerrechten)"]'::jsonb,
     'Erreichbare Definer-View wurde nicht gemeldet: ' || (v ->> 'views_bypassing_rls');
 end $$;
 
@@ -79,7 +79,7 @@ grant select on public.probe_sicht_neu to anon;
 do $$
 declare v jsonb := db_monitor.security_audit();
 begin
-  assert not (v -> 'views_bypassing_rls' @> '["probe_sicht_neu (View mit Eigentuemerrechten)"]'::jsonb),
+  assert not (v -> 'views_bypassing_rls' @> '["probe_sicht_neu (View mit Eigentümerrechten)"]'::jsonb),
     'security_invoker-View faelschlich gemeldet';
 end $$;
 

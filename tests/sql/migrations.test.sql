@@ -23,6 +23,8 @@ revoke all on table public.kc_core_user_links from anon, authenticated;
 \i supabase/migrations/202609060006_kc_automation_und_rollen.sql
 \i supabase/migrations/202609060007_kc_alarm_entwarnung.sql
 \i supabase/migrations/202609060011_db_monitor_paket.sql
+\i supabase/migrations/202609060012_kc_externe_zugaenge.sql
+\i supabase/migrations/202609060013_db_monitor_paket_v2.sql
 
 -- 1. Sauberer Zustand: keine Sicherheitsbefunde
 do $$
@@ -389,5 +391,51 @@ begin
 end $$;
 
 drop table public.kc_kapazitaet_probe;
+
+-- Externe Zugaenge: nur der Dienst kommt heran, und nur was aktiv ist
+insert into public.kc_external_credentials (name, kind, endpoint, secret)
+values ('probe_zugang', 'postgres_http', 'beispiel.example', 'geheim-123');
+do $$
+declare v jsonb := public.kc_external_credential('probe_zugang');
+begin
+  assert v ->> 'secret' = 'geheim-123', 'Der Zugang wird nicht zurueckgegeben';
+  assert v ->> 'endpoint' = 'beispiel.example', 'Die Adresse fehlt';
+  assert (select last_used_at is not null from public.kc_external_credentials where name='probe_zugang'),
+    'Die Nutzung wird nicht vermerkt';
+  assert public.kc_external_credential('gibt_es_nicht') is null,
+    'Ein unbekannter Name muss leer bleiben, nicht raten';
+end $$;
+
+-- Abgeschaltet heisst abgeschaltet
+update public.kc_external_credentials set active = false where name = 'probe_zugang';
+do $$ begin
+  assert public.kc_external_credential('probe_zugang') is null,
+    'Ein abgeschalteter Zugang wird weiter herausgegeben';
+end $$;
+
+-- Weder anon noch authenticated duerfen die Tabelle oder die Funktion anfassen
+do $$
+declare offen text[];
+begin
+  select coalesce(array_agg(g.grantee || ':' || g.privilege_type), '{}') into offen
+  from information_schema.role_table_grants g
+  where g.table_name = 'kc_external_credentials' and g.grantee in ('anon','authenticated');
+  assert offen = '{}', 'Rechte fuer Clientrollen auf kc_external_credentials: ' || array_to_string(offen, ', ');
+  assert not has_function_privilege('anon', 'public.kc_external_credential(text)', 'execute'),
+    'anon darf den Zugang abrufen';
+  assert not has_function_privilege('authenticated', 'public.kc_external_credential(text)', 'execute'),
+    'authenticated darf den Zugang abrufen';
+  assert (select relrowsecurity from pg_class where oid = 'public.kc_external_credentials'::regclass),
+    'RLS ist auf kc_external_credentials nicht aktiv';
+end $$;
+
+-- Die zweite Paketfassung ist eingespielt: sichtbare Meldungen mit Umlauten
+do $$
+declare v text := (select prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                   where n.nspname = 'db_monitor' and p.proname = 'report');
+begin
+  assert v like '%geprüften Client-Rollen%', 'Die Meldung steht noch mit ASCII-Umlauten in der Datenbank';
+  assert v not like '%geprueften Client-Rollen%', 'Die alte Fassung ist noch aktiv';
+end $$;
 
 \echo 'ALLE SQL-PRUEFUNGEN BESTANDEN'

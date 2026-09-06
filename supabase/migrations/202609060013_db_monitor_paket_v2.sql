@@ -1,3 +1,16 @@
+-- Zweite Fassung des tragbaren Pakets: sichtbare Meldungen mit echten Umlauten.
+--
+-- Grund: seit die Neon-Kachel den Bericht direkt anzeigt, stehen die
+-- Meldungen aus 'critical', 'warnings' und 'notes' woertlich in der App.
+-- Damit sind es sichtbare Texte und keine Serverinterna mehr - und dort gilt
+-- im KC System Check, dass Umlaute Umlaute sind. "geprueften Client-Rollen"
+-- stand nach dem Anbinden der Kachel im Klartext auf dem Telefon.
+--
+-- Sonst aendert sich nichts. Der Abschnitt unten ist Zeichen fuer Zeichen der
+-- Inhalt von share/db-monitor/install.sql; darueber wacht
+-- tests/db-monitor-package.test.js. Die KC-Funktionen aus Migration
+-- 202609060011 rufen unveraendert weiter dieselben Namen auf.
+
 -- =============================================================================
 -- db_monitor - tragbare SQL-Ueberwachung fuer PostgreSQL
 -- =============================================================================

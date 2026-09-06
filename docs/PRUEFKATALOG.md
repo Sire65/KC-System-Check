@@ -101,7 +101,34 @@ Auf Neon gibt es weder `anon` noch `authenticated` noch `service_role`. Die
 Datei erkennt das und ueberspringt die entsprechenden Rechte. Genau dieser Fall
 war der Grund fuer den Umbau: dieselbe Datei muss auf beiden Seiten laufen.
 
-Die Neon-Seite wird vom KC System Check bisher nur auf Erreichbarkeit geprueft.
-Die Funktionen liegen jetzt dort bereit; damit die Kachel sie auch liest, braucht
-die Edge Function einen Neon-Zugang. Das ist noch offen und bewusst nicht mit
-erledigt worden.
+## Die Neon-Kachel
+
+Seit v0.7.13 fragt der Server die Spiegeldatenbank selbst. Neon spricht SQL
+ueber HTTP: eine POST-Anfrage auf `https://<host>/sql`, das Geheimnis im Kopf
+`Neon-Connection-String`, nie in der Adresse. Kein Treiber, keine dauerhafte
+Verbindung, eine Anfrage pro Lauf.
+
+Die Kachel zeigt Belegung gegen das Neon-Freikontingent (512 MB), Verbindungen,
+groesste Tabelle und alle Befunde aus `db_monitor.report()`. Antwortet Neon
+nicht, ist das **rot** und nicht grau: ein Spiegel, den niemand erreicht,
+erfuellt seinen Zweck nicht. Einzelne Aussetzer faengt die Entprellung der
+Alarmregel ab. Ist gar kein Zugang hinterlegt, bleibt die bisherige,
+vorbereitete Kachel stehen - das ist ehrlich grau, nicht gruen.
+
+Der Zugang liegt in `kc_external_credentials` unter dem Namen `neon_mirror`,
+lesbar ausschliesslich fuer service_role. Nicht in den Umgebungsvariablen der
+Edge Function: in der Datenbank laesst er sich ohne neues Deploy austauschen und
+vor allem abschalten.
+
+### Was dabei nicht geht - nachgeprueft, nicht vermutet
+
+Der hinterlegte Neon-Zugang ist **kein Lesezugang**. Auf Neon kann sich nur
+anmelden, wer ueber die Neon-API angelegt wurde, und solche Rollen sind dort
+immer Mitglied von `neon_superuser`. Der Versuch, per SQL eine Rolle mit nur
+`execute` auf `db_monitor.report()` anzulegen, scheitert nicht an den Rechten,
+sondern am Neon-Proxy: `password authentication failed`. Getestet mit beiden
+Hostnamen, mit und ohne Pooler.
+
+Was bleibt, ist die Trennung der Kennungen: `kc_monitor` ist nicht die Kennung
+der Spiegelung. Faellt sie auf, laesst sie sich einzeln loeschen, ohne dass die
+Spiegelung stehenbleibt.

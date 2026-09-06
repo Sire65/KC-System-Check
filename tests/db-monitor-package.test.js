@@ -7,13 +7,30 @@
 // hier auf und nicht erst im Betrieb.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 const paket = readFileSync("share/db-monitor/install.sql", "utf8");
-const migration = readFileSync("supabase/migrations/202609060011_db_monitor_paket.sql", "utf8");
+// Jede Aenderung am Paket braucht eine neue Migration - eine bereits
+// eingespielte darf sich nicht mehr aendern. Geprueft wird deshalb die
+// juengste Paketmigration.
+const paketMigrationen = readdirSync("supabase/migrations").filter(f => f.includes("db_monitor_paket")).sort();
+const migration = readFileSync(`supabase/migrations/${paketMigrationen.at(-1)}`, "utf8");
+const anschlussMigration = readFileSync(`supabase/migrations/${paketMigrationen[0]}`, "utf8");
 
-test("Migration traegt das Paket unveraendert", () => {
-  assert.ok(migration.includes(paket), "share/db-monitor/install.sql und die Migration sind auseinandergelaufen");
+test("Die juengste Paketmigration traegt das Paket unveraendert", () => {
+  assert.ok(migration.includes(paket),
+    `share/db-monitor/install.sql und ${paketMigrationen.at(-1)} sind auseinandergelaufen - neue Migration noetig`);
+});
+
+test("Sichtbare Meldungen des Pakets verwenden echte Umlaute", () => {
+  // Diese Texte stehen seit dem Anbinden der Neon-Kachel woertlich in der App.
+  const sichtbar = [...paket.matchAll(/format\('([^']*)'/g)].map(m => m[1])
+    .concat([...paket.matchAll(/hinweise := hinweise \|\| '([^']*)'/g)].map(m => m[1]))
+    .concat([...paket.matchAll(/then '([^']*)' else '([^']*)' end as name/g)].flatMap(m => [m[1], m[2]]));
+  const verdaechtig = sichtbar
+    .filter(t => !t.includes("\n"))   // Kommentarzeilen, die der Ausdruck streift
+    .filter(t => /(ueber|geprueft|moeglich|Rueckstand|ausgeschoepft|uneingeschraenkt|Eigentuemer|grosse|fuer|Kapazitaet)/.test(t));
+  assert.deepEqual(verdaechtig, [], `Meldungen mit ASCII-Umlauten: ${verdaechtig.join(" | ")}`);
 });
 
 test("Paket nennt keine KC-Objekte - sonst ist es nicht tragbar", () => {
@@ -36,7 +53,7 @@ test("Paket setzt keine Supabase-Rollen voraus", () => {
 });
 
 test("KC-Funktionen rufen das Paket auf, statt die Logik zu wiederholen", () => {
-  const anschluss = migration.slice(migration.indexOf(paket) + paket.length);
+  const anschluss = anschlussMigration.slice(anschlussMigration.indexOf("KC-Anschluss"));
   assert.match(anschluss, /db_monitor\.security_audit\(/);
   assert.match(anschluss, /db_monitor\.capacity\(/);
   // Die alte, doppelte Logik darf im Anschluss nicht mehr auftauchen.

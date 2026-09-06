@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"GET, OPTIONS","Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"};
-const FUTURE_URL="https://iddudrxuihdodnvejxcp.supabase.co",FUTURE_KEY="sb_publishable_DWLycZijZEBvakXVncI5IQ_38LZCQxW",GITHUB_REPO="https://api.github.com/repos/Sire65/KC-System-Check",FREE_DB_BYTES=500*1024*1024,enc=new TextEncoder();
+const FUTURE_URL="https://iddudrxuihdodnvejxcp.supabase.co",FUTURE_KEY="sb_publishable_DWLycZijZEBvakXVncI5IQ_38LZCQxW",GITHUB_REPO="https://api.github.com/repos/Sire65/KC-System-Check",FREE_DB_BYTES=500*1024*1024,NEON_FREE_BYTES=512*1024*1024,enc=new TextEncoder();
 const pct=(n:number,d:number)=>d>0?Math.round(n/d*1000)/10:null,mb=(n:number)=>Math.round(n/1024/1024*10)/10;
 async function timed(url:string,init:RequestInit={}){const s=Date.now(),r=await fetch(url,{...init,cache:"no-store"});return{r,ms:Date.now()-s}}
 function mirrorHealth(s:any){const m=s?.mirror??{},age=m.finished_at?Math.round((Date.now()-new Date(m.finished_at).getTime())/60000):null,mis=Number(m.mismatch_count??0),non=Number(s?.non_ok_24h??0);if(!m||Object.keys(m).length===0)return{status:"unknown",health:null,age_min:null};let status="healthy",health=100;if(age===null||age>180){status="warning";health=72}if(mis>0||m.status!=="ok"){status="critical";health=35}else if(non>0){status="warning";health=Math.min(health,88)}return{status,health,age_min:age}}
@@ -107,9 +107,64 @@ async function callerRole(req:Request,own:string,service:string){
   if(!role)return{role:null,reason:"kein_leitstand_zugang",userId:user.id};
   return{role,userId:user.id};
 }
+// --- Neon-Spiegeldatenbank direkt pruefen ---------------------------------
+// Neon spricht SQL ueber HTTP: POST auf https://<host>/sql, das Geheimnis
+// steht im Kopf Neon-Connection-String, nie in der Adresse. Damit braucht es
+// keinen Treiber und keine dauerhafte Verbindung - eine Anfrage, eine Antwort.
+//
+// Der Zugang liegt in der Datenbank (kc_external_credentials) und nicht in den
+// Umgebungsvariablen, weil er sich dort ohne neues Deploy austauschen und vor
+// allem abschalten laesst. Er darf niemals in der Antwort auftauchen.
+async function credential(own:string,service:string,name:string){
+  try{
+    const r=await fetch(`${own}/rest/v1/rpc/kc_external_credential`,{method:"POST",cache:"no-store",headers:{apikey:service,Authorization:`Bearer ${service}`,"Content-Type":"application/json"},body:JSON.stringify({p_name:name})});
+    if(!r.ok)return null;
+    return await r.json();
+  }catch{return null}
+}
+async function neonQuery(cred:any){
+  const host=String(cred?.endpoint||"");
+  if(!host||!cred?.secret)return{ok:false,reason:"kein_zugang",ms:null,data:null,host:null};
+  const s=Date.now();
+  try{
+    const r=await fetch(`https://${host}/sql`,{method:"POST",cache:"no-store",headers:{"Neon-Connection-String":String(cred.secret),"Content-Type":"application/json"},body:JSON.stringify({query:"select db_monitor.report() as bericht",params:[]})});
+    const ms=Date.now()-s;
+    if(!r.ok){let msg="";try{msg=(await r.json())?.message||""}catch{}return{ok:false,reason:msg||`http_${r.status}`,ms,data:null,host}}
+    const body=await r.json();
+    let bericht=body?.rows?.[0]?.bericht??null;
+    if(typeof bericht==="string"){try{bericht=JSON.parse(bericht)}catch{bericht=null}}
+    if(!bericht)return{ok:false,reason:"leere_antwort",ms,data:null,host};
+    return{ok:true,reason:null,ms,data:bericht,host};
+  }catch(e){return{ok:false,reason:String((e as Error)?.message||e),ms:Date.now()-s,data:null,host}}
+}
+function neonResult(res:any,fallback:any){
+  // Kein Zugang hinterlegt: die vorbereitete Kachel bleibt, wie sie war.
+  if(res.reason==="kein_zugang")return fallback;
+  const id="neon",name="Neon · Spiegel-Datenbank",kind="database";
+  // Nicht erreichbar ist eine Stoerung, keine Unbekannte. Ein Spiegel, den
+  // niemand erreicht, erfuellt seinen Zweck nicht - die Entprellung in der
+  // Alarmregel faengt einzelne Aussetzer ab.
+  if(!res.ok)return{id,name,kind,status:"critical",health:35,latency:res.ms,usage:null,capacityLabel:"Nicht erreichbar",detail:`Neon antwortet nicht auf die Prüfabfrage: ${res.reason}`,metrics:{direct_check:true,host:res.host,error:res.reason}};
+  const d=res.data,cap=d.capacity||{},sec=d.security||{},conn=cap.connections||{};
+  const bytes=Number(cap.database_bytes||0),u=pct(bytes,NEON_FREE_BYTES);
+  const status=["healthy","warning","critical"].includes(d.status)?d.status:"unknown";
+  const top=(cap.largest_tables||[])[0];
+  const parts:string[]=[];
+  if(Array.isArray(d.critical)&&d.critical.length)parts.push(d.critical.join(" · "));
+  if(Array.isArray(d.warnings)&&d.warnings.length)parts.push(d.warnings.join(" · "));
+  if(!parts.length)parts.push("Keine Befunde");
+  parts.push(`${mb(bytes)} MB belegt`);
+  if(conn.limit_total)parts.push(`${conn.used}/${conn.limit_total} Verbindungen`);
+  if(top)parts.push(`größte Tabelle ${top.table} ${mb(Number(top.bytes||0))} MB`);
+  if(Array.isArray(d.notes)&&d.notes.length)parts.push(d.notes.join(" · "));
+  return{id,name,kind,status,health:status==="critical"?35:status==="warning"?72:100,latency:res.ms,usage:u,capacityLabel:`${mb(bytes)} / ${mb(NEON_FREE_BYTES)} MB`,detail:parts.join(" · "),metrics:{direct_check:true,host:res.host,database_bytes:bytes,free_tier_database_bytes:NEON_FREE_BYTES,usage_percent:u,connections:conn,largest_tables:cap.largest_tables||[],vacuum_backlog:cap.vacuum_backlog||[],bloat:cap.bloat||[],unused_indexes:cap.unused_indexes||[],tables_without_rls:sec.tables_without_rls||[],client_roles_present:sec.client_roles_present||[],uncovered_grants:sec.uncovered_grants||[],notes:d.notes||[]}};
+}
 function telemetryState(v:any){const s=String(v||"").toLowerCase();if(["ok","healthy","success","passed"].includes(s))return{status:"healthy",health:100};if(["error","failed","critical","down"].includes(s))return{status:"critical",health:35};if(["warning","degraded","partial"].includes(s))return{status:"warning",health:72};return{status:"unknown",health:null}}
 Deno.serve(async(req:Request)=>{if(req.method==="OPTIONS")return new Response(null,{status:204,headers:CORS});if(req.method!=="GET")return new Response(JSON.stringify({error:"method_not_allowed"}),{status:405,headers:CORS});const started=Date.now(),u=new URL(req.url),own=Deno.env.get("SUPABASE_URL")!,service=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;try{if(u.searchParams.get("probe")==="1")return new Response(JSON.stringify({probe:true}),{headers:CORS});if(u.searchParams.get("leitstand")==="1"){const who=await callerRole(req,own,service);if(!who.role)return new Response(JSON.stringify({error:"leitstand_gesperrt",reason:who.reason,hint:"Anmeldung mit einem in kc_system_check_operators freigeschalteten Konto erforderlich."}),{status:403,headers:CORS});const data=await leitstand(own);if(who.role!=="superadmin"){data.sales=[];data.sales_hidden=true}data.viewer={role:who.role};return new Response(JSON.stringify(data),{headers:CORS});}if(u.searchParams.get("history")==="1")return new Response(JSON.stringify({version:"0.4.0-live",history:await history(own),usage:await usage(own)}),{headers:CORS});const H={apikey:service,Authorization:`Bearer ${service}`};let requests=5;const coreP=timed(`${own}/rest/v1/kc_system_check_history?select=checked_at&order=checked_at.desc&limit=1`,{headers:H}).catch(()=>null),snapP=timed(`${own}/rest/v1/rpc/kc_system_check_snapshot`,{method:"POST",headers:{...H,"Content-Type":"application/json"},body:"{}"}).catch(()=>null),futureP=timed(`${FUTURE_URL}/rest/v1/rpc/kc_system_check_public_snapshot`,{method:"POST",headers:{apikey:FUTURE_KEY,Authorization:`Bearer ${FUTURE_KEY}`,"Content-Type":"application/json"},body:"{}"}).catch(()=>null),gitP=timed(GITHUB_REPO,{headers:{Accept:"application/vnd.github+json","User-Agent":"KC-System-Check"}}).catch(()=>null),teleP=timed(`${own}/rest/v1/kc_backup_machine_telemetry?select=measured_at,updated_at,last_backup_at,last_backup_status,last_backup_stored_bytes,storage_target,b2_status,neon_status,status&order=measured_at.desc&limit=1`,{headers:H}).catch(()=>null);const [core,sr,fr,gh,teleReq]=await Promise.all([coreP,snapP,futureP,gitP,teleP]);if(!sr?.r?.ok)throw new Error(`snapshot_http_${sr?.r?.status??"network"}`);const snap=await sr.r.json(),mh=mirrorHealth(snap),coreBytes=Number(snap?.database_bytes??0);let fd:any={},gd:any={},tele:any=null;if(fr?.r?.ok)try{fd=await fr.r.json()}catch{}if(gh?.r?.ok)try{gd=await gh.r.json()}catch{}if(teleReq?.r?.ok)try{tele=(await teleReq.r.json())?.[0]||null}catch{}const [neonDirect,b2Direct,r2Direct,ociDirect]=await Promise.all([optionalEndpoint("NEON"),optionalEndpoint("B2"),optionalEndpoint("R2"),optionalEndpoint("OCI")]);for(const x of[neonDirect,b2Direct,r2Direct,ociDirect])if(x)requests++;const futureBytes=Number(fd?.database_bytes??0),cu=pct(coreBytes,FREE_DB_BYTES),fu=pct(futureBytes,FREE_DB_BYTES),coreOk=!!core?.r?.ok,coreMs=core?.ms??null,coreStatus=coreOk?(coreMs!==null&&coreMs>3000?"warning":"healthy"):"critical",coreHealth=coreOk?(coreMs!==null&&coreMs>3000?82:coreMs!==null&&coreMs>1500?90:100):35;
 let neon=endpointResult("neon","Neon · Direktcheck","database",neonDirect,"Direktcheck vorbereitet; die Supabase→Neon-Spiegelung wird separat geprüft");if(!neonDirect&&tele?.neon_status){const t=telemetryState(tele.neon_status);neon={...neon,status:t.status,health:t.health,capacityLabel:"PC Backup Vault Telemetrie",detail:`Neon-Telemetrie: ${tele.neon_status}`,metrics:{direct_check:false,telemetry:true,measured_at:tele.measured_at}}}
+// Liegt ein Zugang zur Spiegeldatenbank bereit, wird sie selbst befragt statt
+// nur ueber Dritte beurteilt. Ohne Zugang bleibt die bisherige Kachel stehen.
+const neonCred=await credential(own,service,"neon_mirror");if(neonCred){const nq=await neonQuery(neonCred);requests++;neon=neonResult(nq,neon)}
 let b2=endpointResult("b2","Backblaze B2","storage",b2Direct,"Adapter bereit; noch keine B2-Telemetrie oder sichere Read-only-Verbindung");if(!b2Direct&&tele?.b2_status){const t=telemetryState(tele.b2_status),age=tele.measured_at?Math.round((Date.now()-Date.parse(tele.measured_at))/60000):null;b2={...b2,status:t.status,health:t.health,capacityLabel:tele.last_backup_stored_bytes?`${mb(Number(tele.last_backup_stored_bytes))} MB letzter Backup-Satz`:"PC Backup Vault Telemetrie",detail:`B2 ${tele.b2_status} · letzter Backup-Status ${tele.last_backup_status||"unbekannt"}${age!==null?` · Telemetrie vor ${age} min`:""}`,metrics:{direct_check:false,telemetry:true,measured_at:tele.measured_at,last_backup_at:tele.last_backup_at,last_backup_status:tele.last_backup_status,last_backup_stored_bytes:tele.last_backup_stored_bytes,storage_target:tele.storage_target}}}
 const r2=endpointResult("r2","Cloudflare R2","storage",r2Direct,"Als Backup-/Failback-Anbieter vorbereitet; Scharfstellung nach Zugangseinrichtung"),oci=endpointResult("oci","Oracle OCI Object Storage","storage",ociDirect,"Als Reserve-Anbieter vorbereitet; Scharfstellung nach Zugangseinrichtung");
 const [securityRes,capacityRes,exposure]=await Promise.all([rpc(own,service,"kc_system_check_security_audit"),rpc(own,service,"kc_system_check_db_capacity"),exposureResult(own)]);requests+=4;const dbSecurity=securityResult(securityRes),dbCapacity=capacityResult(capacityRes),keyLifetime=keyLifetimeResult();

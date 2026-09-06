@@ -1,6 +1,6 @@
 {
-  "version": "0.7.12",
-  "note": "SQL-Ueberwachung als tragbares Paket db_monitor - laeuft auch auf Neon und fremden PostgreSQL-Instanzen",
+  "version": "0.7.13",
+  "note": "Neon-Kachel angebunden: die Spiegeldatenbank wird jetzt selbst befragt statt nur ueber Dritte beurteilt",
   "channel": "stable",
   "installSekunden": 5
 }
