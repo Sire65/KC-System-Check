@@ -15,6 +15,7 @@ end $$;
 \i supabase/migrations/202609060001_kc_system_check_operators.sql
 \i supabase/migrations/202609060002_kc_system_check_audit.sql
 \i supabase/migrations/202609060003_kc_alarm_quality.sql
+\i supabase/migrations/202609060004_kc_security_audit_calibration.sql
 
 -- 1. Sauberer Zustand: keine Sicherheitsbefunde
 do $$
@@ -33,6 +34,40 @@ begin
   assert v -> 'tables_without_rls' @> '["kc_audit_probe"]'::jsonb, 'Tabelle ohne RLS wurde nicht gemeldet';
   assert (v ->> 'public_grants') like '%kc_audit_probe%', 'Direktes Recht fuer anon wurde nicht gemeldet';
 end $$;
+
+-- 2b. Ein durch RLS gedecktes Recht ist KEIN Befund (Supabase-Standard)
+create table public.kc_audit_gedeckt (id int);
+alter table public.kc_audit_gedeckt enable row level security;
+grant select, insert, update, delete on public.kc_audit_gedeckt to authenticated;
+do $$
+declare v jsonb := public.kc_system_check_security_audit();
+begin
+  assert (v ->> 'public_grants') not like '%kc_audit_gedeckt%',
+    'Ein durch RLS gedecktes Recht darf kein Befund sein, sonst ist die Pruefung dauerhaft rot';
+end $$;
+drop table public.kc_audit_gedeckt;
+
+-- 2c. Eine View mit Eigentuemerrechten umgeht RLS und ist ein Befund
+create table public.kc_audit_basis (id int, geheim text);
+alter table public.kc_audit_basis enable row level security;
+create view public.kc_audit_definer_view as select * from public.kc_audit_basis;
+grant select on public.kc_audit_definer_view to authenticated;
+do $$
+declare v jsonb := public.kc_system_check_security_audit();
+begin
+  assert (v ->> 'views_bypassing_rls') like '%kc_audit_definer_view%',
+    'Eine View mit Eigentuemerrechten muss gemeldet werden';
+end $$;
+-- Mit security_invoker greift das RLS der Basistabelle: kein Befund mehr
+alter view public.kc_audit_definer_view set (security_invoker = true);
+do $$
+declare v jsonb := public.kc_system_check_security_audit();
+begin
+  assert (v ->> 'views_bypassing_rls') not like '%kc_audit_definer_view%',
+    'Mit security_invoker=true ist die View kein Befund mehr';
+end $$;
+drop view public.kc_audit_definer_view;
+drop table public.kc_audit_basis;
 
 -- 3. Eine uneingeschraenkte Policy wird gefunden
 alter table public.kc_audit_probe enable row level security;

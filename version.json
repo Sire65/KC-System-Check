@@ -1,5 +1,5 @@
 {
-  "version": "0.7.2",
-  "note": "Alarmqualitaet: Entprellung, Unterdrueckung von Folgealarmen, Wartungsfenster, Wiedervorlage und Totmannschalter",
+  "version": "0.7.3",
+  "note": "Sicherheitspruefung kalibriert: nur ungedeckter Zugriff ist ein Befund, Views die RLS umgehen werden erkannt",
   "channel": "stable"
 }

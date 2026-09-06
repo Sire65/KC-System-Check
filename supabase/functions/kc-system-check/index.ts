@@ -25,14 +25,17 @@ function notDeployed(id:string,name:string,kind:string,status:number){
 }
 function securityResult(res:any){
   if(!res.ok)return notDeployed("db_security","Datenbank-Sicherheitslage","security",res.status);
-  const d=res.data||{},rls=d.tables_without_rls||[],pol=d.permissive_policies||[],grants=d.public_grants||[];
-  const findings=rls.length+pol.length+grants.length;
-  const status=rls.length||pol.length?"critical":grants.length?"warning":"healthy";
+  const d=res.data||{},rls=d.tables_without_rls||[],views=d.views_bypassing_rls||[],pol=d.permissive_policies||[],grants=d.public_grants||[];
+  const findings=rls.length+views.length+pol.length+grants.length;
+  // Ungedeckter Zugriff ist eine Stoerung. Eine Policy mit using(true) kann
+  // beabsichtigt sein und gehoert geprueft - das ist eine Warnung, kein Ausfall.
+  const status=rls.length||views.length||grants.length?"critical":pol.length?"warning":"healthy";
   const parts=[];
   if(rls.length)parts.push(`${rls.length} Tabelle(n) ohne RLS: ${rls.slice(0,5).join(", ")}`);
-  if(pol.length)parts.push(`${pol.length} Policy(s) mit uneingeschraenktem Zugriff`);
-  if(grants.length)parts.push(`${grants.length} direkte Rechte fuer anon/authenticated`);
-  return{id:"db_security",name:"Datenbank-Sicherheitslage",kind:"security",status,health:status==="critical"?35:status==="warning"?72:100,latency:res.ms,usage:null,capacityLabel:findings?`${findings} Befund(e)`:"Keine Befunde",detail:parts.join(" · ")||"RLS aktiv, keine uneingeschraenkten Policies, keine direkten Rechte fuer anon",metrics:{tables_without_rls:rls,permissive_policies:pol,public_grants:grants}};
+  if(views.length)parts.push(`${views.length} View(s) umgehen RLS: ${views.slice(0,3).join(", ")}`);
+  if(grants.length)parts.push(`${grants.length} ungedeckte Rechte fuer anon/authenticated`);
+  if(pol.length)parts.push(`${pol.length} Policy(s) mit uneingeschraenktem Lesezugriff - pruefen, ob gewollt`);
+  return{id:"db_security",name:"Datenbank-Sicherheitslage",kind:"security",status,health:status==="critical"?35:status==="warning"?72:100,latency:res.ms,usage:null,capacityLabel:findings?`${findings} Befund(e)`:"Keine Befunde",detail:parts.join(" · ")||"RLS aktiv, keine ungedeckten Rechte, keine uneingeschraenkten Policies",metrics:{tables_without_rls:rls,views_bypassing_rls:views,permissive_policies:pol,public_grants:grants}};
 }
 function capacityResult(res:any){
   if(!res.ok)return notDeployed("db_capacity","Datenbank-Kapazitaet","database",res.status);

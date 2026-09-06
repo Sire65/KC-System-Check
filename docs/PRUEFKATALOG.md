@@ -21,10 +21,17 @@ unbewertet und wird nie als gesund dargestellt.
 
 | id | prueft | Schwelle |
 |----|--------|----------|
-| `db_security` | Tabellen ohne RLS, Policies mit `using(true)`, direkte Rechte fuer `anon`/`authenticated` | Tabelle ohne RLS oder offene Policy rot, direkte Rechte gelb |
+| `db_security` | Tabellen ohne RLS, Views die RLS umgehen, **ungedeckte** Rechte fuer `anon`/`authenticated`, Policies mit `using(true)` | ungedeckter Zugriff rot, offene Lese-Policy gelb |
 | `db_capacity` | Verbindungen gegen `max_connections`, groesste Tabellen, Sequenzausschoepfung, Vacuum-Rueckstand | ≥ 90 % Verbindungen oder Sequenz > 70 % rot, ≥ 70 % Verbindungen oder Vacuum-Rueckstand gelb |
 | `endpoint_exposure` | Antwortet die Prüf-API oder der Leitstand ohne Anmeldung? | alles ausser 401/403 rot |
 | `key_lifetime` | Restlaufzeit und Gesamtlaufzeit des oeffentlichen Schluessels | < 30 Tage rot, < 90 Tage oder > 5 Jahre Laufzeit gelb |
+
+Ein Recht an `anon`/`authenticated` ist **kein** Befund, solange RLS oder
+eine View mit `security_invoker=true` es deckt - Supabase vergibt diese
+Rechte standardmaessig. Gemeldet wird nur, was durch nichts gedeckt ist:
+Tabellen ohne RLS, Views mit Eigentuemerrechten und materialisierte
+Views. Ohne diese Unterscheidung meldete die erste Fassung 244 harmlose
+Rechte und waere dauerhaft rot gewesen.
 
 Alle vier lesen ausschliesslich Metadaten - keine Nutzdaten, keine
 Schreibzugriffe, keine kostenpflichtigen Aufrufe. `db_security` und
