@@ -1,5 +1,5 @@
 {
-  "version": "0.7.5",
-  "note": "Tageskennzahlen der Spiegelung bleiben erhalten; Angaben zur Prueffrequenz an den tatsaechlichen Zeitplan angepasst",
+  "version": "0.7.6",
+  "note": "Fernschutz und Alarmierung verlangen Anmeldung oder Automatik-Kennung; Alarme werden auch serverseitig entprellt",
   "channel": "stable"
 }

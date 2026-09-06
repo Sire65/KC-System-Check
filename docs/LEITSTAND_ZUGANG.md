@@ -46,3 +46,32 @@ bekannter Schluessel die Verlaufstabelle nicht mehr fluten. Das Feld
 liegen nicht in diesem Repository. Die App sendet dorthin jetzt die
 Nutzeranmeldung statt des anon-Schluessels; die serverseitige Pruefung
 dieser Anmeldung muss in diesen Funktionen noch nachgezogen werden.
+
+## Automatik-Kennung (ab 0.7.6)
+
+Die Zeitplaene `kc-live-operations-watch-minute` und `kc-system-check-auto-15m`
+meldeten sich bisher mit dem **oeffentlichen** Schluessel an. Genau deshalb
+mussten `kc-live-operations-watch` und `kc-system-check-alerts` fuer jeden
+offenstehen - jede Absicherung haette die Automatik abgeschaltet.
+
+Jetzt haben sie eine eigene Kennung: ein Zufallsgeheimnis, das ausschliesslich
+in der Datenbank liegt (Klartext im Cron-Befehl, SHA-256-Abdruck in
+`kc_automation_credentials`). Es steht in keinem Repository und in keinem
+Browser. Der oeffentliche Schluessel bleibt als Gateway-Schluessel noetig, ist
+aber keine Berechtigung mehr.
+
+Kennung erneuern (der Zeitplan wird dabei mitgeschrieben, das Geheimnis
+verlaesst die Datenbank nicht):
+
+```sql
+-- siehe Migration 202609060006; Muster wie bei der Ersteinrichtung:
+-- neues Geheimnis erzeugen, Abdruck speichern, cron.schedule mit dem
+-- neuen Header neu setzen.
+```
+
+## Rollen: eine Liste statt zwei
+
+`kc_core_user_links` ist die bestehende KC-weite Rollenliste. Wer dort `admin`
+oder `superadmin` ist, ist im System Check automatisch Superadmin - ein
+zweiter Eintrag ist nicht noetig. `kc_system_check_operators` bleibt nur fuer
+Personen, die ausschliesslich hier Zugang bekommen sollen (Rolle `technik`).

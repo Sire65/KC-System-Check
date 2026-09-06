@@ -16,6 +16,11 @@ end $$;
 \i supabase/migrations/202609060002_kc_system_check_audit.sql
 \i supabase/migrations/202609060003_kc_alarm_quality.sql
 \i supabase/migrations/202609060004_kc_security_audit_calibration.sql
+create table if not exists public.kc_core_user_links(user_id uuid, core_role text, active boolean default true);
+alter table public.kc_core_user_links enable row level security;
+revoke all on table public.kc_core_user_links from anon, authenticated;
+\i supabase/migrations/202609060006_kc_automation_und_rollen.sql
+\i supabase/migrations/202609060007_kc_alarm_entwarnung.sql
 
 -- 1. Sauberer Zustand: keine Sicherheitsbefunde
 do $$
@@ -164,6 +169,32 @@ begin
   ), 'anon darf keine Rechte auf der Zugangsliste haben';
 end $$;
 
+-- 10b. Entwarnung nur nach vorheriger Meldung
+truncate public.kc_system_check_alarm_state;
+do $$
+declare v jsonb;
+begin
+  -- Ein Signal, das nie gemeldet wurde, erzeugt keine Entwarnung
+  v := public.kc_system_check_alarm_apply('[{"id":"still","status":"healthy"}]'::jsonb);
+  assert jsonb_array_length(v -> 'recovered') = 0, 'Ohne vorherige Meldung gibt es keine Entwarnung';
+
+  -- Ein bestaetigter und gemeldeter Alarm muss entwarnt werden.
+  -- Die erste Messung eines noch unbekannten Signals gilt sofort.
+  v := public.kc_system_check_alarm_apply('[{"id":"kc_core","name":"KC Core","status":"critical"}]'::jsonb);
+  assert jsonb_array_length(v -> 'notify') = 1, 'Der erste bekannte Zustand muss gemeldet werden';
+  v := public.kc_system_check_alarm_apply('[{"id":"kc_core","name":"KC Core","status":"critical"}]'::jsonb);
+  assert jsonb_array_length(v -> 'notify') = 0, 'Derselbe Alarm darf nicht erneut gemeldet werden';
+  v := public.kc_system_check_alarm_apply('[{"id":"kc_core","status":"healthy"}]'::jsonb);
+  assert jsonb_array_length(v -> 'recovered') = 0, 'Eine einzelne gute Messung entwarnt noch nicht';
+  v := public.kc_system_check_alarm_apply('[{"id":"kc_core","status":"healthy"}]'::jsonb);
+  v := public.kc_system_check_alarm_apply('[{"id":"kc_core","status":"healthy"}]'::jsonb);
+  assert jsonb_array_length(v -> 'recovered') = 1, 'Nach bestaetigter Erholung muss entwarnt werden';
+
+  -- Und nur einmal
+  v := public.kc_system_check_alarm_apply('[{"id":"kc_core","status":"healthy"}]'::jsonb);
+  assert jsonb_array_length(v -> 'recovered') = 0, 'Entwarnung darf sich nicht wiederholen';
+end $$;
+
 -- 11. Verdichtung bewahrt die Kennzahlen und loescht selbst nichts
 create table if not exists public.kc_db_mirror_runs(
   id bigserial primary key, status text, started_at timestamptz, finished_at timestamptz,
@@ -199,6 +230,33 @@ begin
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'kc_db_mirror_runs_retention'
   ), 'Ein konkurrierender Aufraeumer neben kc_internal.kc_db_mirror_retention_cleanup ist nicht erlaubt';
+end $$;
+
+-- 13. Rollen aus beiden Listen, Automatik-Kennung
+do $$
+begin
+  insert into public.kc_core_user_links values ('11111111-1111-1111-1111-111111111111','admin',true);
+  insert into public.kc_system_check_operators values ('22222222-2222-2222-2222-222222222222','technik',true,null,now());
+  assert public.kc_system_check_operator_role('11111111-1111-1111-1111-111111111111') = 'superadmin',
+    'Ein KC-Admin muss ohne zweiten Eintrag Superadmin sein';
+  assert public.kc_system_check_operator_role('22222222-2222-2222-2222-222222222222') = 'technik',
+    'Nur-System-Check-Zugang muss weiter funktionieren';
+  assert public.kc_system_check_operator_role('33333333-3333-3333-3333-333333333333') is null,
+    'Ein fremdes Konto darf keine Rolle bekommen';
+
+  insert into public.kc_automation_credentials(name, token_sha256)
+    values ('cron', encode(sha256(convert_to('ein-hinreichend-langes-testgeheimnis','UTF8')),'hex'));
+  assert public.kc_automation_verify('cron','ein-hinreichend-langes-testgeheimnis'),
+    'Gueltige Automatik-Kennung muss akzeptiert werden';
+  assert not public.kc_automation_verify('cron','falsch-aber-ebenfalls-lang-genug--'),
+    'Falsche Kennung muss abgelehnt werden';
+  assert not public.kc_automation_verify('cron','kurz'), 'Zu kurze Kennung muss abgelehnt werden';
+  assert (select last_used_at is not null from public.kc_automation_credentials where name='cron'),
+    'Die Nutzung muss vermerkt werden';
+  assert not exists (
+    select 1 from information_schema.role_table_grants
+    where table_name = 'kc_automation_credentials' and grantee in ('anon','authenticated')
+  ), 'Die Kennungstabelle darf fuer anon kein Recht haben';
 end $$;
 
 \echo 'ALLE SQL-PRUEFUNGEN BESTANDEN'
