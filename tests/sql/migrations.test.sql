@@ -199,6 +199,9 @@ end $$;
 create table if not exists public.kc_db_mirror_runs(
   id bigserial primary key, status text, started_at timestamptz, finished_at timestamptz,
   source_rows bigint, target_rows bigint, replication_lag_sec numeric, mismatch_count int);
+-- wie in der Produktion: RLS aktiv, kein Client-Recht
+alter table public.kc_db_mirror_runs enable row level security;
+revoke all on table public.kc_db_mirror_runs from anon, authenticated;
 \i supabase/migrations/202609060005_kc_mirror_runs_retention.sql
 insert into public.kc_db_mirror_runs(status, started_at, replication_lag_sec, mismatch_count)
 select case when n % 20 = 0 then 'error' else 'ok' end,
@@ -296,6 +299,46 @@ begin
     select 1 from pg_policies where schemaname='public'
       and tablename='kc_attendance_events' and policyname='attendance_schreiben_dienst'
   ), 'Die serverseitige Schreibregel muss erhalten bleiben';
+end $$;
+
+-- 15. Datenvertrag ebenfalls nur serverseitig, Sicherheitspruefung wird sauber
+create table if not exists public.kc_core_data_contract(
+  data_area text, app_id text, is_owner boolean, may_read boolean, may_write boolean);
+alter table public.kc_core_data_contract enable row level security;
+grant select on public.kc_core_data_contract to authenticated;
+drop policy if exists vertrag_lesen on public.kc_core_data_contract;
+create policy vertrag_lesen on public.kc_core_data_contract for select to authenticated using (true);
+drop policy if exists vertrag_pflegen on public.kc_core_data_contract;
+create policy vertrag_pflegen on public.kc_core_data_contract for all to service_role using (true);
+insert into public.kc_core_data_contract values ('anwesenheit','kc-dp2',true,true,true);
+
+do $$
+declare v jsonb := public.kc_system_check_security_audit();
+begin
+  assert (v ->> 'permissive_policies') like '%vertrag_lesen%',
+    'Die offene Lese-Policy muss vor der Migration gemeldet werden';
+end $$;
+
+\i supabase/migrations/202609060009_kc_data_contract_nur_dienst.sql
+
+do $$
+declare v jsonb := public.kc_system_check_security_audit();
+begin
+  assert (v ->> 'permissive_policies') not like '%vertrag_lesen%',
+    'Nach der Migration darf die offene Lese-Policy nicht mehr existieren';
+  assert not exists (
+    select 1 from information_schema.role_table_grants
+    where table_schema = 'public' and table_name = 'kc_core_data_contract'
+      and grantee in ('anon','authenticated')
+  ), 'Clients duerfen kein Recht mehr auf dem Datenvertrag haben';
+  assert (select count(*) from public.kc_core_data_contract) = 1,
+    'Serverseitig muss der Vertrag unveraendert lesbar bleiben';
+  -- Und damit ist die gesamte Sicherheitslage befundfrei
+  assert jsonb_array_length(v -> 'tables_without_rls') = 0
+     and jsonb_array_length(v -> 'views_bypassing_rls') = 0
+     and jsonb_array_length(v -> 'public_grants') = 0
+     and jsonb_array_length(v -> 'permissive_policies') = 0,
+    'Nach beiden Einschraenkungen darf kein Sicherheitsbefund mehr offen sein';
 end $$;
 
 \echo 'ALLE SQL-PRUEFUNGEN BESTANDEN'

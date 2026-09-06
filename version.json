@@ -1,6 +1,6 @@
 {
-  "version": "0.7.9",
-  "note": "Neue serverseitige Pruefungen sind ab Werk aktiv, statt stillschweigend abgewaehlt zu bleiben",
+  "version": "0.7.10",
+  "note": "Datenvertrag nur noch serverseitig lesbar; Sicherheitspruefung ohne offenen Befund",
   "channel": "stable",
   "installSekunden": 5
 }
