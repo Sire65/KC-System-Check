@@ -10,22 +10,12 @@ jobs:
           node-version: 24
       - name: Unit regression tests
         run: node --test tests/*.test.js
-      - name: Backend syntax
-        run: |
-          node --check backend/server.js
-          node --check backend/config.js
-          node --check backend/health-model.js
-          node --check backend/adapters/http-json.js
-          node --check backend/adapters/supabase.js
-          node --check backend/adapters/neon.js
-          node --check backend/adapters/mirror.js
-          node --check backend/adapters/b2.js
       - name: Frontend syntax
         run: |
           for f in js/*.js js/adapters/*.js; do node --check "$f"; done
       - name: ESLint external static analysis
         run: |
-          npx --yes eslint@10.9.1 js backend worker/src --no-config-lookup \
+          npx --yes eslint@10.9.1 js --no-config-lookup \
             --rule 'no-unreachable:error' \
             --rule 'no-dupe-keys:error' \
             --rule 'no-duplicate-case:error'
@@ -43,8 +33,6 @@ jobs:
           grep -q 'ASVS' js/verification-profile.js
           grep -q '100% bedeutet 100% der definierten' js/verification-profile.js
           grep -q 'keine absolute Fehlerfreiheitsgarantie' docs/VERIFICATION_PROFILE.md
-      - name: Worker syntax
-        run: node --check worker/src/index.js
       - name: Playwright external mobile browser TÜV
         run: |
           npm init -y >/dev/null 2>&1

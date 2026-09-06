@@ -1,5 +1,6 @@
 import{sanitizeDeep}from"../safe-html.js";
-export async function loadRuntime(){for(const p of["./config/runtime.json","./config/runtime.public.json"]){try{const r=await fetch(p,{cache:"no-store"});if(r.ok){const cfg=await r.json();if(cfg?.apiBaseUrl)return cfg}}catch{}}return{apiBaseUrl:"",apiToken:"",apiStyle:"generic",mode:"demo"}}
+import{loadLiveRuntime}from"../runtime-config.js";
+export const loadRuntime=loadLiveRuntime;
 function headersFor(runtime,direct){const headers={};if(runtime?.apiToken){headers.Authorization=`Bearer ${runtime.apiToken}`;if(direct)headers.apikey=runtime.apiToken}return headers}
 function endpoint(runtime,path){const direct=runtime?.apiStyle==="supabase-edge",base=direct?runtime.apiBaseUrl:`${runtime.apiBaseUrl.replace(/\/$/,"")}${path}`;return{direct,base}}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));

@@ -1,9 +1,10 @@
+import{loadRuntimeConfig}from'./runtime-config.js';
 const $=s=>document.querySelector(s);
 const SESSION_KEY='kc-system-check-admin-jwt';
 let runtime=null,deviceRegistered=false,registering=false,refreshBusy=false;
 function endpoint(){return runtime?.apiBaseUrl?runtime.apiBaseUrl.replace(/\/kc-system-check(?:\?.*)?$/,'/kc-system-check-alerts'):''}
 function registerEndpoint(){return runtime?.apiBaseUrl?runtime.apiBaseUrl.replace(/\/kc-system-check(?:\?.*)?$/,'/kc-system-check-push-register'):''}
-async function loadRuntime(){for(const p of ['./config/runtime.json','./config/runtime.public.json']){try{const r=await fetch(p,{cache:'no-store'});if(r.ok)return await r.json()}catch{}}return null}
+const loadRuntime=loadRuntimeConfig;
 function pushText(d){if(!d)return['noch kein Zustellnachweis','warn'];const st=String(d.status||'');if(['opened','displayed'].includes(st))return[st==='opened'?'aktiv · auf Gerät geöffnet':'aktiv · auf Gerät angezeigt','ok'];if(['sent','delivered'].includes(st))return['aktiv · Versandweg bereit · Gerätebestätigung ausstehend','ok'];if(['retry_scheduled','dead_lettered','failed'].includes(st))return[`fehlgeschlagen${d.error_code?` · ${d.error_code}`:''}`,'bad'];return[st||'unbekannt','warn']}
 function emailText(d){if(!d)return['noch kein Versandnachweis','warn'];const st=String(d.status||'');if(['delivered','opened'].includes(st))return[st==='opened'?'aktiv · zugestellt und geöffnet':'aktiv · zugestellt','ok'];if(st==='sent')return['aktiv · Brevo bereit · Postfachbestätigung nicht verfügbar','ok'];if(['retry_scheduled','dead_lettered','failed'].includes(st))return[`fehlgeschlagen${d.error_code?` · ${d.error_code}`:''}`,'bad'];return[st||'unbekannt','warn']}
 function ensureDeviceUi(){const anchor=$('#serverPushProvider');if(!anchor||$('#localPushDeviceBox'))return;const box=document.createElement('div');box.id='localPushDeviceBox';box.className='alarm-channel-actions';box.innerHTML='<span id="localPushDeviceStatus" class="alarm-provider warn">Dieses Gerät: noch nicht bestätigt</span><button id="connectThisPushDevice" type="button" class="secondary">Dieses Gerät für Push aktivieren</button>';anchor.after(box);$('#connectThisPushDevice').addEventListener('click',()=>registerThisDevice(true))}

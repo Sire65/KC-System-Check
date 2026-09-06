@@ -1,11 +1,71 @@
+// Selbstkontrolle des Leitstands. Liest ausschliesslich den Zustand, nicht die
+// gerenderte Oberflaeche: frueher wurde der Zeitpunkt des letzten Laufs per
+// Regex aus dem Fusszeilentext geparst.
+import{state,subscribe,latestRun}from"./state.js";
 const $=s=>document.querySelector(s);
 const STORE='kc-self-check-v1';
 const MAX_RUN_AGE=36*60*60*1000;
 const LONG_RUNNING=5*60*1000;
-function parseLastRun(){const t=$('#lastRunLabel')?.textContent||'';let m=t.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4}).*?(\d{1,2}):(\d{2})/);if(m){let y=+m[3];if(y<100)y+=2000;const d=new Date(y,+m[2]-1,+m[1],+m[4],+m[5]);return Number.isNaN(d.getTime())?null:d}m=t.match(/(\d{1,2}):(\d{2})/);if(!m)return null;const now=new Date(),d=new Date(now.getFullYear(),now.getMonth(),now.getDate(),+m[1],+m[2]);if(d.getTime()>now.getTime()+5*60*1000)d.setDate(d.getDate()-1);return d}
-function progressState(){const card=$('#progressCard');if(!card||card.classList.contains('hidden'))return null;const text=($('#progressText')?.textContent||'').trim(),step=($('#currentStep')?.textContent||'').trim();let since=Number(sessionStorage.getItem('kc-self-progress-since')||0);if(!since){since=Date.now();sessionStorage.setItem('kc-self-progress-since',String(since))}return{since,text,step}}
-function contradiction(){const health=Number(($('#healthValue')?.textContent||'').replace(',','.'));const top=($('#healthText')?.textContent||'').toLowerCase();const liveBad=!!document.querySelector('#live .dot.bad,#live .live-alert .dot.bad,#findings .finding.bad');if(health===100&&liveBad&&!/störung/.test(top))return'100 % trotz sichtbarer LIVE-Störung';return null}
-function evaluate(){const now=Date.now(),issues=[],last=parseLastRun(),p=progressState();if(last&&now-last.getTime()>MAX_RUN_AGE)issues.push({level:'warn',text:'Letzter Prüflauf ist älter als 36 Stunden'});if(!last)issues.push({level:'warn',text:'Zeitpunkt des letzten Prüflaufs nicht eindeutig erkennbar'});if(p&&now-p.since>LONG_RUNNING)issues.push({level:'bad',text:`Prüfung läuft ungewöhnlich lange: ${p.step||p.text||'Schritt unbekannt'}`});if(!p)sessionStorage.removeItem('kc-self-progress-since');const c=contradiction();if(c)issues.push({level:'bad',text:`Widersprüchlicher Status: ${c}`});const active=[...document.querySelectorAll('#systemSelectors input[type="checkbox"]:checked:not(:disabled)')].length;if(!active)issues.push({level:'warn',text:'Kein aktives Prüfsystem ausgewählt'});try{localStorage.setItem(STORE,JSON.stringify({checkedAt:now,issues}))}catch{}return issues}
-function ensureStyle(){if($('#kcSelfStyle'))return;const s=document.createElement('style');s.id='kcSelfStyle';s.textContent='.kc-self{margin-top:8px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#0e1728;font-size:12px}.kc-self.ok{display:none}.kc-self.warn{border-color:var(--warn)}.kc-self.bad{border-color:var(--bad)}';document.head.appendChild(s)}
-function render(){ensureStyle();const hero=$('.hero');if(!hero)return;const issues=evaluate();let box=$('#kcSelfCheck');if(!box){box=document.createElement('div');box.id='kcSelfCheck';box.className='kc-self';hero.appendChild(box)}const level=issues.some(x=>x.level==='bad')?'bad':issues.length?'warn':'ok';box.className=`kc-self ${level}`;box.innerHTML=issues.length?`<strong>Leitstand-Selbstkontrolle: ${issues.length} Hinweis${issues.length===1?'':'e'}</strong><div class="muted">${issues.map(x=>x.text).join(' · ')}</div>`:''}
-render();setInterval(render,30000);new MutationObserver(()=>requestAnimationFrame(render)).observe(document.documentElement,{subtree:true,childList:true,characterData:true});
+
+function lastRunAt(){
+  const run=latestRun();
+  const value=Date.parse(run?.at||run?.checked_at||'');
+  return Number.isFinite(value)?value:null;
+}
+
+function liveDisruption(){
+  const live=state.live;
+  if(!live)return false;
+  const stale=t=>{const v=Date.parse(t||'');return Number.isFinite(v)?Date.now()-v>180000:true};
+  const heartbeats=Array.isArray(live.heartbeats)?live.heartbeats:[];
+  return heartbeats.some(h=>/(kasse|markt|pos|manager)/i.test(h?.program_id||'')&&stale(h?.measured_at||h?.received_at));
+}
+
+function contradiction(){
+  const run=latestRun();
+  const health=Number(run?.health);
+  if(!Number.isFinite(health)||health<100)return null;
+  return liveDisruption()?'100 % trotz gemeldeter LIVE-Stoerung':null;
+}
+
+export function evaluate(now=Date.now()){
+  const issues=[],last=lastRunAt(),started=Number(state.runStartedAt)||0;
+  if(last===null)issues.push({level:'warn',text:'Noch kein ausgewerteter Prüflauf vorhanden'});
+  else if(now-last>MAX_RUN_AGE)issues.push({level:'warn',text:'Letzter Prüflauf ist älter als 36 Stunden'});
+  if(started&&now-started>LONG_RUNNING)issues.push({level:'bad',text:'Prüfung läuft ungewöhnlich lange'});
+  if(!state.systems.some(s=>s.enabled))issues.push({level:'warn',text:'Kein aktives Prüfsystem ausgewählt'});
+  const conflict=contradiction();
+  if(conflict)issues.push({level:'bad',text:`Widersprüchlicher Status: ${conflict}`});
+  return issues;
+}
+
+function ensureStyle(){
+  if($('#kcSelfStyle'))return;
+  const s=document.createElement('style');
+  s.id='kcSelfStyle';
+  s.textContent='.kc-self{margin-top:8px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#0e1728;font-size:12px}.kc-self.ok{display:none}.kc-self.warn{border-color:var(--warn)}.kc-self.bad{border-color:var(--bad)}';
+  document.head.appendChild(s);
+}
+
+function render(){
+  ensureStyle();
+  const hero=$('.hero');
+  if(!hero)return;
+  const issues=evaluate();
+  try{localStorage.setItem(STORE,JSON.stringify({checkedAt:Date.now(),issues}))}catch{}
+  let box=$('#kcSelfCheck');
+  if(!box){box=document.createElement('div');box.id='kcSelfCheck';box.className='kc-self';hero.appendChild(box)}
+  const level=issues.some(x=>x.level==='bad')?'bad':issues.length?'warn':'ok';
+  box.className=`kc-self ${level}`;
+  box.textContent='';
+  if(!issues.length)return;
+  const title=document.createElement('strong');
+  title.textContent=`Leitstand-Selbstkontrolle: ${issues.length} Hinweis${issues.length===1?'':'e'}`;
+  const detail=document.createElement('div');
+  detail.className='muted';
+  detail.textContent=issues.map(x=>x.text).join(' · ');
+  box.append(title,detail);
+}
+
+subscribe(render);
+setInterval(render,30000);

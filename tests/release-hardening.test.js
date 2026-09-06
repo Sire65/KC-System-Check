@@ -2,8 +2,8 @@ import test from'node:test';import assert from'node:assert/strict';import fs fro
 const read=p=>fs.readFileSync(p,'utf8');
 
 test('healthy dashboard hides non-actionable watch trends',()=>{const s=read('js/early-warning.js');assert.match(s,/filter\(v=>v\.t\.level==='warn'\)/);assert.match(s,/actionable:w\.length/)});
-test('mobile compact module is wired into startup',()=>{assert.match(read('js/state.js'),/import"\.\/mobile-compact\.js"/)});
-test('verification profile module is wired into startup',()=>{assert.match(read('js/state.js'),/import"\.\/verification-profile\.js"/)});
+test('mobile compact module is wired into startup',()=>{assert.match(read('js/startup-modules.js'),/import"\.\/mobile-compact\.js"/);assert.match(read('js/app.js'),/import"\.\/startup-modules\.js"/)});
+test('verification profile module is wired into startup',()=>{assert.match(read('js/startup-modules.js'),/import"\.\/verification-profile\.js"/)});
 test('public runtime contains no service role or secret key labels',()=>{const s=read('config/runtime.public.json');assert.doesNotMatch(s,/service[_-]?role|secret[_-]?key|private[_-]?key/i)});
 test('service worker uses network first and purges old caches',()=>{const s=read('sw.js');assert.match(s,/networkFirst/);assert.match(s,/purgeOldCaches/);assert.match(s,/cache:"no-store"/)});
 test('pages bundle copies all startup safety modules',()=>{const s=read('.github/workflows/pages.yml');for(const f of['health-assistant.js','early-warning.js','self-check.js','kicc-heartbeat.js','quality-tools.js','mobile-compact.js','verification-profile.js'])assert.match(s,new RegExp(f.replace('.','\\.')))});

@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+
+const VERSION = JSON.parse(fs.readFileSync('version.json', 'utf8')).version;
 const URL = 'http://127.0.0.1:4173/';
 
 // Produktionsendpunkte werden blockiert: der Test darf keine echten Prüfläufe auslösen.
@@ -10,7 +13,7 @@ test('Ohne erreichbare Prüf-API zeigt der Leitstand kein Grün', async ({ page 
   await isolate(page);
   await page.goto(URL);
   await expect(page.locator('.topbar h1')).toContainText('KC System Check');
-  await expect(page.locator('#appVersion')).toHaveText('v0.6.14');
+  await expect(page.locator('#appVersion')).toHaveText(`v${VERSION}`);
   await expect(page.locator('#healthValue')).toHaveText('—');
   await expect(page.locator('#healthText')).toHaveText('Noch nicht geprüft');
   await expect(page.locator('#statusOrb')).not.toHaveAttribute('data-state', 'ok');

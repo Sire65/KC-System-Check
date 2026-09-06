@@ -1,3 +1,4 @@
+import{loadRuntimeConfig}from'./runtime-config.js';
 const $=s=>document.querySelector(s);
 const SESSION_KEY='kc-system-check-admin-jwt';
 let runtime=null,settings=null,adminToken=sessionStorage.getItem(SESSION_KEY)||'';
@@ -10,7 +11,7 @@ function styles(){if($('#kcAlertSettingsStyles'))return;const e=document.createE
 `;document.head.appendChild(e)}
 function endpoint(){return runtime?.apiBaseUrl?runtime.apiBaseUrl.replace(/\/kc-system-check(?:\?.*)?$/,'/kc-system-check-alerts'):''}
 function baseUrl(){const e=endpoint();return e?e.split('/functions/v1/')[0]:''}
-async function loadRuntime(){for(const p of ['./config/runtime.json','./config/runtime.public.json']){try{const r=await fetch(p,{cache:'no-store'});if(r.ok)return await r.json()}catch{}}return null}
+const loadRuntime=loadRuntimeConfig;
 function providerText(p){if(!p)return['Unbekannt','warn'];const h=String(p.health_status||'unknown');if(h==='healthy')return['bereit','ok'];if(h==='down')return[`gestört · ${Number(p.consecutive_failures||0)} Fehler`,'bad'];return[h,'warn']}
 function setStatus(t,bad=false){const e=$('#alarmSaveStatus');if(e){e.textContent=t;e.style.color=bad?'var(--bad)':'var(--muted)'}const d=$('#alarmDiagMessage');if(d)d.textContent=t}
 function enableControls(on){['#serverPushEnabled','#serverEmailEnabled','#serverPushThreshold','#serverEmailThreshold','#serverCheckInterval','#serverRecoveryPush','#serverRecoveryEmail','#saveServerAlertsBtn','#testEmailBtn','#testPushBtn','#diagTestEmail','#diagTestPush'].forEach(s=>{const e=$(s);if(e)e.disabled=!on})}
