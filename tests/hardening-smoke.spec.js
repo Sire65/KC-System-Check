@@ -95,3 +95,28 @@ test('Eine neue serverseitige Prüfung erscheint ohne App-Änderung', async ({ p
   await expect(page.locator('#systemCards')).toContainText('ohne RLS');
   await expect(page.locator('#healthValue')).toHaveText('35');
 });
+
+test('Ein einzelner Ausreißer erzeugt keinen Alarm, der bestätigte schon', async ({ page }) => {
+  const answer = status => ({
+    version: 'test', status, health: status === 'critical' ? 35 : 100, coverage: 100,
+    checkedAt: new Date().toISOString(), duration_ms: 10,
+    results: [{ id: 'kc_core', name: 'KC Core · Supabase', kind: 'database', status, health: status === 'critical' ? 35 : 100, latency: 40, detail: 'Testlauf' }]
+  });
+  let next = 'healthy';
+  await isolate(page, route =>
+    route.request().url().includes('systems=')
+      ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(answer(next)) })
+      : route.abort()
+  );
+  await page.goto(URL);
+
+  await page.locator('#oneTouchBtn').click();
+  await expect(page.locator('#kcAlarmState')).toContainText('Keine bestätigten Alarme');
+
+  next = 'critical';
+  await page.locator('#oneTouchBtn').click();
+  await expect(page.locator('#kcAlarmState')).toContainText('Keine bestätigten Alarme');
+
+  await page.locator('#oneTouchBtn').click();
+  await expect(page.locator('#kcAlarmState')).toContainText('1 bestätigter Alarm');
+});

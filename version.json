@@ -1,5 +1,5 @@
 {
-  "version": "0.7.1",
-  "note": "Neue Pruefungen: RLS- und Rechtelage, Verbindungs- und Sequenzkapazitaet, Endpunkt-Absicherung, Schluessel-Restlaufzeit",
+  "version": "0.7.2",
+  "note": "Alarmqualitaet: Entprellung, Unterdrueckung von Folgealarmen, Wartungsfenster, Wiedervorlage und Totmannschalter",
   "channel": "stable"
 }

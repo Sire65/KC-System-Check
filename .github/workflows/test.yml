@@ -40,3 +40,24 @@ jobs:
           npx playwright install --with-deps chromium
           python3 -m http.server 4173 >/tmp/kc-http.log 2>&1 &
           npx playwright test tests/external-smoke.spec.js tests/hardening-smoke.spec.js tests/live-access.spec.js --reporter=line --workers=1
+
+  sql:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+        ports:
+          - 5432:5432
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Migrationen und Serverfunktionen gegen PostgreSQL pruefen
+        run: tests/sql/run.sh

@@ -20,12 +20,16 @@ export const state={
   settings:{notifyYellow:true,notifyRed:true,warnUsage:70,critUsage:90,...safeJson("kc-system-settings",{})},
   lastRun:null,
   live:null,
+  alarmMemory:safeJson("kc-alarm-memory",{}),
+  maintenance:safeJson("kc-alarm-maintenance",{}),
+  alarmView:null,
   runStartedAt:null,
   cancelRequested:false,
   currentController:null
 };
 export function saveSettings(){localStorage.setItem("kc-system-settings",JSON.stringify(state.settings))}
 export function saveHistory(){localStorage.setItem("kc-system-history",JSON.stringify(state.history))}
+export function saveAlarms(){try{localStorage.setItem("kc-alarm-memory",JSON.stringify(state.alarmMemory));localStorage.setItem("kc-alarm-maintenance",JSON.stringify(state.maintenance))}catch{}}
 
 const listeners=new Set();
 export function subscribe(listener){listeners.add(listener);try{listener(state)}catch(error){console.warn("[KC System Check] Zustands-Abonnent fehlgeschlagen",error)}return()=>listeners.delete(listener)}

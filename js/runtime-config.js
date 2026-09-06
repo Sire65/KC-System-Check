@@ -17,6 +17,17 @@ async function read(){
   return {...EMPTY};
 }
 
+let alarmPolicy=null;
+// Alarmregeln liegen als Konfiguration neben der App, nicht im Code.
+export async function loadAlarmPolicy(){
+  if(alarmPolicy)return alarmPolicy;
+  try{
+    const response=await fetch("./config/alarm-policy.json",{cache:"no-store"});
+    if(response.ok){const value=await response.json();if(value&&typeof value==="object")alarmPolicy=value}
+  }catch{}
+  return alarmPolicy||{};
+}
+
 export function loadRuntimeConfig(){
   if(cached)return Promise.resolve(cached);
   if(!pending)pending=read().then(config=>{cached=config;pending=null;return config});
