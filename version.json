@@ -1,6 +1,6 @@
 {
-  "version": "0.7.31",
-  "note": "Datenfluss-Karte in leitstand.js eingebettet - v0.7.30 lud auf GitHub Pages leer, weil der Pages-Build neue js-Dateien nicht mitkopiert",
+  "version": "0.7.32",
+  "note": "Backup-App-Telemetrie aus kicc_backup_telemetry wird gelesen (Edge Function v24); Integritaet/Restore PASS zaehlt als bestanden",
   "channel": "stable",
   "installSekunden": 5
 }

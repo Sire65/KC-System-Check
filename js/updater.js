@@ -8,7 +8,7 @@
 //      die im Versionsverzeichnis stehen, und danach wird wirklich neu geladen -
 //      keine Fortschrittsanzeige ohne dahinterliegenden Vorgang.
 import"./diagnostics-runtime.js";
-const CURRENT_VERSION="0.7.31",VERSION_URL="./version.json";
+const CURRENT_VERSION="0.7.32",VERSION_URL="./version.json";
 const $=s=>document.querySelector(s);
 const SPAETER='kc-update-spaeter';
 const SPAETER_STUNDEN=12;
