@@ -1,5 +1,5 @@
 import test from'node:test';import assert from'node:assert/strict';import fs from'node:fs';
-import{knotenId,laeufeErmitteln}from'../js/datenfluss.js';
+import{knotenId,laeufeErmitteln}from'../js/leitstand.js';
 
 test('Programm-IDs landen auf den richtigen Knoten',()=>{
   assert.equal(knotenId('kc-marktkasse-02'),'kasse-02');assert.equal(knotenId('pos'),'kasse-01');
@@ -30,7 +30,7 @@ test('rote Kachel wird durch Sollzeit nie besser',()=>{
 });
 
 test('LIVE-Leitstand haengt die Datenfluss-Karte ein und der Broadcast-Client meidet die Datenbank',()=>{
-  const l=fs.readFileSync('js/leitstand.js','utf8'),d=fs.readFileSync('js/datenfluss.js','utf8');
+  const l=fs.readFileSync('js/leitstand.js','utf8'),d=l;
   assert.match(l,/renderDatenfluss\(data,laufzeit\)/);
   assert.match(d,/realtime\/v1\/websocket/);assert.match(d,/phx_join/);
   assert.doesNotMatch(d,/rest\/v1\//);                    // keine REST-Abfrage aus diesem Modul
