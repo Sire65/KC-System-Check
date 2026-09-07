@@ -18,13 +18,17 @@ export function mergeSystems(systems=[],results=[]){
 export function statusClass(status){return status==="healthy"||status==="ok"?"ok":status==="warning"||status==="warn"?"warn":status==="critical"||status==="bad"?"bad":"idle"}
 export function overallStatus(results=[]){if(results.some(r=>["critical","bad"].includes(r.status)))return"bad";if(results.some(r=>["warning","warn"].includes(r.status)))return"warn";if(!results.some(r=>["healthy","ok"].includes(r.status)))return"unknown";return"ok"}
 // ============================================================================
-// Speicherziele live (frueher js/storage-backup-live.js). Eingebettet in usage.js (reines, in Node testbares Modul), weil der
-// Pages-Workflow eine feste Kopierliste hat - eine neue Datei laedt dort nicht,
-// und ein fehlender Import laesst die ganze App leer (so bei v0.7.30).
+// Speicherziele live. Absichtlich in usage.js eingebettet, weil der Pages-
+// Workflow eine feste Kopierliste hat. Nur technische Telemetrie; keine
+// Zugangsdaten, Benutzernamen oder Pfade werden dargestellt.
 // ============================================================================
 
 const TARGET_ORDER=["nas_backup","hidrive_1","hidrive_2"];
 const LABELS={nas_backup:"NAS Backup",hidrive_1:"HiDrive 1",hidrive_2:"HiDrive 2"};
+const STALE_SECONDS=6*60*60;
+
+const num=(...values)=>{for(const v of values){const n=Number(v);if(Number.isFinite(n)&&n>=0)return n}return null};
+const text=(value,max=180)=>String(value??"").slice(0,max);
 
 export function storageTargetsFromLive(live){
   const backup=live?.backup||{};
@@ -34,16 +38,27 @@ export function storageTargetsFromLive(live){
   const byId=new Map(rows.filter(x=>x&&typeof x==="object").map(x=>[String(x.id||""),x]));
   return TARGET_ORDER.map(id=>{
     const row=byId.get(id);
-    if(!row)return{id,name:LABELS[id],kind:id==="nas_backup"?"nas":"hidrive",status:"not_configured",latencyMs:null,checkedAt:null,detail:"Noch keine Ziel-Telemetrie vorhanden"};
-    const status=String(row.status||"unknown").toLowerCase();
+    if(!row)return{id,name:LABELS[id],kind:id==="nas_backup"?"nas":"hidrive",status:"not_configured",latencyMs:null,checkedAt:null,detail:"Noch keine Ziel-Telemetrie vorhanden",detailCode:"",lastBackupAt:null,lastVerifyAt:null,lastRestoreAt:null,totalBytes:null,freeBytes:null,usedBytes:null};
+    const rawStatus=String(row.status||"unknown").toLowerCase();
+    const checkedAt=row.checkedAt??row.checked_at??row.measuredAt??row.measured_at??null;
+    const age=checkedAt?Math.max(0,(Date.now()-Date.parse(checkedAt))/1000):null;
+    let status=["healthy","warning","critical","unknown","not_configured"].includes(rawStatus)?rawStatus:"unknown";
+    if(status==="healthy"&&(!Number.isFinite(age)||age>STALE_SECONDS))status="unknown";
     return{
       id,
-      name:String(row.name||LABELS[id]).slice(0,80),
-      kind:String(row.kind|| (id==="nas_backup"?"nas":"hidrive")).slice(0,24),
-      status:["healthy","warning","critical","unknown","not_configured"].includes(status)?status:"unknown",
-      latencyMs:Number.isFinite(Number(row.latencyMs??row.latency_ms))?Number(row.latencyMs??row.latency_ms):null,
-      checkedAt:row.checkedAt??row.checked_at??null,
-      detail:String(row.detail||"").slice(0,180),
+      name:text(row.name||LABELS[id],80),
+      kind:text(row.kind|| (id==="nas_backup"?"nas":"hidrive"),24),
+      status,
+      latencyMs:num(row.latencyMs,row.latency_ms),
+      checkedAt,
+      detail:text(row.detail||row.message||"",180),
+      detailCode:text(row.detailCode??row.detail_code??row.code??"",80),
+      lastBackupAt:row.lastBackupAt??row.last_backup_at??null,
+      lastVerifyAt:row.lastVerifyAt??row.last_verify_at??row.last_integrity_at??null,
+      lastRestoreAt:row.lastRestoreAt??row.last_restore_at??row.last_restore_test_at??null,
+      totalBytes:num(row.totalBytes,row.total_bytes,row.capacityBytes,row.capacity_bytes),
+      freeBytes:num(row.freeBytes,row.free_bytes, row.availableBytes,row.available_bytes),
+      usedBytes:num(row.usedBytes,row.used_bytes),
     };
   });
 }
@@ -66,6 +81,22 @@ function ageText(value){
   if(s<86400)return`vor ${Math.round(s/3600)} h`;
   return`vor ${Math.round(s/86400)} T`;
 }
+function stamp(label,value){return`<div><span class="muted small">${label}</span><strong>${value?ageText(value):"—"}</strong></div>`}
+function capacity(row){
+  let total=row.totalBytes,free=row.freeBytes,used=row.usedBytes;
+  if(total!=null&&used==null&&free!=null)used=Math.max(0,total-free);
+  if(total==null||total<=0)return"Keine verlässlichen Kapazitätsdaten";
+  const pct=used==null?null:Math.min(100,Math.max(0,used/total*100));
+  return`${free==null?"frei —":`frei ${formatBytes(free)}`} · gesamt ${formatBytes(total)}${pct==null?"":` · ${pct.toFixed(1)} % belegt`}`;
+}
+function overallStorage(rows){
+  if(rows.some(x=>x.status==="critical"))return{cls:"bad",label:"Störung",text:"Mindestens ein Speicherziel meldet eine Störung."};
+  if(rows.some(x=>x.status==="warning"))return{cls:"warn",label:"Prüfen",text:"Mindestens ein Speicherziel meldet eine Warnung."};
+  if(rows.some(x=>x.status==="unknown"))return{cls:"idle",label:"Unvollständig",text:"Mindestens ein Status fehlt oder ist veraltet."};
+  if(rows.every(x=>x.status==="not_configured"))return{cls:"idle",label:"Noch nicht eingerichtet",text:"Es liegen noch keine Zielmessungen vor."};
+  if(rows.some(x=>x.status==="not_configured"))return{cls:"idle",label:"Teilweise eingerichtet",text:"Mindestens ein Speicherziel ist noch nicht eingerichtet."};
+  return{cls:"ok",label:"Speicher gesund",text:"Alle eingerichteten Speicherziele melden aktuelle, unauffällige Werte."};
+}
 
 function ensureHost(){
   let host=document.querySelector("#liveStorageTargets");
@@ -74,7 +105,7 @@ function ensureHost(){
   if(!backup)return null;
   const article=document.createElement("article");
   article.className="card";
-  article.innerHTML='<div class="row between"><div><h3>Speicherziele</h3><div class="muted small">NAS und beide HiDrive-Ziele · nur Status, keine Zugangsdaten oder Pfade</div></div><span class="badge">LIVE</span></div><div id="liveStorageTargets" style="margin-top:8px"></div>';
+  article.innerHTML='<div class="row between"><div><h3>Speicher-Leitstand</h3><div class="muted small">NAS und beide HiDrive-Ziele · technische Read-only-Telemetrie</div></div><span class="badge">LIVE</span></div><div id="liveStorageTargets" style="margin-top:8px"></div>';
   backup.insertAdjacentElement("afterend",article);
   return article.querySelector("#liveStorageTargets");
 }
@@ -83,12 +114,11 @@ function render(live){
   if(typeof document==="undefined")return;
   const host=ensureHost();
   if(!host)return;
-  const rows=storageTargetsFromLive(live);
-  host.innerHTML=rows.map(row=>{
-    const visual=storageTargetVisual(row.status);
-    const latency=row.latencyMs==null?"":` · ${Math.round(row.latencyMs)} ms`;
-    const detail=row.detail|| (row.status==="not_configured"?"Ziel noch nicht eingerichtet":"Kein Detail gemeldet");
-    return`<div class="live-device ${visual.cls==='bad'?'live-alert':''}"><span class="dot ${visual.cls}"></span><div><strong>${row.name}</strong><div class="muted small">${detail} · ${ageText(row.checkedAt)}${latency}</div></div><span class="live-tag">${visual.tag}</span></div>`;
+  const rows=storageTargetsFromLive(live),overall=overallStorage(rows);
+  host.innerHTML=`<div class="live-kpi" style="margin-bottom:10px"><span class="dot ${overall.cls}"></span><div class="muted small">Gesamtlage Speicher</div><div class="kpi">${overall.label}</div><div class="muted small">${overall.text}</div></div>`+rows.map(row=>{
+    const visual=storageTargetVisual(row.status),latency=row.latencyMs==null?"—":`${Math.round(row.latencyMs)} ms`;
+    const detail=row.detail|| (row.status==="not_configured"?"Ziel noch nicht eingerichtet":"Kein technisches Detail gemeldet");
+    return`<details class="live-history" style="margin-top:8px" ${visual.cls==='bad'?'open':''}><summary class="live-device ${visual.cls==='bad'?'live-alert':''}" style="cursor:pointer"><span class="dot ${visual.cls}"></span><div><strong>${row.name}</strong><div class="muted small">${detail} · ${ageText(row.checkedAt)}</div></div><span class="live-tag">${visual.tag}</span></summary><div class="live-kpis" style="margin-top:8px"><div class="live-kpi"><div class="muted small">Letzte Messung</div><div class="kpi">${ageText(row.checkedAt)}</div><div class="muted small">Latenz ${latency}</div></div><div class="live-kpi"><div class="muted small">Kapazität</div><div class="kpi">${row.totalBytes==null?"—":formatBytes(row.totalBytes)}</div><div class="muted small">${capacity(row)}</div></div></div><div class="live-kpis" style="margin-top:8px">${stamp("Letzte Sicherung",row.lastBackupAt)}${stamp("Letzte Prüfung",row.lastVerifyAt)}${stamp("Restore-Test",row.lastRestoreAt)}</div>${row.detailCode?`<div class="muted small" style="margin-top:8px">Diagnosecode: ${row.detailCode}</div>`:""}</details>`;
   }).join("");
 }
 
