@@ -1,6 +1,6 @@
 {
-  "version": "0.7.29",
-  "note": "Das Aufraeumen der Lebenszeichen ist eingeplant; die Einrichtung nennt die Verbrauchsmigration",
+  "version": "0.7.30",
+  "note": "Datenfluss-Karte und Ueberwachungslaeufe im LIVE-Leitstand; Backup-App gekoppelt-aber-stumm ist ein Befund",
   "channel": "stable",
   "installSekunden": 5
 }
