@@ -9,7 +9,9 @@ test("storage target panel always exposes NAS and two HiDrive slots",()=>{
   ]}}});
   assert.deepEqual(rows.map(x=>x.id),["nas_backup","hidrive_1","hidrive_2"]);
   assert.equal(rows[0].status,"critical");
-  assert.equal(rows[1].status,"healthy");
+  // Ein gruen gemeldeter Zielstatus ohne Messzeitpunkt darf im neuen Leitstand
+  // nicht als aktuell gesund erscheinen. Ohne Frischebeleg wird er neutral.
+  assert.equal(rows[1].status,"unknown");
   assert.equal(rows[2].status,"not_configured");
 });
 
@@ -30,4 +32,12 @@ test("target model does not require paths or credentials",()=>{
   assert.equal(text.includes("username"),false);
   assert.equal(text.includes("root_path"),false);
   assert.equal(rows[2].name,"Technik");
+});
+
+test("healthy target needs a fresh timestamp",()=>{
+  const rows=storageTargetsFromLive({backup:{kicc:{storage_targets:[
+    {id:"hidrive_1",status:"healthy",checkedAt:new Date().toISOString(),detail:"HiDrive erreichbar"}
+  ]}}});
+  assert.equal(rows[1].status,"healthy");
+  assert.equal(storageTargetVisual(rows[1].status).cls,"ok");
 });
