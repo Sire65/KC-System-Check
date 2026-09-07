@@ -1,6 +1,6 @@
 import test from"node:test";
 import assert from"node:assert/strict";
-import{storageTargetsFromLive,storageTargetVisual}from"../js/storage-backup-live.js";
+import{storageTargetsFromLive,storageTargetVisual}from"../js/usage.js";
 
 test("storage target panel always exposes NAS and two HiDrive slots",()=>{
   const rows=storageTargetsFromLive({backup:{kicc:{storage_targets:[

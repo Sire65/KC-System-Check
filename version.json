@@ -1,6 +1,6 @@
 {
-  "version": "0.7.32",
-  "note": "Backup-App-Telemetrie aus kicc_backup_telemetry wird gelesen (Edge Function v24); Integritaet/Restore PASS zaehlt als bestanden",
+  "version": "0.7.33",
+  "note": "storage-backup-live.js in usage.js eingebettet - der Pages-Build kopiert nur eine feste Dateiliste, sonst laedt die App leer",
   "channel": "stable",
   "installSekunden": 5
 }
