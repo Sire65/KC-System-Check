@@ -1,6 +1,7 @@
 {
-  "version": "0.7.33",
-  "note": "storage-backup-live.js in usage.js eingebettet - der Pages-Build kopiert nur eine feste Dateiliste, sonst laedt die App leer",
+  "version": "0.7.34",
+  "note": "Alarm-Deduplizierung, robuste Pages-Auslieferung und automatische Versionspflege für lange Sitzungen",
   "channel": "stable",
-  "installSekunden": 5
+  "installSekunden": 5,
+  "verbindlich": true
 }
