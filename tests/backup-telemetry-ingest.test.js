@@ -29,6 +29,14 @@ test('telemetry updates the current KICC snapshot and the live-monitor view',()=
   assert.match(src,/machine_client_id:machine\.id/);
 });
 
+test('provider status follows the real backup target so B2 is not left OFFEN',()=>{
+  assert.match(src,/function providerStatuses/);
+  assert.match(src,/backblaze/);
+  assert.match(src,/b2_status:provider\.b2_status/);
+  assert.match(src,/neon_status:provider\.neon_status/);
+  assert.match(src,/providerStatuses\(row\.backup_target,row\.last_backup_status\|\|row\.status\)/);
+});
+
 test('successful ingest returns only acknowledgement metadata, never telemetry payload',()=>{
   assert.match(src,/return json\(\{ok:true,stored:true,liveStored:true,targetCount:storageTargets\.length\}\)/);
   assert.doesNotMatch(src,/return json\(row\)/);
