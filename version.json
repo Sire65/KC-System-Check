@@ -1,6 +1,6 @@
 {
-  "version": "0.7.36",
-  "note": "LIVE-Leitstand aufgeräumt: Leitstand, Datenflüsse und Technik getrennt; Leitflüsse aus echten Betriebsdaten",
+  "version": "0.7.37",
+  "note": "Frühwarnung kalibriert: niedrige Antwortzeiten und einzelne Netzspitzen erzeugen keine falschen Trendwarnungen mehr",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true
