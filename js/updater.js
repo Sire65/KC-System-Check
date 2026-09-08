@@ -1,18 +1,16 @@
-// Aktualisierungshinweis. Drei Festlegungen, die frueher gefehlt haben:
+// Aktualisierungshinweis.
 //
-//   1. Gefragt wird beim Start, nicht alle sechs Stunden. Wer die App oeffnet,
-//      schaut hin; ein Zeitfenster im Hintergrund trifft niemanden.
-//   2. "Spaeter" wird gemerkt - zwoelf Stunden fuer genau diesen Stand. Vorher
-//      blendete es das Band nur aus und es kam sofort wieder.
-//   3. Beim Installieren laeuft ein Zeitbalken. Er zaehlt die Sekunden herunter,
-//      die im Versionsverzeichnis stehen, und danach wird wirklich neu geladen -
-//      keine Fortschrittsanzeige ohne dahinterliegenden Vorgang.
+// Neben der Prüfung beim Start wird nun auch während langer Sitzungen geprüft.
+// Genau dort entstand der Versionsalarm 0.7.31/0.7.33: ein bereits geöffneter
+// Browser-Tab sendete weiter Heartbeats, obwohl GitHub Pages schon neuer war.
 import"./diagnostics-runtime.js";
-const CURRENT_VERSION="0.7.33",VERSION_URL="./version.json";
+const CURRENT_VERSION="0.7.34",VERSION_URL="./version.json";
 const $=s=>document.querySelector(s);
 const SPAETER='kc-update-spaeter';
 const SPAETER_STUNDEN=12;
-let waitingWorker=null,angekuendigt=null,installSekunden=5;
+const CHECK_INTERVAL_MS=5*60*1000;
+const PFLICHT_AUTO_MS=60*1000;
+let waitingWorker=null,angekuendigt=null,installSekunden=5,pruefungLaeuft=false,pflichtTimer=null;
 
 function parts(v){return String(v).replace(/^v/i,"").split(".").map(x=>parseInt(x,10)||0)}
 function newer(a,b){const A=parts(a),B=parts(b);for(let i=0;i<Math.max(A.length,B.length);i++){const x=A[i]||0,y=B[i]||0;if(x!==y)return x>y}return false}
@@ -30,17 +28,24 @@ function showUpdate(version,note="",verbindlich=false){
   const b=$("#updateBanner"),t=$("#updateText"),spaeter=$("#laterUpdateBtn"),install=$("#installUpdateBtn");
   if(!b)return;
   angekuendigt=version;
-  t.textContent=`Version ${version} ist verfügbar${note?" · "+note:""}`;
-  // Eine verbindliche Fassung kennt kein Spaeter: aufschieben waere dort keine
-  // sinnvolle Wahl.
+  t.textContent=`Version ${version} ist verfügbar${note?" · "+note:""}${verbindlich?" · verbindliches Stabilitätsupdate":""}`;
   if(spaeter)spaeter.classList.toggle("hidden",!!verbindlich);
   if(install){install.disabled=false;install.textContent="Jetzt aktualisieren"}
   $("#updateProgress")?.classList.remove("an");
   const bar=$("#updateBar");if(bar)bar.style.width="0%";
   b.classList.remove("hidden");
+
+  // Verbindliche Stabilitätsupdates dürfen in einem dauerhaft geöffneten
+  // Leitstand nicht tagelang liegen bleiben. Eine Minute bleibt für einen
+  // bewussten manuellen Klick; danach übernimmt die App selbst.
+  if(pflichtTimer){clearTimeout(pflichtTimer);pflichtTimer=null}
+  if(verbindlich){
+    pflichtTimer=setTimeout(()=>{
+      if(angekuendigt===version)balkenLaufenLassen(installSekunden,uebernehmen);
+    },PFLICHT_AUTO_MS);
+  }
 }
 
-// Zaehlt echte Sekunden herunter und ruft danach auf, was angekuendigt war.
 function balkenLaufenLassen(sekunden,fertig){
   const huelle=$("#updateProgress"),bar=$("#updateBar"),rest=$("#updateRemaining");
   if(!huelle||!bar||!rest){fertig();return}
@@ -55,6 +60,8 @@ function balkenLaufenLassen(sekunden,fertig){
 }
 
 export async function checkForAppUpdate({silent=true}={}){
+  if(pruefungLaeuft)return null;
+  pruefungLaeuft=true;
   try{
     const r=await fetch(`${VERSION_URL}?t=${Date.now()}`,{cache:"no-store"});
     if(!r.ok)throw new Error(`HTTP ${r.status}`);
@@ -64,27 +71,22 @@ export async function checkForAppUpdate({silent=true}={}){
       if(!silent)alert(`KC System Check ist aktuell (Version ${CURRENT_VERSION}).`);
       return null;
     }
-    // Von selbst darf der Hinweis nicht nerven. Wer ausdruecklich nachsieht,
-    // bekommt ihn immer.
     if(silent&&!info.verbindlich&&spaeterGemerkt(info.version))return info;
     installSekunden=info.installSekunden;
     showUpdate(info.version,info.note||"",!!info.verbindlich);
     return info;
   }catch(e){
-    // Ein nicht erreichbares Verzeichnis ist keine Aktualitaet und wird nie
-    // als "aktuell" gemeldet.
     if(!silent)alert(`Update-Prüfung nicht möglich: ${e.message}`);
     return null;
-  }
+  }finally{pruefungLaeuft=false}
 }
 
 async function uebernehmen(){
   const install=$("#installUpdateBtn");
   try{
+    if(pflichtTimer){clearTimeout(pflichtTimer);pflichtTimer=null}
     if(waitingWorker){
       waitingWorker.postMessage({type:"SKIP_WAITING"});
-      // controllerchange laedt neu. Bleibt es aus - alter Worker, kein
-      // Controller - laedt der Rueckfall nach drei Sekunden selbst.
       setTimeout(()=>location.reload(),3000);
       return;
     }
@@ -108,6 +110,7 @@ export function setupUpdater(){
     install.disabled=true;install.textContent="Wird vorbereitet …";
     if(spaeter)spaeter.disabled=true;
     spaeterVergessen();
+    if(pflichtTimer){clearTimeout(pflichtTimer);pflichtTimer=null}
     balkenLaufenLassen(installSekunden,uebernehmen);
   });
   if("serviceWorker"in navigator){
@@ -123,6 +126,8 @@ export function setupUpdater(){
       });
     }).catch(()=>{});
   }
-  // Bei jedem Start. Was zurueckgestellt wurde, schweigt trotzdem zwoelf Stunden.
   checkForAppUpdate({silent:true});
+  // Dauerhaft geöffnete Leitstände prüfen regelmäßig weiter. Dadurch bleibt ein
+  // alter Tab nicht mehr über Stunden als aktive Altversion im Gleichstandscheck.
+  setInterval(()=>checkForAppUpdate({silent:true}),CHECK_INTERVAL_MS);
 }
