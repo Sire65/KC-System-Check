@@ -1,6 +1,6 @@
 {
-  "version": "0.7.37",
-  "note": "Frühwarnung kalibriert: niedrige Antwortzeiten und einzelne Netzspitzen erzeugen keine falschen Trendwarnungen mehr",
+  "version": "0.7.38",
+  "note": "Datenfluss konsolidiert: dunkelgraue Ruherouten, grün nur bei gemessenem Verkehr; Zähler werden als Differenz ausgewertet",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true
