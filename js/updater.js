@@ -4,7 +4,7 @@
 // Genau dort entstand der Versionsalarm 0.7.31/0.7.33: ein bereits geöffneter
 // Browser-Tab sendete weiter Heartbeats, obwohl GitHub Pages schon neuer war.
 import"./diagnostics-runtime.js";
-const CURRENT_VERSION="0.7.37",VERSION_URL="./version.json";
+const CURRENT_VERSION="0.7.38",VERSION_URL="./version.json";
 const $=s=>document.querySelector(s);
 const SPAETER='kc-update-spaeter';
 const SPAETER_STUNDEN=12;
