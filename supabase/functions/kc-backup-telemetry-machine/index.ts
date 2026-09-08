@@ -22,6 +22,13 @@ function sanitizeTarget(v:any){if(!v||typeof v!=='object'||Array.isArray(v))retu
 function sanitizeTargets(input:any){if(!Array.isArray(input))return[];const byId=new Map<string,any>();for(const raw of input.slice(0,12)){const row=sanitizeTarget(raw);if(row)byId.set(row.id,row)}return['nas_backup','hidrive_1','hidrive_2'].map(id=>byId.get(id)).filter(Boolean)}
 function iso(v:any){const s=safeText(v,60);if(!s)return null;const n=Date.parse(s);return Number.isFinite(n)?new Date(n).toISOString():null}
 function intOrNull(v:any){const n=Number(v);return Number.isFinite(n)&&n>=0?Math.trunc(n):null}
+function providerStatuses(target:unknown,status:unknown){
+  const t=safeText(target,80).toLowerCase(),s=safeText(status,40).toUpperCase();
+  return{
+    b2_status:/\bb2\b|backblaze/.test(t)?s||null:null,
+    neon_status:/\bneon\b/.test(t)?s||null:null
+  };
+}
 
 Deno.serve(async(req:Request)=>{
   if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
@@ -69,6 +76,9 @@ Deno.serve(async(req:Request)=>{
   // Der Live-Betriebswächter liest die an den gekoppelten Maschinen-Client
   // gebundene Tabelle. Beide Sichten werden aus derselben authentifizierten
   // Messung versorgt, damit System-Check und KICC nicht auseinanderlaufen.
+  // Der Anbieterstatus wird aus dem realen Backup-Ziel abgeleitet. Ohne das
+  // blieb z. B. ein erfolgreiches B2-Backup im System-Check als "OFFEN" stehen.
+  const provider=providerStatuses(row.backup_target,row.last_backup_status||row.status);
   const machineRow={
     machine_client_id:machine.id,
     source_program:SOURCE,
@@ -83,6 +93,8 @@ Deno.serve(async(req:Request)=>{
     last_restore_test_at:row.last_restore_test_at,
     restore_result:row.last_restore_test_result,
     storage_target:row.backup_target,
+    b2_status:provider.b2_status,
+    neon_status:provider.neon_status,
     rpo_seconds:row.rpo_seconds,
     rto_seconds:row.rto_seconds,
     measured_at:row.measured_at,
