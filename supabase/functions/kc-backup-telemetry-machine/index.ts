@@ -35,13 +35,14 @@ Deno.serve(async(req:Request)=>{
   if(!machine)return json({error:'DEVICE_AUTH_FAILED'},401);
   if(machine.status!=='active')return json({error:'DEVICE_NOT_ACTIVE',status:machine.status},423);
 
+  const now=new Date().toISOString();
   const storageTargets=sanitizeTargets(body.storageTargets);
   const row={
     source_program:SOURCE,
     device_id:deviceId,
     app_version:safeText(body.appVersion,40),
     status:safeText(body.status,40).toUpperCase(),
-    measured_at:iso(body.measuredAt)||new Date().toISOString(),
+    measured_at:iso(body.measuredAt)||now,
     last_backup_at:iso(body.lastBackupAt),
     last_backup_status:safeText(body.lastBackupStatus,40).toUpperCase(),
     last_backup_bytes:intOrNull(body.lastBackupBytes),
@@ -55,10 +56,42 @@ Deno.serve(async(req:Request)=>{
     rpo_seconds:intOrNull(body.rpoSeconds),
     rto_seconds:intOrNull(body.rtoSeconds),
     storage_targets:storageTargets,
-    updated_at:new Date().toISOString()
+    updated_at:now
   };
-  const {error}=await client.from('kicc_backup_telemetry').insert(row);
+
+  // kicc_backup_telemetry ist ein aktueller Zustandsdatensatz mit
+  // PRIMARY KEY (source_program, device_id). INSERT konnte daher nur beim
+  // allerersten Lebenszeichen funktionieren; alle Folgemessungen liefen auf
+  // einen Duplicate-Key. UPSERT hält den Datensatz jetzt wirklich aktuell.
+  const {error}=await client.from('kicc_backup_telemetry').upsert(row,{onConflict:'source_program,device_id'});
   if(error)return json({error:'BACKUP_TELEMETRY_STORE_FAILED',detail:safeText(error.message,240)},500);
-  await client.from('kc_communication_machine_clients').update({last_seen_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',machine.id);
-  return json({ok:true,stored:true,targetCount:storageTargets.length});
+
+  // Der Live-Betriebswächter liest die an den gekoppelten Maschinen-Client
+  // gebundene Tabelle. Beide Sichten werden aus derselben authentifizierten
+  // Messung versorgt, damit System-Check und KICC nicht auseinanderlaufen.
+  const machineRow={
+    machine_client_id:machine.id,
+    source_program:SOURCE,
+    device_id:deviceId,
+    app_version:row.app_version,
+    status:row.status,
+    last_backup_at:row.last_backup_at,
+    last_backup_status:row.last_backup_status,
+    last_backup_original_bytes:row.last_backup_bytes,
+    last_integrity_at:row.last_verify_at,
+    integrity_result:row.integrity_status||row.last_verify_result,
+    last_restore_test_at:row.last_restore_test_at,
+    restore_result:row.last_restore_test_result,
+    storage_target:row.backup_target,
+    rpo_seconds:row.rpo_seconds,
+    rto_seconds:row.rto_seconds,
+    measured_at:row.measured_at,
+    storage_targets:row.storage_targets,
+    updated_at:now
+  };
+  const {error:machineError}=await client.from('kc_backup_machine_telemetry').upsert(machineRow,{onConflict:'machine_client_id'});
+  if(machineError)return json({error:'BACKUP_LIVE_TELEMETRY_STORE_FAILED',detail:safeText(machineError.message,240)},500);
+
+  await client.from('kc_communication_machine_clients').update({last_seen_at:now,updated_at:now}).eq('id',machine.id);
+  return json({ok:true,stored:true,liveStored:true,targetCount:storageTargets.length});
 });
