@@ -34,11 +34,11 @@ export function normalizeFlowNode(raw){
   if(/manager/.test(id))return"pc-manager";
   if(/money|butler|bargeld/.test(id))return"money-butler";
   if(/kc[-_]?dp|dienstplan/.test(id))return"dp-app";
+  if(/neon[-_]?mirror|mirror|spiegel/.test(id))return"neon-mirror";
+  if(/b2|backblaze/.test(id))return"b2";
+  if(/neon/.test(id))return"neon-vault";
   if(/pc[-_]?backup|backup|vault|pbv/.test(id))return"pc-backup";
   if(/supabase|kc[-_]?core|kicc|communication|system-check/.test(id))return"supabase";
-  if(/neon[-_]?mirror|mirror|spiegel/.test(id))return"neon-mirror";
-  if(/neon/.test(id))return"neon-vault";
-  if(/b2|backblaze/.test(id))return"b2";
   return null;
 }
 export function trafficView(entry,now=Date.now()){
