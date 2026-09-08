@@ -4,7 +4,7 @@
 // Genau dort entstand der Versionsalarm 0.7.31/0.7.33: ein bereits geöffneter
 // Browser-Tab sendete weiter Heartbeats, obwohl GitHub Pages schon neuer war.
 import"./diagnostics-runtime.js";
-const CURRENT_VERSION="0.7.35",VERSION_URL="./version.json";
+const CURRENT_VERSION="0.7.36",VERSION_URL="./version.json";
 const $=s=>document.querySelector(s);
 const SPAETER='kc-update-spaeter';
 const SPAETER_STUNDEN=12;
@@ -35,9 +35,6 @@ function showUpdate(version,note="",verbindlich=false){
   const bar=$("#updateBar");if(bar)bar.style.width="0%";
   b.classList.remove("hidden");
 
-  // Verbindliche Stabilitätsupdates dürfen in einem dauerhaft geöffneten
-  // Leitstand nicht tagelang liegen bleiben. Eine Minute bleibt für einen
-  // bewussten manuellen Klick; danach übernimmt die App selbst.
   if(pflichtTimer){clearTimeout(pflichtTimer);pflichtTimer=null}
   if(verbindlich){
     pflichtTimer=setTimeout(()=>{
@@ -127,7 +124,5 @@ export function setupUpdater(){
     }).catch(()=>{});
   }
   checkForAppUpdate({silent:true});
-  // Dauerhaft geöffnete Leitstände prüfen regelmäßig weiter. Dadurch bleibt ein
-  // alter Tab nicht mehr über Stunden als aktive Altversion im Gleichstandscheck.
   setInterval(()=>checkForAppUpdate({silent:true}),CHECK_INTERVAL_MS);
 }
