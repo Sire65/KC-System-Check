@@ -15,6 +15,13 @@ psql -v ON_ERROR_STOP=1 -q -c "drop database if exists ${PAKET};" -d postgres
 psql -v ON_ERROR_STOP=1 -q -c "create database ${PAKET};" -d postgres
 psql -v ON_ERROR_STOP=1 -q -d "${PAKET}" -f tests/sql/db-monitor.test.sql
 
+# Datenfluss-Wahrheit in einer sauberen Minimaldatenbank: Heartbeat-Zaehler
+# duerfen kein Dauergruen erzeugen, Backup-Zeit ist der echte Abschlusszeitpunkt.
+FLOW="${DB}_flow_truth"
+psql -v ON_ERROR_STOP=1 -q -c "drop database if exists ${FLOW};" -d postgres
+psql -v ON_ERROR_STOP=1 -q -c "create database ${FLOW};" -d postgres
+psql -v ON_ERROR_STOP=1 -q -d "${FLOW}" -f tests/sql/live-flow-truth.test.sql
+
 # Der Portabilitaetsbeweis: eine leere Datenbank, in der NUR die Migrationen
 # dieses Programms liegen - so wie bei jemandem, der es uebernimmt.
 FREMD="${DB}_fremd"
