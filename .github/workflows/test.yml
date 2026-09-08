@@ -27,9 +27,11 @@ jobs:
           VERSION=$(node -p "require('./version.json').version")
           test -n "$VERSION"
           grep -q "kc-system-check-v${VERSION}" sw.js
+          grep -q "CURRENT_VERSION=\"${VERSION}\"" js/updater.js
+          grep -q "VERSION='${VERSION}'" js/kicc-heartbeat.js
+          node -e "const v=require('./version.json'); if(v.verbindlich!==true) process.exit(1)"
+          grep -q 'cp -R js dist/js' .github/workflows/pages.yml
           grep -q 'growthWindow' js/usage.js
-          grep -q 'js/usage.js' .github/workflows/pages.yml
-          grep -q 'js/verification-profile.js' .github/workflows/pages.yml
           grep -q 'ASVS' js/verification-profile.js
           grep -q '100% bedeutet 100% der definierten' js/verification-profile.js
           grep -q 'keine absolute Fehlerfreiheitsgarantie' docs/VERIFICATION_PROFILE.md
