@@ -10,6 +10,7 @@ import{loadRemoteHistory}from"./adapters/live.js";
 // Gleichzeitig normalisieren wir den Namen des Backup-Zeitstempels: der
 // System-Check liefert last_ok_at, die Laufanzeige erwartet last_backup_at.
 const POLL_MS=5*60*1000;
+const FIRST_SYNC_MS=6000; // app.js lädt den Verlauf beim Start bereits einmal
 let busy=false;
 
 function ts(v){const n=Date.parse(v||"");return Number.isFinite(n)?n:null}
@@ -73,7 +74,9 @@ async function sync(){
 const observer=new MutationObserver(()=>patchProgramRow());
 function start(){
   observer.observe(document.body,{childList:true,subtree:true});
-  setTimeout(sync,400);
+  // Kein zweiter Request im Startvorgang: app.js fragt history=1 bereits ab.
+  // Kurz danach gleichen wir den LIVE-Zustand gezielt mit dem Server ab.
+  setTimeout(sync,FIRST_SYNC_MS);
   setInterval(sync,POLL_MS);
   setInterval(patchProgramRow,5000);
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")sync()});
