@@ -1,6 +1,6 @@
 {
-  "version": "0.7.34",
-  "note": "Alarm-Deduplizierung, robuste Pages-Auslieferung und automatische Versionspflege für lange Sitzungen",
+  "version": "0.7.35",
+  "note": "LIVE-Überwachungsläufe verwenden den aktuellen Serverstand statt veralteten Browserzustand",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true
