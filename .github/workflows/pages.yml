@@ -21,10 +21,12 @@ jobs:
       - name: Build static PWA
         run: |
           rm -rf dist
-          mkdir -p dist/js/adapters dist/icons dist/config dist/db-monitor
+          mkdir -p dist/icons dist/config dist/db-monitor
           cp index.html diagnose.html manifest.webmanifest sw.js version.json dist/
-          cp js/app.js js/state.js js/safe-html.js js/runtime-config.js js/startup-modules.js js/session.js js/alarm-policy.js js/charts.js js/gauges.js js/updater.js js/usage.js js/diagnostics.js js/diagnostics-runtime.js js/leitstand.js js/health-assistant.js js/early-warning.js js/self-check.js js/kicc-heartbeat.js js/quality-tools.js js/mobile-compact.js js/desktop-layout.js js/verification-profile.js js/alert-settings.js js/delivery-proof.js js/action-progress.js js/remote-operations.js dist/js/
-          cp js/adapters/base.js js/adapters/demo.js js/adapters/live.js dist/js/adapters/
+          # Die komplette JS-Struktur wird ausgeliefert. Eine feste Dateiliste hat
+          # bei neuen Modulen bereits mehrfach zu einer formal erfolgreichen,
+          # aber im Browser unvollständigen Veröffentlichung geführt.
+          cp -R js dist/js
           cp icons/icon-192.svg icons/icon-512.svg dist/icons/
           cp config/runtime.public.json dist/config/runtime.json
           cp config/alarm-policy.json dist/config/alarm-policy.json
