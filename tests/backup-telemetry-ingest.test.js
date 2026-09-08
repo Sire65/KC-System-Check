@@ -23,8 +23,14 @@ test('storage target ingest rejects path and credential-shaped fields',()=>{
   assert.match(src,/forbiddenKey\.test\(k\)/);
 });
 
-test('telemetry is stored server-side without returning payload details',()=>{
-  assert.match(src,/from\(['"]kicc_backup_telemetry['"]\)\.insert\(row\)/);
-  assert.match(src,/return json\(\{ok:true,stored:true,targetCount:storageTargets\.length\}\)/);
+test('telemetry updates the current KICC snapshot and the live-monitor view',()=>{
+  assert.match(src,/from\(['"]kicc_backup_telemetry['"]\)\.upsert\(row,\{onConflict:['"]source_program,device_id['"]\}\)/);
+  assert.match(src,/from\(['"]kc_backup_machine_telemetry['"]\)\.upsert\(machineRow,\{onConflict:['"]machine_client_id['"]\}\)/);
+  assert.match(src,/machine_client_id:machine\.id/);
+});
+
+test('successful ingest returns only acknowledgement metadata, never telemetry payload',()=>{
+  assert.match(src,/return json\(\{ok:true,stored:true,liveStored:true,targetCount:storageTargets\.length\}\)/);
   assert.doesNotMatch(src,/return json\(row\)/);
+  assert.doesNotMatch(src,/return json\(machineRow\)/);
 });
