@@ -13,4 +13,4 @@ import"./delivery-proof.js";
 import"./action-progress.js";
 import"./remote-operations.js";
 import"./monitoring-runs-sync.js";
-import"./live-layout.js";
+import"./live-layout-v2.js";
