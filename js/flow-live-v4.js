@@ -13,8 +13,8 @@ const RETAIN_MS=24*60*60_000;
 const KANAL="kc-datenfluss";
 
 const STATIC_ROUTES=[
-  {from:"kasse-01",to:"supabase",fromLabel:"Kasse 01",toLabel:"Supabase · KC Core",kind:"Kassen-Sync"},
-  {from:"kasse-02",to:"supabase",fromLabel:"Kasse 02",toLabel:"Supabase · KC Core",kind:"Kassen-Sync"},
+  {from:"kasse-01",to:"pc-manager",fromLabel:"Kasse 01",toLabel:"PC Manager",kind:"Kassen-Liveverkehr"},
+  {from:"kasse-02",to:"pc-manager",fromLabel:"Kasse 02",toLabel:"PC Manager",kind:"Kassen-Liveverkehr"},
   {from:"pc-manager",to:"supabase",fromLabel:"PC Manager",toLabel:"Supabase · KC Core",kind:"Manager-Sync"},
   {from:"money-butler",to:"supabase",fromLabel:"Money Butler",toLabel:"Supabase · KC Core",kind:"Bargeld-Sync"},
   {from:"kc-verwaltung",to:"supabase",fromLabel:"KC Verwaltung",toLabel:"Supabase · KC Core",kind:"Verwaltungs-Sync"},
@@ -41,7 +41,7 @@ export function normalizeFlowNode(raw){
   if(/kc[-_ ]?verwaltung|verwaltung/.test(id))return"kc-verwaltung";
   if(/kasse|markt|pos/.test(id)){
     const n=id.match(/(?:kasse|markt|pos)[-_ ]?(0?[12])(?:\D|$)/i)||id.match(/(?:^|\D)(0?[12])(?:\D|$)/);
-    return n?`kasse-${String(n[1]).padStart(2,"0")}`:null; // keine erfundene Kasse-01-Zuordnung
+    return n?`kasse-${String(n[1]).padStart(2,"0")}`:null;
   }
   if(/manager/.test(id))return"pc-manager";
   if(/money|butler|bargeld/.test(id))return"money-butler";
