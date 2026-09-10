@@ -2,10 +2,10 @@
 -- nicht abrufbar - dann meldet die Ursache und nicht beides.
 insert into public.kc_system_check_alarm_policy (id, policy)
 values ('default', '{
-  "note": "Alarmregeln als Konfiguration, nicht als Code. dependencies nennt je Signal die Voraussetzungen: faellt eine davon aus, ist das Signal ein Folgealarm und wird unterdrueckt. renotifyStatuses bestimmt, welche Zustaende nach renotifyAfterMinutes erneut gemeldet werden - eine offene Warnung ist eine Aufgabe, kein Vorfall, und wird nicht stuendlich wiederholt.",
+  "note": "Alarmregeln als Konfiguration, nicht als Code. GELB wird sofort im Leitstand angezeigt, aber erst nach drei aufeinanderfolgenden Warnmessungen gemeldet; bei 15-Minuten-Pruefung also nach etwa 30 Minuten. ROT wird sofort bei der ersten kritischen Messung gemeldet. dependencies nennt je Signal die Voraussetzungen: faellt eine davon aus, ist das Signal ein Folgealarm und wird unterdrueckt. renotifyStatuses bestimmt, welche Zustaende nach renotifyAfterMinutes erneut gemeldet werden - eine offene Warnung ist eine Aufgabe, kein Vorfall, und wird nicht stuendlich wiederholt.",
   "confirmAfter": {
-    "critical": 2,
-    "warning": 2,
+    "critical": 1,
+    "warning": 3,
     "unknown": 3,
     "healthy": 3
   },
