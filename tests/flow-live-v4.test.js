@@ -45,6 +45,19 @@ test('feste Routen entsprechen der realen Architektur',()=>{
   assert.ok(!__flowTruthForTests.STATIC_ROUTES.some(r=>/^kasse-0[12]$/.test(r.from)&&r.to==='supabase'));
 });
 
+test('expliziter Kassen-Flow wird als echter Verkehr Kasse zu Manager übernommen',()=>{
+  __flowTruthForTests.activity.clear();
+  const at=new Date().toISOString();
+  __flowTruthForTests.ingest({
+    flows:[{program_id:'kc-bilderkasse',instance_id:'kasse-01',source_id:'kasse-01',target_id:'pc-manager',flow_type:'SYNC',event_count:1,byte_count:null,status:'OK',measured_at:at,received_at:at}],
+    heartbeats:[]
+  });
+  const kasse=__flowTruthForTests.entries().find(r=>r.from==='kasse-01'&&r.to==='pc-manager');
+  assert.ok(kasse?.state,'Kassenverkehr muss als Route vorhanden sein');
+  assert.equal(kasse.state.events,1);
+  assert.equal(kasse.view.moving,true);
+});
+
 test('Oberfläche trennt Live-Bewegung und 15-Minuten-Historie sichtbar',()=>{
   const s=fs.readFileSync('js/flow-live-v4.js','utf8'),startup=fs.readFileSync('js/startup-modules.js','utf8');
   assert.match(startup,/flow-live-v4\.js/);
