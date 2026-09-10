@@ -32,7 +32,7 @@ test('kürzlicher Verkehr bleibt grau und erhält nur einen statischen Marker',(
   assert.equal(sixteenMin.cls,'idle');
 });
 
-test('KC Verwaltung ist echte feste Route, generische Kasse wird nicht erfunden',()=>{
+test('feste Routen entsprechen der realen Architektur',()=>{
   assert.equal(normalizeFlowNode('kc-verwaltung'),'kc-verwaltung');
   assert.equal(normalizeFlowNode('KC Verwaltung'),'kc-verwaltung');
   assert.equal(normalizeFlowNode('kc-bilderkasse'),null);
@@ -40,6 +40,9 @@ test('KC Verwaltung ist echte feste Route, generische Kasse wird nicht erfunden'
   assert.equal(normalizeFlowNode('kasse-02'),'kasse-02');
   assert.equal(__flowTruthForTests.STATIC_ROUTES.length,9);
   assert.ok(__flowTruthForTests.STATIC_ROUTES.some(r=>r.from==='kc-verwaltung'&&r.to==='supabase'));
+  assert.ok(__flowTruthForTests.STATIC_ROUTES.some(r=>r.from==='kasse-01'&&r.to==='pc-manager'));
+  assert.ok(__flowTruthForTests.STATIC_ROUTES.some(r=>r.from==='kasse-02'&&r.to==='pc-manager'));
+  assert.ok(!__flowTruthForTests.STATIC_ROUTES.some(r=>/^kasse-0[12]$/.test(r.from)&&r.to==='supabase'));
 });
 
 test('Oberfläche trennt Live-Bewegung und 15-Minuten-Historie sichtbar',()=>{
@@ -51,4 +54,5 @@ test('Oberfläche trennt Live-Bewegung und 15-Minuten-Historie sichtbar',()=>{
   assert.match(s,/letzter echter Verkehr/);
   assert.match(s,/animateMotion/);
   assert.match(s,/Heartbeats allein sind KEIN Verkehr/);
+  assert.match(s,/Kassen-Liveverkehr/);
 });
