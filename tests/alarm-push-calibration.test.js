@@ -9,8 +9,8 @@ test('GELB wird erst nach drei Warnmessungen gemeldet',()=>{
   assert.equal(policy.confirmAfter.warning,3);
 });
 
-test('ROT wird bei der ersten kritischen Messung gemeldet',()=>{
-  assert.equal(policy.confirmAfter.critical,1);
+test('ROT bleibt gegen einen einzelnen Messausreisser entprellt',()=>{
+  assert.equal(policy.confirmAfter.critical,2);
 });
 
 test('Warnungen werden nicht als Folgealarm stuendlich wiederholt',()=>{
@@ -18,6 +18,6 @@ test('Warnungen werden nicht als Folgealarm stuendlich wiederholt',()=>{
 });
 
 test('Produktionsmigration bildet dieselben Schwellen ab',()=>{
-  assert.match(migration,/\{confirmAfter,critical\}[^\n]*'1'::jsonb/);
+  assert.match(migration,/\{confirmAfter,critical\}[^\n]*'2'::jsonb/);
   assert.match(migration,/\{confirmAfter,warning\}[^\n]*'3'::jsonb/);
 });
