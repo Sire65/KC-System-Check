@@ -4,7 +4,7 @@
 // Genau dort entstand der Versionsalarm 0.7.31/0.7.33: ein bereits geöffneter
 // Browser-Tab sendete weiter Heartbeats, obwohl GitHub Pages schon neuer war.
 import"./diagnostics-runtime.js";
-const CURRENT_VERSION="0.7.38",VERSION_URL="./version.json";
+const CURRENT_VERSION="0.7.39",VERSION_URL="./version.json";
 const $=s=>document.querySelector(s);
 const SPAETER='kc-update-spaeter';
 const SPAETER_STUNDEN=12;
@@ -34,15 +34,12 @@ function showUpdate(version,note="",verbindlich=false){
   $("#updateProgress")?.classList.remove("an");
   const bar=$("#updateBar");if(bar)bar.style.width="0%";
   b.classList.remove("hidden");
-
   if(pflichtTimer){clearTimeout(pflichtTimer);pflichtTimer=null}
-  if(verbindlich){
-    pflichtTimer=setTimeout(()=>{
-      if(angekuendigt===version)balkenLaufenLassen(installSekunden,uebernehmen);
-    },PFLICHT_AUTO_MS);
-  }
+  if(verbindlich){pfichtStart(version)}
 }
-
+function pfichtStart(version){
+  pflichtTimer=setTimeout(()=>{if(angekuendigt===version)balkenLaufenLassen(installSekunden,uebernehmen)},PFLICHT_AUTO_MS);
+}
 function balkenLaufenLassen(sekunden,fertig){
   const huelle=$("#updateProgress"),bar=$("#updateBar"),rest=$("#updateRemaining");
   if(!huelle||!bar||!rest){fertig();return}
@@ -55,74 +52,27 @@ function balkenLaufenLassen(sekunden,fertig){
     if(anteil>=1){clearInterval(uhr);fertig()}
   },100);
 }
-
 export async function checkForAppUpdate({silent=true}={}){
-  if(pruefungLaeuft)return null;
-  pruefungLaeuft=true;
+  if(pruefungLaeuft)return null;pruefungLaeuft=true;
   try{
-    const r=await fetch(`${VERSION_URL}?t=${Date.now()}`,{cache:"no-store"});
-    if(!r.ok)throw new Error(`HTTP ${r.status}`);
+    const r=await fetch(`${VERSION_URL}?t=${Date.now()}`,{cache:"no-store"});if(!r.ok)throw new Error(`HTTP ${r.status}`);
     const info=await r.json();
-    if(!newer(info.version,CURRENT_VERSION)){
-      spaeterVergessen();
-      if(!silent)alert(`KC System Check ist aktuell (Version ${CURRENT_VERSION}).`);
-      return null;
-    }
+    if(!newer(info.version,CURRENT_VERSION)){spaeterVergessen();if(!silent)alert(`KC System Check ist aktuell (Version ${CURRENT_VERSION}).`);return null}
     if(silent&&!info.verbindlich&&spaeterGemerkt(info.version))return info;
-    installSekunden=info.installSekunden;
-    showUpdate(info.version,info.note||"",!!info.verbindlich);
-    return info;
-  }catch(e){
-    if(!silent)alert(`Update-Prüfung nicht möglich: ${e.message}`);
-    return null;
-  }finally{pruefungLaeuft=false}
+    installSekunden=info.installSekunden;showUpdate(info.version,info.note||"",!!info.verbindlich);return info;
+  }catch(e){if(!silent)alert(`Update-Prüfung nicht möglich: ${e.message}`);return null}finally{pruefungLaeuft=false}
 }
-
 async function uebernehmen(){
   const install=$("#installUpdateBtn");
   try{
     if(pflichtTimer){clearTimeout(pflichtTimer);pflichtTimer=null}
-    if(waitingWorker){
-      waitingWorker.postMessage({type:"SKIP_WAITING"});
-      setTimeout(()=>location.reload(),3000);
-      return;
-    }
-    const reg=await navigator.serviceWorker?.getRegistration();
-    if(reg)await reg.update();
-    location.reload();
-  }catch(e){
-    if(install){install.disabled=false;install.textContent="Jetzt aktualisieren"}
-    $("#updateProgress")?.classList.remove("an");
-    alert(`Update konnte nicht gestartet werden: ${e.message}`);
-  }
+    if(waitingWorker){waitingWorker.postMessage({type:"SKIP_WAITING"});setTimeout(()=>location.reload(),3000);return}
+    const reg=await navigator.serviceWorker?.getRegistration();if(reg)await reg.update();location.reload();
+  }catch(e){if(install){install.disabled=false;install.textContent="Jetzt aktualisieren"}$("#updateProgress")?.classList.remove("an");alert(`Update konnte nicht gestartet werden: ${e.message}`)}
 }
-
 export function setupUpdater(){
-  $("#laterUpdateBtn")?.addEventListener("click",()=>{
-    if(angekuendigt)spaeterMerken(angekuendigt);
-    $("#updateBanner")?.classList.add("hidden");
-  });
-  $("#installUpdateBtn")?.addEventListener("click",()=>{
-    const install=$("#installUpdateBtn"),spaeter=$("#laterUpdateBtn");
-    install.disabled=true;install.textContent="Wird vorbereitet …";
-    if(spaeter)spaeter.disabled=true;
-    spaeterVergessen();
-    if(pflichtTimer){clearTimeout(pflichtTimer);pflichtTimer=null}
-    balkenLaufenLassen(installSekunden,uebernehmen);
-  });
-  if("serviceWorker"in navigator){
-    let hadController=!!navigator.serviceWorker.controller;
-    navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadController)location.reload();hadController=true});
-    navigator.serviceWorker.ready.then(reg=>{
-      if(reg.waiting)waitingWorker=reg.waiting;
-      reg.addEventListener("updatefound",()=>{
-        const worker=reg.installing;
-        worker?.addEventListener("statechange",()=>{
-          if(worker.state==="installed"&&navigator.serviceWorker.controller){waitingWorker=worker;showUpdate("neu","App-Dateien sind bereit")}
-        });
-      });
-    }).catch(()=>{});
-  }
-  checkForAppUpdate({silent:true});
-  setInterval(()=>checkForAppUpdate({silent:true}),CHECK_INTERVAL_MS);
+  $("#laterUpdateBtn")?.addEventListener("click",()=>{if(angekuendigt)spaeterMerken(angekuendigt);$("#updateBanner")?.classList.add("hidden")});
+  $("#installUpdateBtn")?.addEventListener("click",()=>{const install=$("#installUpdateBtn"),spaeter=$("#laterUpdateBtn");install.disabled=true;install.textContent="Wird vorbereitet …";if(spaeter)spaeter.disabled=true;spaeterVergessen();if(pflichtTimer){clearTimeout(pflichtTimer);pflichtTimer=null}balkenLaufenLassen(installSekunden,uebernehmen)});
+  if("serviceWorker"in navigator){let hadController=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadController)location.reload();hadController=true});navigator.serviceWorker.ready.then(reg=>{if(reg.waiting)waitingWorker=reg.waiting;reg.addEventListener("updatefound",()=>{const worker=reg.installing;worker?.addEventListener("statechange",()=>{if(worker.state==="installed"&&navigator.serviceWorker.controller){waitingWorker=worker;showUpdate("neu","App-Dateien sind bereit")}})})}).catch(()=>{})}
+  checkForAppUpdate({silent:true});setInterval(()=>checkForAppUpdate({silent:true}),CHECK_INTERVAL_MS);
 }

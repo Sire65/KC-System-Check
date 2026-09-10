@@ -1,6 +1,6 @@
 {
-  "version": "0.7.38",
-  "note": "Datenfluss konsolidiert: dunkelgraue Ruherouten, grün nur bei gemessenem Verkehr; Zähler werden als Differenz ausgewertet",
+  "version": "0.7.39",
+  "note": "Echter Datenfluss erweitert: 15-Minuten-Kürzlich-Anzeige ohne künstliche Bewegung; KC Verwaltung als reale Route vorbereitet",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true
