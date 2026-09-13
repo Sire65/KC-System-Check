@@ -1,6 +1,6 @@
 {
-  "version": "0.7.39",
-  "note": "Echter Datenfluss erweitert: 15-Minuten-Kürzlich-Anzeige ohne künstliche Bewegung; KC Verwaltung als reale Route vorbereitet",
+  "version": "0.7.40",
+  "note": "Datenfluss korrigiert: Neon-Spiegel folgt nur noch dem bestaetigten Serverlauf; Programmaustausch zeigt alle bekannten Datenwege und fehlende Telemetrie offen an",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true
