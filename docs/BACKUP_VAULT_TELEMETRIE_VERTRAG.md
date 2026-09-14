@@ -11,7 +11,7 @@ Backup-Nutzdaten oder Geheimnisse.
 ## Betriebsrhythmus
 
 PC Backup Vault wird **manuell bei Bedarf gestartet**. Es besteht derzeit kein
-tägllicher oder anderer fester Soll-Zeitplan.
+täglicher oder anderer fester Soll-Zeitplan.
 
 Daraus folgt für KC System Check:
 
