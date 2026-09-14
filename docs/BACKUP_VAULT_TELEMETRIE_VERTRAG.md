@@ -1,12 +1,25 @@
 # Vertrag: PC Backup Vault → KC System Check
 
-Stand: 2026-09-07
+Stand: 2026-09-14
 
 ## Zweck
 
 KC System Check darf Backup Vault ausschließlich **read-only** überwachen. Die
 Schnittstelle transportiert Betriebszustand und Prüfergebnisse, niemals
 Backup-Nutzdaten oder Geheimnisse.
+
+## Betriebsrhythmus
+
+PC Backup Vault wird **manuell bei Bedarf gestartet**. Es besteht derzeit kein
+tägllicher oder anderer fester Soll-Zeitplan.
+
+Daraus folgt für KC System Check:
+
+- Das Alter des letzten erfolgreichen Backup-Laufs ist eine Information, allein aber kein Warn- oder Fehlergrund.
+- Das Alter der letzten Telemetrie ist ebenfalls nur eine Information, solange kein fester Soll-Zeitplan hinterlegt ist.
+- Ein nicht gestartetes Backup Vault wird nicht als Ausfall bewertet.
+- `warning` oder `critical` entstehen weiterhin aus tatsächlich gemeldeten Problemen, zum Beispiel fehlgeschlagenem Backup, fehlerhafter Integritätsprüfung, Verify-Fehler oder Restore-Test-Fehler.
+- Wird später ein verbindlicher Zeitplan eingerichtet, darf die Überwachung ausgebliebene Soll-Läufe wieder bewerten. Der Soll-Zeitplan muss dafür ausdrücklich konfiguriert sein; er wird nicht aus dem Alter vorhandener Telemetrie abgeleitet.
 
 ## Verbindliche Quelle
 
