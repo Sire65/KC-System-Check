@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 
 const quelle = readFileSync("supabase/functions/kc-system-check/index.ts", "utf8");
 const abschnitt = quelle
-  .slice(quelle.indexOf("function mirrorDetail"), quelle.indexOf("// --- Lebenszeichen der Programme"))
+  .slice(quelle.indexOf("function mirrorDetail"), quelle.indexOf("function seit("))
   .replace(/:\s*string\[\]/g, "").replace(/:\s*boolean/g, "").replace(/:\s*any/g, "");
 const mirrorDetail = new Function(`${abschnitt}; return mirrorDetail;`)();
 const gesundAbschnitt = quelle
@@ -33,9 +33,6 @@ test("Eine Warnung nennt Tabelle und Meldung", () => {
 });
 
 test("Ein Lauf ohne Tabelle erfindet keine", () => {
-  // Laeufe ueber den Gesamtzustand ("47/48 Tabellen frisch") tragen keine
-  // Tabelle. Die Kachel schrieb dafuer "unbenannte Tabelle: ..." - ein Name,
-  // den es nicht gibt, vor einer Meldung, die fuer sich steht.
   const text = mirrorDetail(
     { status: "warning", age_min: 4 },
     { mirror: { mismatch_count: 0 },
@@ -87,9 +84,6 @@ test("Die Momentaufnahme liefert den Grund mit", () => {
 });
 
 test("Die Diagnose nennt die Schemaaenderung als erste Spur", () => {
-  // Der haeufigste Grund fuer eine Pruefsummen-Abweichung ist eine Spalte, die
-  // in der Quelle dazukam und im Spiegel fehlt. Genau das ist am 2026-09-06
-  // passiert - und die Diagnose schickte einen vorher zum Mirror-Worker.
   const d = readFileSync("js/diagnostics.js", "utf8");
   assert.match(d, /Der Spiegel zieht Schemaänderungen NICHT automatisch nach/);
   assert.match(d, /ALTER TABLE nachziehen/);
@@ -102,10 +96,6 @@ test("Die Diagnose nennt die betroffenen Tabellen statt 'Status unbekannt'", () 
   assert.match(d, /Betroffen: \$\{namen\.join\(", "\)\}/);
 });
 
-
-// Eine Kachel, die aus Gewohnheit gelb steht, verdeckt den Tag darauf einen
-// echten Befund. Anlass: am 2026-09-06 war die Abweichung um 11:30 behoben -
-// die Kachel waere trotzdem bis zum naechsten Vormittag gelb geblieben.
 test("Ein behobener Befund faerbt nicht mehr", () => {
   const frisch = new Date(Date.now() - 60000).toISOString();
   const mh = mirrorHealth({ mirror: { status: "ok", mismatch_count: 0, finished_at: frisch },
