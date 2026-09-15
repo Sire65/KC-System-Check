@@ -1,4 +1,5 @@
 import{state,subscribe,latestResult}from"./state.js";
+import{stableCashRegisterSlots}from"./device-slots.js";
 
 const MARKET_START=new Date(2026,11,4);
 const MARKET_END=new Date(2026,11,14);
@@ -96,7 +97,7 @@ function render(){
   const neon=resultState(resultById("neon"));
   const mirror=resultState(resultById("mirror"));
   const managers=latestMatches(/manager/i),manager=heartbeatState(managers[0]||null);
-  const kassen=latestMatches(/kasse|markt|pos/i),kasse1=heartbeatState(kassen[0]||null),kasse2=heartbeatState(kassen[1]||null);
+  const kassen=latestMatches(/kasse|markt|pos/i),assigned=stableCashRegisterSlots(kassen),kasse1=heartbeatState(assigned.slots[0]),kasse2=heartbeatState(assigned.slots[1]);
   const routers=latestMatches(/router|gateway|internet|network|netz/i),router=routerState(routers[0]||null);
   const printers=latestMatches(/printer|bondruck|receipt|tm[-_]?t88/i),printer=printerState(printers[0]||null);
   const butlers=latestMatches(/money[-_ ]?butler|cash[-_ ]?butler/i),butler=moneyButlerState(butlers[0]||null);
@@ -110,7 +111,7 @@ function render(){
   box.append(row("PC Manager",manager.text));
   box.append(row("Kasse 1",kasse1.text));
   box.append(row("Kasse 2",kasse2.text));
-  if(kassen.length>2)box.append(row("Weitere Kassen",`${kassen.length-2} zusätzliche Instanz(en) erkannt`));
+  if(assigned.extras.length)box.append(row("Weitere Kassen",`${assigned.extras.length} zusätzliche Instanz(en) erkannt`));
   box.append(row("Router / Internet",router.text));
   box.append(row("Bondrucker",printer.text));
   if(printers.length>1)box.append(row("Weitere Bondrucker",`${printers.length-1} zusätzliche Instanz(en) erkannt`));
@@ -118,8 +119,8 @@ function render(){
 
   const note=document.createElement("div");note.className="muted small";
   note.textContent=active
-    ?"Im aktiven Marktzeitraum zählen echte Störungen, Warnungen und bereits angebundene aber nicht aktive Komponenten in die Marktbereitschaft. Fehlende, noch nicht angebundene Telemetrie bleibt neutral, verhindert aber ein vollständiges BEREIT."
-    :"In der Vorbereitung werden nur vorhandene Messwerte bewertet. Fehlende Telemetrie bleibt neutral; bereits bekannte, aber derzeit inaktive Komponenten werden nicht als BEREIT gewertet.";
+    ?"Im aktiven Marktzeitraum zählen echte Störungen, Warnungen und bereits angebundene aber nicht aktive Komponenten in die Marktbereitschaft. Kasse 1/2 bleiben über Kassen-/Terminalnummer oder feste Gerätekennung stabil zugeordnet. Fehlende, noch nicht angebundene Telemetrie bleibt neutral, verhindert aber ein vollständiges BEREIT."
+    :"In der Vorbereitung werden nur vorhandene Messwerte bewertet. Kasse 1/2 bleiben stabil zugeordnet; fehlende Telemetrie bleibt neutral und bereits bekannte, aber derzeit inaktive Komponenten werden nicht als BEREIT gewertet.";
   box.append(note);
 }
 if(typeof document!=="undefined")subscribe(render);
