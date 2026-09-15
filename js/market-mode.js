@@ -42,6 +42,20 @@ function printerState(h){
   if(base.state==="warn"||["LOW","NEAR_END","PAPER_LOW"].includes(paper))return{state:"warn",text:`PRÜFEN · ${paper?"Papier niedrig":"Heartbeat"} · ${transport||"Verbindung unbekannt"} · ${age}`};
   const bits=["OK"];if(transport)bits.push(transport);if(paper)bits.push(`Papier ${paper}`);bits.push(age);return{state:"ok",text:bits.join(" · ")};
 }
+function moneyButlerState(h){
+  const base=heartbeatState(h);if(!h||base.state==="bad"||base.state==="idle")return base;
+  const transfer=String(h.transfer_status||h.handover_status||h.cash_transfer_status||"").toUpperCase();
+  const fill=String(h.fill_status||h.load_status||h.stock_status||"").toUpperCase();
+  const fillPercent=num(h.fill_percent,h.load_percent,h.stock_percent);
+  const errors=num(h.transfer_error_count,h.cash_error_count,h.error_count);
+  const age=ageText(ageMs(h.measured_at||h.received_at));
+  if(["FAILED","ERROR","BLOCKED","JAMMED"].includes(transfer)||["FAILED","ERROR","EMPTY","BLOCKED"].includes(fill))return{state:"bad",text:`STÖRUNG · ${transfer||fill} · ${age}`};
+  if(errors!==null&&errors>0)return{state:"warn",text:`PRÜFEN · ${Math.round(errors)} Fehler · ${age}`};
+  if(base.state==="warn"||["PENDING","WAITING","DEGRADED"].includes(transfer)||(fillPercent!==null&&fillPercent<20)){
+    const bits=["PRÜFEN"];if(transfer)bits.push(`Übergabe ${transfer}`);if(fillPercent!==null)bits.push(`Füllstand ${Math.round(fillPercent)} %`);else if(fill)bits.push(`Füllung ${fill}`);bits.push(age);return{state:"warn",text:bits.join(" · ")};
+  }
+  const bits=["OK"];if(transfer)bits.push(`Übergabe ${transfer}`);if(fillPercent!==null)bits.push(`Füllstand ${Math.round(fillPercent)} %`);else if(fill)bits.push(`Füllung ${fill}`);bits.push(age);return{state:"ok",text:bits.join(" · ")};
+}
 function latestMatches(rx){
   const map=new Map();
   for(const h of heartbeats()){
@@ -79,7 +93,8 @@ function render(){
   const printers=latestMatches(/printer|bondruck|receipt|tm[-_]?t88/i);
   box.append(row("Bondrucker",printerState(printers[0]||null).text));
   if(printers.length>1)box.append(row("Weitere Bondrucker",`${printers.length-1} zusätzliche Instanz(en) erkannt`));
-  box.append(row("Money Butler","TELEMETRIE VORBEREITET"));
-  const note=document.createElement("div");note.className="muted small";note.textContent="Kassen, PC Manager, Router und Bondrucker werden nur bei vorhandener Telemetrie bewertet. Heartbeat >90 s = prüfen, >180 s = nicht aktiv. Fehlende Telemetrie bleibt neutral.";box.append(note);
+  const butlers=latestMatches(/money[-_ ]?butler|cash[-_ ]?butler/i);
+  box.append(row("Money Butler",moneyButlerState(butlers[0]||null).text));
+  const note=document.createElement("div");note.className="muted small";note.textContent="Kassen, PC Manager, Router, Bondrucker und Money Butler werden nur bei vorhandener Telemetrie bewertet. Heartbeat >90 s = prüfen, >180 s = nicht aktiv. Fehlende Telemetrie bleibt neutral.";box.append(note);
 }
 if(typeof document!=="undefined")subscribe(render);
