@@ -1,7 +1,7 @@
 {
-  "version": "0.7.40",
-  "note": "Datenfluss korrigiert: Neon-Spiegel folgt nur noch dem bestaetigten Serverlauf; Programmaustausch zeigt alle bekannten Datenwege und fehlende Telemetrie offen an",
-  "channel": "stable",
+  "version": "0.8.0-beta.1",
+  "note": "Additive Betriebsübersicht: Systeme, Datenbank und Failover, Kassen und Geräte sowie Backup und Sicherheit auf einen Blick; bestehende Detailansichten bleiben unverändert",
+  "channel": "beta",
   "installSekunden": 5,
-  "verbindlich": true
+  "verbindlich": false
 }
