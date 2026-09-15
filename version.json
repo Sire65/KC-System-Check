@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.3",
-  "note": "Kassen- und Gerätebereitschaft ergänzt: aktuelle Kassen- und PC-Manager-Kontakte werden kompakt bewertet; Akku-, WLAN- und Speichertelemetrie wird nur angezeigt, wenn sie tatsächlich geliefert wird. Inaktive Programme wie DP2 erzeugen keine Geräte-Störung.",
+  "version": "0.8.0-beta.4",
+  "note": "Schema-Drift vorbereitet: der Failover-Block kann Supabase- und Neon-Schemas künftig per Signatur vergleichen. Die Anzeige bleibt bis zur getesteten Serveraktivierung neutral und erzeugt keinen Alarm.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
