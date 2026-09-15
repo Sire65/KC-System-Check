@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.16",
-  "note": "Qualitätsrunde für den Betriebsleitstand: Betriebsübersicht nutzt den jüngsten bekannten Lauf, INFO/HINWEIS übersteuern keine gesunden Bereiche mehr, Geräte-Schwellen sind auf 90/180 Sekunden vereinheitlicht und Geräte-/Schema-Zusatzanzeigen werden nach jedem Parent-Render zuverlässig neu gezeichnet. 0.7.40 bleibt unverändert.",
+  "version": "0.8.0-beta.17",
+  "note": "Qualitätsrunde fortgesetzt: Recovery- und Marktbetriebsmodul verwenden jetzt denselben zentralen jüngsten bekannten Lauf wie die Betriebsübersicht. Dadurch werden Remote-History, lokaler Verlauf und letzter Lauf konsistent ausgewertet; 0.7.40 bleibt unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
