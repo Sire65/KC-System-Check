@@ -1,4 +1,4 @@
-import{state,subscribe,latestRun}from"./state.js";
+import{state,subscribe,latestResult}from"./state.js";
 
 const MARKET_START=new Date(2026,11,4);
 const MARKET_END=new Date(2026,11,14);
@@ -10,7 +10,7 @@ const norm=v=>{const s=String(v||"").toLowerCase();if(["healthy","ok"].includes(
 const num=(...values)=>{for(const value of values){const n=Number(value);if(Number.isFinite(n))return n}return null};
 function liveData(){const x=state.live||{};return x.live&&typeof x.live==="object"?x.live:x}
 function heartbeats(){return Array.isArray(liveData()?.heartbeats)?liveData().heartbeats:[]}
-function resultById(id){const run=latestRun(),rows=Array.isArray(run?.results)?run.results:[];return rows.find(r=>r?.id===id)||null}
+function resultById(id){return latestResult(id)}
 function resultState(row){const s=norm(row?.status);if(s==="healthy")return{state:"ok",text:"OK"};if(s==="warning")return{state:"warn",text:"PRÜFEN"};if(s==="critical")return{state:"bad",text:"STÖRUNG"};if(s==="not_configured")return{state:"prepared",text:"VORBEREITET"};return{state:"unknown",text:"UNBEKANNT"}}
 function heartbeatState(h){
   if(!h)return{state:"prepared",text:"TELEMETRIE VORBEREITET"};
@@ -76,6 +76,7 @@ function readiness(components,active){
   if(bad>0)text=`NICHT BEREIT · ${bad} Störung(en)`;
   else if(active&&idle>0)text=`NICHT BEREIT · ${idle} Komponente(n) nicht aktiv`;
   else if(warn>0)text=`EINGESCHRÄNKT · ${warn} zu prüfen`;
+  else if(!active&&idle>0)text=`VORBEREITUNG · ${idle} Komponente(n) derzeit nicht aktiv`;
   else if(missing>0)text=`NOCH NICHT VOLLSTÄNDIG BEWERTBAR · ${measured.length}/${components.length} messbar`;
   else text=`BEREIT · ${components.length}/${components.length} messbar`;
   return{text,measured:measured.length,total:components.length,missing,bad,warn,idle};
@@ -118,7 +119,7 @@ function render(){
   const note=document.createElement("div");note.className="muted small";
   note.textContent=active
     ?"Im aktiven Marktzeitraum zählen echte Störungen, Warnungen und bereits angebundene aber nicht aktive Komponenten in die Marktbereitschaft. Fehlende, noch nicht angebundene Telemetrie bleibt neutral, verhindert aber ein vollständiges BEREIT."
-    :"In der Vorbereitung werden nur vorhandene Messwerte bewertet. Fehlende Telemetrie bleibt neutral und verhindert ein voreiliges BEREIT.";
+    :"In der Vorbereitung werden nur vorhandene Messwerte bewertet. Fehlende Telemetrie bleibt neutral; bereits bekannte, aber derzeit inaktive Komponenten werden nicht als BEREIT gewertet.";
   box.append(note);
 }
 if(typeof document!=="undefined")subscribe(render);
