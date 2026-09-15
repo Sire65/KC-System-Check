@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.2",
-  "note": "Betriebsübersicht erweitert: Failover zeigt Primär Supabase, Reserve Neon, Spiegelzustand, Abweichungen, Alter und eine klare Failover-bereit-JA/NEIN-Bewertung; bestehende Detailansichten bleiben unverändert",
+  "version": "0.8.0-beta.3",
+  "note": "Kassen- und Gerätebereitschaft ergänzt: aktuelle Kassen- und PC-Manager-Kontakte werden kompakt bewertet; Akku-, WLAN- und Speichertelemetrie wird nur angezeigt, wenn sie tatsächlich geliefert wird. Inaktive Programme wie DP2 erzeugen keine Geräte-Störung.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
