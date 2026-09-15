@@ -12,7 +12,7 @@ function latestRun(){return state.lastRun||state.history?.at?.(-1)||state.histor
 function liveData(){const x=state.live||{};return x.live&&typeof x.live==="object"?x.live:x}
 function heartbeats(){return Array.isArray(liveData()?.heartbeats)?liveData().heartbeats:[]}
 function resultById(id){const run=latestRun(),rows=Array.isArray(run?.results)?run.results:[];return rows.find(r=>r?.id===id)||null}
-function statusText(row){const s=norm(row?.status);if(s==="healthy")return"OK";if(s==="warning")return"PRÜFEN";if(s==="critical")return"STÖRUNG";if(s==="not_configured")return"VORBEREITET";return"UNBEKANNT"}
+function resultState(row){const s=norm(row?.status);if(s==="healthy")return{state:"ok",text:"OK"};if(s==="warning")return{state:"warn",text:"PRÜFEN"};if(s==="critical")return{state:"bad",text:"STÖRUNG"};if(s==="not_configured")return{state:"prepared",text:"VORBEREITET"};return{state:"unknown",text:"UNBEKANNT"}}
 function heartbeatState(h){
   if(!h)return{state:"prepared",text:"TELEMETRIE VORBEREITET"};
   const age=ageMs(h?.measured_at||h?.received_at),raw=String(h?.status||"").toUpperCase();
@@ -67,34 +67,59 @@ function latestMatches(rx){
   }
   return[...map.values()].sort((a,b)=>Date.parse(b?.measured_at||b?.received_at||0)-Date.parse(a?.measured_at||a?.received_at||0));
 }
-function row(label,value){const d=document.createElement("div");d.className="kc-ops-fact";const a=document.createElement("span");a.className="muted";a.textContent=label;const b=document.createElement("span");b.textContent=value;d.append(a,b);return d}
+function readiness(components,active){
+  const measured=components.filter(c=>!["prepared","unknown"].includes(c.state));
+  const missing=components.length-measured.length;
+  const bad=measured.filter(c=>c.state==="bad").length;
+  const warn=measured.filter(c=>c.state==="warn").length;
+  const idle=measured.filter(c=>c.state==="idle").length;
+  let text;
+  if(bad>0)text=`NICHT BEREIT · ${bad} Störung(en)`;
+  else if(active&&idle>0)text=`NICHT BEREIT · ${idle} Komponente(n) nicht aktiv`;
+  else if(warn>0)text=`EINGESCHRÄNKT · ${warn} zu prüfen`;
+  else if(missing>0)text=`NOCH NICHT VOLLSTÄNDIG BEWERTBAR · ${measured.length}/${components.length} messbar`;
+  else text=`BEREIT · ${components.length}/${components.length} messbar`;
+  return{text,measured:measured.length,total:components.length,missing,bad,warn,idle};
+}
+function row(label,value,strong=false){const d=document.createElement("div");d.className="kc-ops-fact";const a=document.createElement("span");a.className="muted";a.textContent=label;const b=document.createElement("span");if(strong)b.className="kc-ops-ready";b.textContent=value;d.append(a,b);return d}
 function ensureBox(host){let box=host.querySelector("#marketModeInfo");if(box)return box;box=document.createElement("div");box.id="marketModeInfo";box.className="kc-ops-facts";box.style.marginTop="10px";host.appendChild(box);return box}
 function render(){
   if(typeof document==="undefined")return;
   const host=document.querySelector("#operationsOverviewCard");if(!host)return;
   const box=ensureBox(host),now=new Date();box.innerHTML="";
-  const phase=now<MARKET_START?"Vorbereitung":now<MARKET_END?"AKTIV":"Abgeschlossen";
+  const active=now>=MARKET_START&&now<MARKET_END;
+  const phase=now<MARKET_START?"Vorbereitung":active?"AKTIV":"Abgeschlossen";
   box.append(row("Marktbetrieb",`${phase} · ${MARKET_LABEL}`));
   if(now>=MARKET_END){const note=document.createElement("div");note.className="muted small";note.textContent="Die Marktkomponenten werden außerhalb des Marktzeitraums nicht als Pflichtbetrieb bewertet.";box.append(note);return}
-  box.append(row("Supabase",statusText(resultById("kc_core"))));
-  box.append(row("Neon",statusText(resultById("neon"))));
-  box.append(row("Spiegelung",statusText(resultById("mirror"))));
 
-  const managers=latestMatches(/manager/i);
-  box.append(row("PC Manager",heartbeatState(managers[0]||null).text));
+  const supabase=resultState(resultById("kc_core"));
+  const neon=resultState(resultById("neon"));
+  const mirror=resultState(resultById("mirror"));
+  const managers=latestMatches(/manager/i),manager=heartbeatState(managers[0]||null);
+  const kassen=latestMatches(/kasse|markt|pos/i),kasse1=heartbeatState(kassen[0]||null),kasse2=heartbeatState(kassen[1]||null);
+  const routers=latestMatches(/router|gateway|internet|network|netz/i),router=routerState(routers[0]||null);
+  const printers=latestMatches(/printer|bondruck|receipt|tm[-_]?t88/i),printer=printerState(printers[0]||null);
+  const butlers=latestMatches(/money[-_ ]?butler|cash[-_ ]?butler/i),butler=moneyButlerState(butlers[0]||null);
+  const components=[supabase,neon,mirror,manager,kasse1,kasse2,router,printer,butler];
+  const ready=readiness(components,active);
+  box.append(row("Marktbereitschaft",ready.text,true));
 
-  const kassen=latestMatches(/kasse|markt|pos/i);
-  box.append(row("Kasse 1",heartbeatState(kassen[0]||null).text));
-  box.append(row("Kasse 2",heartbeatState(kassen[1]||null).text));
+  box.append(row("Supabase",supabase.text));
+  box.append(row("Neon",neon.text));
+  box.append(row("Spiegelung",mirror.text));
+  box.append(row("PC Manager",manager.text));
+  box.append(row("Kasse 1",kasse1.text));
+  box.append(row("Kasse 2",kasse2.text));
   if(kassen.length>2)box.append(row("Weitere Kassen",`${kassen.length-2} zusätzliche Instanz(en) erkannt`));
-
-  const routers=latestMatches(/router|gateway|internet|network|netz/i);
-  box.append(row("Router / Internet",routerState(routers[0]||null).text));
-  const printers=latestMatches(/printer|bondruck|receipt|tm[-_]?t88/i);
-  box.append(row("Bondrucker",printerState(printers[0]||null).text));
+  box.append(row("Router / Internet",router.text));
+  box.append(row("Bondrucker",printer.text));
   if(printers.length>1)box.append(row("Weitere Bondrucker",`${printers.length-1} zusätzliche Instanz(en) erkannt`));
-  const butlers=latestMatches(/money[-_ ]?butler|cash[-_ ]?butler/i);
-  box.append(row("Money Butler",moneyButlerState(butlers[0]||null).text));
-  const note=document.createElement("div");note.className="muted small";note.textContent="Kassen, PC Manager, Router, Bondrucker und Money Butler werden nur bei vorhandener Telemetrie bewertet. Heartbeat >90 s = prüfen, >180 s = nicht aktiv. Fehlende Telemetrie bleibt neutral.";box.append(note);
+  box.append(row("Money Butler",butler.text));
+
+  const note=document.createElement("div");note.className="muted small";
+  note.textContent=active
+    ?"Im aktiven Marktzeitraum zählen echte Störungen, Warnungen und bereits angebundene aber nicht aktive Komponenten in die Marktbereitschaft. Fehlende, noch nicht angebundene Telemetrie bleibt neutral, verhindert aber ein vollständiges BEREIT."
+    :"In der Vorbereitung werden nur vorhandene Messwerte bewertet. Fehlende Telemetrie bleibt neutral und verhindert ein voreiliges BEREIT.";
+  box.append(note);
 }
 if(typeof document!=="undefined")subscribe(render);
