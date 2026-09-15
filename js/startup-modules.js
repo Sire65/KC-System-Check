@@ -18,3 +18,4 @@ import"./flow-live-v4.js";
 import"./flow-live-v4-hotfix.js";
 import"./operations-overview.js";
 import"./recovery-readiness.js";
+import"./market-mode.js";
