@@ -1,10 +1,9 @@
-import{state,subscribe}from"./state.js";
+import{latestRun,subscribe}from"./state.js";
 
 function norm(v){return String(v||"").toLowerCase()}
 function yes(v){return ["ok","pass","passed","success","healthy"].includes(norm(v))}
 function findCard(){return [...document.querySelectorAll("#operationsOverview .kc-ops-card")].find(c=>c.textContent?.includes("Backup & Sicherheit"))||null}
 function row(label,value){const d=document.createElement("div");d.className="kc-ops-fact";const a=document.createElement("span");a.className="muted";a.textContent=label;const b=document.createElement("span");b.textContent=value;d.append(a,b);return d}
-function latestRun(){return state.lastRun||state.history?.at?.(-1)||state.history?.[state.history.length-1]||null}
 function render(){
   if(typeof document==="undefined")return;
   const card=findCard();if(!card)return;
