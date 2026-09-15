@@ -1,4 +1,4 @@
-import{state,subscribe}from"./state.js";
+import{state,subscribe,latestRun}from"./state.js";
 import{loadLiveRuntime}from"./runtime-config.js";
 import{sessionToken}from"./session.js";
 
@@ -19,7 +19,7 @@ function findCard(){
 }
 function latestResult(){
   if(remote)return remote;
-  const run=state.lastRun||state.history?.at?.(-1)||state.history?.[state.history.length-1]||null;
+  const run=latestRun();
   return (run?.results||[]).find(r=>r?.id==="schema_drift")||null;
 }
 function siblingUrl(base){
@@ -67,4 +67,7 @@ function render(){
   box.append(detail);card.append(box);refresh();
 }
 
-if(typeof document!=="undefined")subscribe(render);
+if(typeof document!=="undefined"){
+  subscribe(render);
+  document.addEventListener("kc:operations-rendered",render);
+}
