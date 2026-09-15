@@ -1,5 +1,6 @@
 import{state,subscribe}from"./state.js";
 import"./schema-drift.js";
+import{latestInstances,stableCashRegisterSlots}from"./device-slots.js";
 
 const WARN_MS=90000,CRIT_MS=180000;
 const ageMs=v=>{const t=Date.parse(v||"");return Number.isFinite(t)?Math.max(0,Date.now()-t):null};
@@ -32,20 +33,20 @@ function render(){
   const data=liveData(),hs=Array.isArray(data?.heartbeats)?data.heartbeats:[];
   const pos=hs.filter(h=>/kasse|markt|pos/i.test(h?.program_id||""));
   const mgr=hs.filter(h=>/manager/i.test(h?.program_id||""));
-  const posLatest=new Map();for(const h of pos){const k=String(h.instance_id||h.source_id||h.program_id);const old=posLatest.get(k);if(!old||Date.parse(h.measured_at||h.received_at||0)>Date.parse(old?.measured_at||old?.received_at||0))posLatest.set(k,h)}
-  const posRows=[...posLatest.values()].sort((a,b)=>Date.parse(b.measured_at||b.received_at||0)-Date.parse(a.measured_at||a.received_at||0));
+  const assigned=stableCashRegisterSlots(pos),posRows=assigned.instances;
   const current=posRows.filter(h=>{const a=ageMs(h.measured_at||h.received_at);return a!==null&&a<=WARN_MS}).length;
   const box=document.createElement("div");box.className="kc-ops-facts kc-device-facts";
   box.append(row("Kassen",posRows.length?`${current}/${Math.max(2,posRows.length)} aktuell`:`0/2 · Anbindung vorbereitet`));
-  if(posRows[0])box.append(row("Kasse 1",deviceState(posRows[0])));
-  if(posRows[1])box.append(row("Kasse 2",deviceState(posRows[1])));
-  const mh=latest(mgr);box.append(row("PC Manager",deviceState(mh)));
+  box.append(row("Kasse 1",deviceState(assigned.slots[0])));
+  box.append(row("Kasse 2",deviceState(assigned.slots[1])));
+  if(assigned.extras.length)box.append(row("Weitere Kassen",`${assigned.extras.length} zusätzliche Instanz(en) erkannt`));
+  const mh=latest(latestInstances(mgr));box.append(row("PC Manager",deviceState(mh)));
   const newest=latest([...posRows,mh].filter(Boolean));
   box.append(row("Letzter Gerätekontakt",newest?ago(ageMs(newest.measured_at||newest.received_at)):"noch keiner"));
   const m=metrics(newest);
   const extra=document.createElement("div");extra.className="muted small";extra.textContent=m?[meter("Akku",m.battery),meter("WLAN",m.wifi),meter("Speicher frei",m.free)].join(" · "):"Akku · WLAN · Speicher: Telemetrie vorbereitet, aber noch nicht geliefert";
   box.append(extra);
-  const note=document.createElement("div");note.className="muted small";note.textContent="Nur Kassen und PC Manager werden hier als betriebsrelevante Geräte gewertet. Bis 90 s aktuell, 90–180 s PRÜFEN, danach nicht aktiv. DP2 erzeugt keine Geräte-Störung.";box.append(note);
+  const note=document.createElement("div");note.className="muted small";note.textContent="Kasse 1/2 werden stabil über explizite Kassen-/Terminalnummern oder ersatzweise über eine feste Gerätekennung zugeordnet; unterschiedliche Heartbeat-Zeitpunkte tauschen die Bezeichnungen nicht mehr. Bis 90 s aktuell, 90–180 s PRÜFEN, danach nicht aktiv. DP2 erzeugt keine Geräte-Störung.";box.append(note);
   card.append(box);
 }
 
