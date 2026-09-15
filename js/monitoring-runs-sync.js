@@ -6,9 +6,10 @@ import{loadRemoteHistory}from"./adapters/live.js";
 // serverseitige 15-Minuten-Cron längst neue Läufe in kc_system_check_history
 // geschrieben hat. Das erzeugte die falsche rote Meldung "AUSGEBLIEBEN".
 //
-// Wir halten den lokalen Referenzlauf deshalb mit dem jüngsten Serverlauf gleich.
-// Gleichzeitig normalisieren wir den Namen des Backup-Zeitstempels: der
-// System-Check liefert last_ok_at, die Laufanzeige erwartet last_backup_at.
+// Wir halten den lokalen Referenzlauf deshalb mit dem jüngsten Serverlauf gleich
+// und stellen den normalisierten Serververlauf zusätzlich zentral bereit. So
+// können Betriebsübersicht, Recovery und Marktbetrieb auch nach einer partiellen
+// Auswahlprüfung den jeweils jüngsten bekannten Einzelstatus weiterverwenden.
 const POLL_MS=5*60*1000;
 const FIRST_SYNC_MS=6000; // app.js lädt den Verlauf beim Start bereits einmal
 let busy=false;
@@ -59,14 +60,15 @@ async function sync(){
   busy=true;
   try{
     const remote=await loadRemoteHistory(state.runtime);
+    state.remoteHistory=(Array.isArray(remote?.history)?remote.history:[]).map(normalizeRun).filter(Boolean);
     const run=normalizeRun(newestHistory(remote?.history));
     if(run&&newerThanLocal(run)){
       state.lastRun=run;
-      publish();
     }else if(state.lastRun){
       // Auch ein bereits aktueller lokaler Lauf braucht die Backup-Alias-Korrektur.
       state.lastRun={...state.lastRun,results:(state.lastRun.results||[]).map(normalizeResult)};
     }
+    publish();
   }catch{/* LIVE-Leitstand soll bei einem einzelnen History-Fehler weiterlaufen */}
   finally{busy=false;setTimeout(patchProgramRow,0)}
 }
