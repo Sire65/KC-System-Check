@@ -1,4 +1,4 @@
-import{state,subscribe}from"./state.js";
+import{state,subscribe,latestRun}from"./state.js";
 import"./device-readiness.js";
 import"./schema-drift.js";
 
@@ -17,7 +17,6 @@ function norm(status){
   if(s==="not_configured")return"not_configured";
   return"unknown";
 }
-function rank(status){return({critical:4,warning:3,unknown:2,not_configured:1,healthy:0})[status]??2}
 function visual(status){
   if(status==="critical")return{cls:"bad",tag:"ROT",text:"Sofort prüfen"};
   if(status==="warning")return{cls:"warn",tag:"GELB",text:"Prüfung erforderlich"};
@@ -28,12 +27,16 @@ function visual(status){
 function summarize(results,group){
   const rows=results.filter(r=>group.ids.includes(r?.id));
   if(!rows.length)return{status:"unknown",issues:0,hints:0,info:0,total:0};
-  let worst="healthy";
-  for(const row of rows){const s=norm(row.status);if(rank(s)>rank(worst))worst=s}
-  const issues=rows.filter(row=>["warning","critical"].includes(norm(row.status))).length;
-  const hints=rows.filter(row=>norm(row.status)==="unknown").length;
-  const info=rows.filter(row=>norm(row.status)==="not_configured").length;
-  return{status:worst,issues,hints,info,total:rows.length};
+  const states=rows.map(row=>norm(row.status));
+  const issues=states.filter(s=>s==="warning"||s==="critical").length;
+  const hints=states.filter(s=>s==="unknown").length;
+  const info=states.filter(s=>s==="not_configured").length;
+  let status="not_configured";
+  if(states.includes("critical"))status="critical";
+  else if(states.includes("warning"))status="warning";
+  else if(states.includes("healthy"))status="healthy";
+  else if(states.includes("unknown"))status="unknown";
+  return{status,issues,hints,info,total:rows.length};
 }
 function numberFrom(...values){for(const value of values){const n=Number(value);if(Number.isFinite(n))return n}return null}
 function minutesText(value){const n=numberFrom(value);if(n===null)return"Alter unbekannt";if(n<60)return`vor ${Math.max(0,Math.round(n))} min`;const h=n/60;if(h<48)return`vor ${h.toFixed(h<10?1:0).replace(".0","")} h`;return`vor ${Math.round(h/24)} T`}
@@ -91,7 +94,7 @@ function summaryText(sum,v){
 function render(){
   if(typeof document==="undefined")return;
   const host=ensureHost();if(!host)return;
-  const run=state.lastRun||state.history?.at?.(-1)||state.history?.[state.history.length-1]||null;
+  const run=latestRun();
   const results=Array.isArray(run?.results)?run.results:[];host.innerHTML="";
   for(const group of GROUPS){
     const sum=summarize(results,group),v=visual(sum.status),card=document.createElement("div");card.className="kc-ops-card";
@@ -101,5 +104,6 @@ function render(){
     const detail=document.createElement("div");detail.className="muted small";detail.style.marginTop="6px";detail.textContent=summaryText(sum,v);
     card.append(head,detail);if(group.id==="failover")appendFailover(card,results);host.appendChild(card);
   }
+  document.dispatchEvent(new CustomEvent("kc:operations-rendered"));
 }
 if(typeof document!=="undefined")subscribe(render);
