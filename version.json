@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.9",
-  "note": "Marktbetrieb erweitert: Supabase, Neon und Spiegelung werden aus echten Prüfergebnissen angezeigt; PC Manager und Kassen nur bei vorhandenen Heartbeats. Router, Bondrucker und Money Butler bleiben bis zu echter Telemetrie neutral als vorbereitet. Bestehende Alarmregeln und 0.7.40 bleiben unverändert.",
+  "version": "0.8.0-beta.10",
+  "note": "Betriebssemantik nachgeschärft: nur GELB/ROT zählen als auffällig; HINWEIS und INFO bleiben getrennte neutrale Zustände. Failover wird nur noch als bereit gemeldet, wenn Spiegelung, Neon und Schema-Prüfung tatsächlich bewertet und gesund sind. 0.7.40 bleibt unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
