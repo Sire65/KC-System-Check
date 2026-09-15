@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.8",
-  "note": "Marktbetriebsphase additiv vorbereitet: der Leitstand zeigt automatisch Vorbereitung, aktiven Marktzeitraum 04.–13.12.2026 oder abgeschlossen an. Bestehende Alarmregeln und die produktive 0.7.40 bleiben unverändert; Gerätebewertung wird erst mit vorhandener Telemetrie erweitert.",
+  "version": "0.8.0-beta.9",
+  "note": "Marktbetrieb erweitert: Supabase, Neon und Spiegelung werden aus echten Prüfergebnissen angezeigt; PC Manager und Kassen nur bei vorhandenen Heartbeats. Router, Bondrucker und Money Butler bleiben bis zu echter Telemetrie neutral als vorbereitet. Bestehende Alarmregeln und 0.7.40 bleiben unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
