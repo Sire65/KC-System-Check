@@ -37,14 +37,28 @@ export function cashRegisterSlot(h){
 export function stableCashRegisterSlots(list=[]){
   const instances=latestInstances(list);
   const ordered=[...instances].sort((a,b)=>stamp(b)-stamp(a));
-  const slots=[null,null],used=new Set();
+  const slots=[null,null],used=new Set(),conflicts=[];
+
+  // Explizite Kassen-/Terminalnummern haben Vorrang. Wenn zwei verschiedene
+  // Geräte denselben Slot melden, gewinnt nur der jüngste Heartbeat. Das
+  // zweite Gerät darf NICHT als Kasse 2 einsortiert werden, sondern wird als
+  // Konflikt gemeldet. So wird ein Ersatztablet nicht versehentlich zur dritten
+  // oder falschen Kasse, sofern es dieselbe logische Kassennummer weiterführt.
   for(const h of ordered){
-    const slot=cashRegisterSlot(h);if(!slot||slots[slot-1])continue;
-    slots[slot-1]=h;used.add(heartbeatKey(h));
+    const slot=cashRegisterSlot(h);if(!slot)continue;
+    const key=heartbeatKey(h);used.add(key);
+    if(!slots[slot-1]){slots[slot-1]=h;continue}
+    conflicts.push({slot,winner:slots[slot-1],duplicate:h});
   }
+
+  // Nur Instanzen OHNE erkennbare logische Kassennummer dürfen ersatzweise
+  // deterministisch auf freie Slots verteilt werden. Diese Fallback-Zuordnung
+  // bleibt über die feste Gerätekennung stabil, kann einen Gerätewechsel aber
+  // naturgemäß nicht als dieselbe Kasse erkennen. Dafür sollte kasse_no o. ä.
+  // geliefert werden.
   const unassigned=instances
-    .filter(h=>!used.has(heartbeatKey(h)))
+    .filter(h=>!used.has(heartbeatKey(h))&&!cashRegisterSlot(h))
     .sort((a,b)=>heartbeatKey(a).localeCompare(heartbeatKey(b),"de"));
   for(let i=0;i<2;i++)if(!slots[i]&&unassigned.length)slots[i]=unassigned.shift();
-  return{slots,extras:unassigned,instances};
+  return{slots,extras:unassigned,instances,conflicts};
 }
