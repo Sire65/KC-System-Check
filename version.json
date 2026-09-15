@@ -1,7 +1,7 @@
 {
-  "version": "0.8.0-rc.1",
-  "note": "Release Candidate 1: Beta-Funktionsumfang eingefroren und nach vollständig grünem beta.24-Prüflauf übernommen. Zusätzlich ist die Versionslogik jetzt SemVer-sicher, damit beta → rc → stable korrekt aktualisiert wird. main/0.7.40 bleibt unverändert.",
-  "channel": "beta",
+  "version": "0.8.0",
+  "note": "Stable 0.8.0: Der vollständig geprüfte Betriebsleitstand aus RC1 ist freigegeben. Enthalten sind Betriebsübersicht, Marktbereitschaft, Geräte-/Kassenbewertung, Recovery, Schema-Drift und SemVer-sichere Updates. Rückfallstand 0.7.40 bleibt in der Git-Historie erhalten.",
+  "channel": "stable",
   "installSekunden": 5,
-  "verbindlich": false
+  "verbindlich": true
 }
