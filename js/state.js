@@ -36,8 +36,25 @@ const listeners=new Set();
 export function subscribe(listener){listeners.add(listener);try{listener(state)}catch(error){console.warn("[KC System Check] Zustands-Abonnent fehlgeschlagen",error)}return()=>listeners.delete(listener)}
 export function publish(){for(const listener of listeners){try{listener(state)}catch(error){console.warn("[KC System Check] Zustands-Abonnent fehlgeschlagen",error)}}}
 function runTime(run){const t=Date.parse(run?.at||run?.checked_at||0);return Number.isFinite(t)?t:0}
-export function latestRun(){
-  const candidates=[state.lastRun,...(Array.isArray(state.remoteHistory)?state.remoteHistory:[]),...(Array.isArray(state.history)?state.history:[])].filter(Boolean);
-  if(!candidates.length)return null;
-  return candidates.reduce((best,run)=>runTime(run)>=runTime(best)?run:best,candidates[0]);
+function candidateRuns(){
+  return [state.lastRun,...(Array.isArray(state.remoteHistory)?state.remoteHistory:[]),...(Array.isArray(state.history)?state.history:[])].filter(Boolean).sort((a,b)=>runTime(b)-runTime(a));
+}
+export function latestRun(){return candidateRuns()[0]||null}
+export function latestResult(id){
+  if(!id)return null;
+  for(const run of candidateRuns()){
+    const rows=Array.isArray(run?.results)?run.results:[];
+    const result=rows.find(r=>r?.id===id);
+    if(result)return result;
+  }
+  return null;
+}
+export function latestResults(){
+  const byId=new Map();
+  for(const run of candidateRuns()){
+    for(const result of Array.isArray(run?.results)?run.results:[]){
+      const id=result?.id;if(id&&!byId.has(id))byId.set(id,result);
+    }
+  }
+  return [...byId.values()];
 }
