@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.12",
-  "note": "Marktbetrieb um Router-/Internet-Telemetrie ergänzt: Router-Heartbeats werden nur bei vorhandenen Messwerten bewertet. Bis 90 s aktuell, 90–180 s PRÜFEN, darüber NICHT AKTIV; Latenz und Signal können PRÜFEN/STÖRUNG auslösen. Fehlende Router-Telemetrie bleibt neutral. 0.7.40 bleibt unverändert.",
+  "version": "0.8.0-beta.13",
+  "note": "Marktbetrieb um Bondrucker-Telemetrie ergänzt: Drucker werden nur bei vorhandenen Heartbeats bewertet. Verbindungsart, Papierstatus und gemeldete Druckfehler können berücksichtigt werden; fehlende optionale Telemetrie bleibt neutral. 0.7.40 bleibt unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
