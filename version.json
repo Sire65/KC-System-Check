@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.17",
-  "note": "Qualitätsrunde fortgesetzt: Recovery- und Marktbetriebsmodul verwenden jetzt denselben zentralen jüngsten bekannten Lauf wie die Betriebsübersicht. Dadurch werden Remote-History, lokaler Verlauf und letzter Lauf konsistent ausgewertet; 0.7.40 bleibt unverändert.",
+  "version": "0.8.0-beta.18",
+  "note": "Statischer Regression-Check nachgeschärft: Betriebsübersicht, Recovery, Marktbetrieb und Schema-Fallback behalten nach partiellen Auswahlprüfungen den jeweils jüngsten bekannten Einzelstatus. Der normalisierte Serververlauf wird zentral bereitgestellt; stale Geräte können auch in der Vorbereitung kein fälschliches BEREIT mehr erzeugen. 0.7.40 bleibt unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
