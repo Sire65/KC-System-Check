@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.1",
-  "note": "Additive Betriebsübersicht: Systeme, Datenbank und Failover, Kassen und Geräte sowie Backup und Sicherheit auf einen Blick; bestehende Detailansichten bleiben unverändert",
+  "version": "0.8.0-beta.2",
+  "note": "Betriebsübersicht erweitert: Failover zeigt Primär Supabase, Reserve Neon, Spiegelzustand, Abweichungen, Alter und eine klare Failover-bereit-JA/NEIN-Bewertung; bestehende Detailansichten bleiben unverändert",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
