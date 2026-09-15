@@ -1,7 +1,7 @@
 {
-  "version": "0.7.40",
-  "note": "Datenfluss korrigiert: Neon-Spiegel folgt nur noch dem bestaetigten Serverlauf; Programmaustausch zeigt alle bekannten Datenwege und fehlende Telemetrie offen an",
-  "channel": "stable",
+  "version": "0.8.0-rc.1",
+  "note": "Release Candidate 1: Beta-Funktionsumfang eingefroren und nach vollständig grünem beta.24-Prüflauf übernommen. Zusätzlich ist die Versionslogik jetzt SemVer-sicher, damit beta → rc → stable korrekt aktualisiert wird. main/0.7.40 bleibt unverändert.",
+  "channel": "beta",
   "installSekunden": 5,
-  "verbindlich": true
+  "verbindlich": false
 }

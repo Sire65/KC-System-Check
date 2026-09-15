@@ -1,4 +1,5 @@
 import test from'node:test';import assert from'node:assert/strict';import fs from'node:fs';
+import{compareVersions,isNewerVersion}from'../js/version-compare.js';
 
 test('update notice asks on start instead of on a six hour window',()=>{const s=fs.readFileSync('js/updater.js','utf8');assert.match(s,/checkForAppUpdate\(\{silent:true\}\)/);assert.doesNotMatch(s,/kc-last-update-check/);assert.doesNotMatch(s,/6\*60\*60\*1000/)});
 
@@ -22,3 +23,11 @@ test('the banner carries the bar and it moves only with the clock',()=>{const h=
   assert.doesNotMatch(h,/#updateBar\{[^}]*animation:/)});
 
 test('version file names the countdown length',()=>{const v=JSON.parse(fs.readFileSync('version.json','utf8'));assert.equal(typeof v.installSekunden,'number');assert.ok(v.installSekunden>=2&&v.installSekunden<=30)});
+
+test('SemVer orders beta, RC and stable correctly',()=>{
+  assert.ok(isNewerVersion('0.8.0-rc.1','0.8.0-beta.24'));
+  assert.ok(isNewerVersion('0.8.0-rc.2','0.8.0-rc.1'));
+  assert.ok(isNewerVersion('0.8.0','0.8.0-rc.9'));
+  assert.equal(compareVersions('0.8.0-rc.1','0.8.0-rc.1'),0);
+  assert.ok(compareVersions('0.7.40','0.8.0-rc.1')<0);
+});

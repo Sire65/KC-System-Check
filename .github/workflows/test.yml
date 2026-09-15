@@ -29,7 +29,7 @@ jobs:
           grep -q "kc-system-check-v${VERSION}" sw.js
           grep -q "CURRENT_VERSION=\"${VERSION}\"" js/updater.js
           grep -q "VERSION='${VERSION}'" js/kicc-heartbeat.js
-          node -e "const v=require('./version.json'); if(v.verbindlich!==true) process.exit(1)"
+          node -e "const v=require('./version.json'); if(v.channel==='stable'&&v.verbindlich!==true) process.exit(1); if(v.channel==='beta'&&v.verbindlich!==false) process.exit(1)"
           grep -q 'cp -R js dist/js' .github/workflows/pages.yml
           grep -q 'growthWindow' js/usage.js
           grep -q 'ASVS' js/verification-profile.js
