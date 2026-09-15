@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.11",
-  "note": "Marktbetrieb erweitert: Kasse 1 und Kasse 2 werden als getrennte Heartbeat-Instanzen ausgewertet; PC Manager ebenso. Frische Heartbeats gelten bis 3 Minuten, DEGRADED wird als PRÜFEN und echte Fehlerzustände als STÖRUNG angezeigt. Fehlende Telemetrie bleibt neutral. 0.7.40 bleibt unverändert.",
+  "version": "0.8.0-beta.12",
+  "note": "Marktbetrieb um Router-/Internet-Telemetrie ergänzt: Router-Heartbeats werden nur bei vorhandenen Messwerten bewertet. Bis 90 s aktuell, 90–180 s PRÜFEN, darüber NICHT AKTIV; Latenz und Signal können PRÜFEN/STÖRUNG auslösen. Fehlende Router-Telemetrie bleibt neutral. 0.7.40 bleibt unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
