@@ -4,16 +4,14 @@
 // Genau dort entstand der Versionsalarm 0.7.31/0.7.33: ein bereits geöffneter
 // Browser-Tab sendete weiter Heartbeats, obwohl GitHub Pages schon neuer war.
 import"./diagnostics-runtime.js";
-const CURRENT_VERSION="0.8.0-beta.24",VERSION_URL="./version.json";
+import{isNewerVersion}from"./version-compare.js";
+const CURRENT_VERSION="0.8.0-rc.1",VERSION_URL="./version.json";
 const $=s=>document.querySelector(s);
 const SPAETER='kc-update-spaeter';
 const SPAETER_STUNDEN=12;
 const CHECK_INTERVAL_MS=5*60*1000;
 const PFLICHT_AUTO_MS=60*1000;
 let waitingWorker=null,angekuendigt=null,installSekunden=5,pruefungLaeuft=false,pflichtTimer=null;
-
-function parts(v){return String(v).replace(/^v/i,"").split(".").map(x=>parseInt(x,10)||0)}
-function newer(a,b){const A=parts(a),B=parts(b);for(let i=0;i<Math.max(A.length,B.length);i++){const x=A[i]||0,y=B[i]||0;if(x!==y)return x>y}return false}
 
 function spaeterGemerkt(version){
   try{
@@ -57,7 +55,7 @@ export async function checkForAppUpdate({silent=true}={}){
   try{
     const r=await fetch(`${VERSION_URL}?t=${Date.now()}`,{cache:"no-store"});if(!r.ok)throw new Error(`HTTP ${r.status}`);
     const info=await r.json();
-    if(!newer(info.version,CURRENT_VERSION)){spaeterVergessen();if(!silent)alert(`KC System Check ist aktuell (Version ${CURRENT_VERSION}).`);return null}
+    if(!isNewerVersion(info.version,CURRENT_VERSION)){spaeterVergessen();if(!silent)alert(`KC System Check ist aktuell (Version ${CURRENT_VERSION}).`);return null}
     if(silent&&!info.verbindlich&&spaeterGemerkt(info.version))return info;
     installSekunden=info.installSekunden;showUpdate(info.version,info.note||"",!!info.verbindlich);return info;
   }catch(e){if(!silent)alert(`Update-Prüfung nicht möglich: ${e.message}`);return null}finally{pruefungLaeuft=false}
