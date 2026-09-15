@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.4",
-  "note": "Schema-Drift vorbereitet: der Failover-Block kann Supabase- und Neon-Schemas künftig per Signatur vergleichen. Die Anzeige bleibt bis zur getesteten Serveraktivierung neutral und erzeugt keinen Alarm.",
+  "version": "0.8.0-beta.5",
+  "note": "Schema-Drift serverseitig für den Beta-Weg vorbereitet: verglichen werden nur aktive Spiegel-Tabellen und nur die für die Spiegelung relevanten Strukturmerkmale Spaltenname, Reihenfolge und Datentyp. Lockerere Neon-Constraints erzeugen damit keine Fehlalarme. Der separate Read-only-Endpunkt bleibt bis zum gezielten Deploy ohne Einfluss auf 0.7.40.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
