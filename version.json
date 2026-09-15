@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.20",
-  "note": "Kassen-Zuordnung stabilisiert: Kasse 1 und Kasse 2 werden nicht mehr nach dem jeweils jüngsten Heartbeat benannt, sondern bevorzugt über explizite Kassen-/Terminalnummern und ersatzweise deterministisch über eine feste Gerätekennung. Dadurch tauschen die Bezeichnungen bei unterschiedlichen Meldezeiten nicht mehr. 0.7.40 bleibt unverändert.",
+  "version": "0.8.0-beta.21",
+  "note": "Geräteidentität weiter abgesichert: Zwei verschiedene aktive Geräte mit derselben Kassen-/Terminalnummer werden als doppelte Slot-Zuordnung erkannt und nicht fälschlich auf Kasse 1 und Kasse 2 verteilt. Bei einem Ersatztablet gewinnt der jüngste Heartbeat derselben logischen Kassennummer; ältere/stale Geräte erzeugen keinen aktiven Konflikt. 0.7.40 bleibt unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
