@@ -1,4 +1,5 @@
 import{state,subscribe}from"./state.js";
+import"./schema-drift.js";
 
 const OP=/kasse|markt|pos|manager/i;
 const ageMs=v=>{const t=Date.parse(v||"");return Number.isFinite(t)?Math.max(0,Date.now()-t):null};
