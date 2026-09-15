@@ -31,6 +31,17 @@ function routerState(h){
   }
   const bits=["OK"];if(latency!==null)bits.push(`${Math.round(latency)} ms`);if(signal!==null)bits.push(`Signal ${Math.round(signal)} %`);bits.push(ageText(ageMs(h.measured_at||h.received_at)));return{state:"ok",text:bits.join(" · ")};
 }
+function printerState(h){
+  const base=heartbeatState(h);if(!h||base.state==="bad"||base.state==="idle")return base;
+  const paper=String(h.paper_status||h.paper||"").toUpperCase();
+  const transport=String(h.connection_type||h.transport||h.interface||"").toUpperCase();
+  const errors=num(h.print_error_count,h.printer_error_count,h.error_count);
+  const age=ageText(ageMs(h.measured_at||h.received_at));
+  if(["EMPTY","OUT","NO_PAPER","PAPER_OUT"].includes(paper))return{state:"bad",text:`STÖRUNG · Papier leer · ${age}`};
+  if(errors!==null&&errors>0)return{state:"warn",text:`PRÜFEN · ${Math.round(errors)} Druckfehler · ${transport||"Verbindung unbekannt"} · ${age}`};
+  if(base.state==="warn"||["LOW","NEAR_END","PAPER_LOW"].includes(paper))return{state:"warn",text:`PRÜFEN · ${paper?"Papier niedrig":"Heartbeat"} · ${transport||"Verbindung unbekannt"} · ${age}`};
+  const bits=["OK"];if(transport)bits.push(transport);if(paper)bits.push(`Papier ${paper}`);bits.push(age);return{state:"ok",text:bits.join(" · ")};
+}
 function latestMatches(rx){
   const map=new Map();
   for(const h of heartbeats()){
@@ -65,8 +76,10 @@ function render(){
 
   const routers=latestMatches(/router|gateway|internet|network|netz/i);
   box.append(row("Router / Internet",routerState(routers[0]||null).text));
-  box.append(row("Bondrucker","TELEMETRIE VORBEREITET"));
+  const printers=latestMatches(/printer|bondruck|receipt|tm[-_]?t88/i);
+  box.append(row("Bondrucker",printerState(printers[0]||null).text));
+  if(printers.length>1)box.append(row("Weitere Bondrucker",`${printers.length-1} zusätzliche Instanz(en) erkannt`));
   box.append(row("Money Butler","TELEMETRIE VORBEREITET"));
-  const note=document.createElement("div");note.className="muted small";note.textContent="Kassen, PC Manager und Router werden nur bei vorhandener Telemetrie bewertet. Heartbeat >90 s = prüfen, >180 s = nicht aktiv. Fehlende Telemetrie bleibt neutral.";box.append(note);
+  const note=document.createElement("div");note.className="muted small";note.textContent="Kassen, PC Manager, Router und Bondrucker werden nur bei vorhandener Telemetrie bewertet. Heartbeat >90 s = prüfen, >180 s = nicht aktiv. Fehlende Telemetrie bleibt neutral.";box.append(note);
 }
 if(typeof document!=="undefined")subscribe(render);
