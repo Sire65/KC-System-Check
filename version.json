@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.7",
-  "note": "Backup & Recovery erweitert: die Schnellübersicht zeigt Recovery-Bereitschaft, Integritäts-/Verify-Ergebnis und Restore-Test nur aus vorhandener Telemetrie. Manuell gestartete Backup-Vault-Läufe bleiben korrekt von täglichen Pflichtläufen getrennt. 0.7.40 bleibt unverändert.",
+  "version": "0.8.0-beta.8",
+  "note": "Marktbetriebsphase additiv vorbereitet: der Leitstand zeigt automatisch Vorbereitung, aktiven Marktzeitraum 04.–13.12.2026 oder abgeschlossen an. Bestehende Alarmregeln und die produktive 0.7.40 bleiben unverändert; Gerätebewertung wird erst mit vorhandener Telemetrie erweitert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
