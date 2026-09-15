@@ -1,4 +1,4 @@
-import{state,subscribe,latestRun}from"./state.js";
+import{subscribe,latestResult as latestKnownResult}from"./state.js";
 import{loadLiveRuntime}from"./runtime-config.js";
 import{sessionToken}from"./session.js";
 
@@ -17,11 +17,7 @@ function findCard(){
   return [...document.querySelectorAll("#operationsOverview .kc-ops-card")]
     .find(c=>c.textContent?.includes("Datenbank & Failover"))||null;
 }
-function latestResult(){
-  if(remote)return remote;
-  const run=latestRun();
-  return (run?.results||[]).find(r=>r?.id==="schema_drift")||null;
-}
+function latestResult(){return remote||latestKnownResult("schema_drift")||null}
 function siblingUrl(base){
   try{
     const u=new URL(base,location.href);
