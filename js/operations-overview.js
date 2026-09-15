@@ -1,4 +1,4 @@
-import{state,subscribe,latestRun}from"./state.js";
+import{subscribe,latestResults}from"./state.js";
 import"./device-readiness.js";
 import"./schema-drift.js";
 
@@ -94,8 +94,7 @@ function summaryText(sum,v){
 function render(){
   if(typeof document==="undefined")return;
   const host=ensureHost();if(!host)return;
-  const run=latestRun();
-  const results=Array.isArray(run?.results)?run.results:[];host.innerHTML="";
+  const results=latestResults();host.innerHTML="";
   for(const group of GROUPS){
     const sum=summarize(results,group),v=visual(sum.status),card=document.createElement("div");card.className="kc-ops-card";
     const head=document.createElement("div");head.className="kc-ops-head";
