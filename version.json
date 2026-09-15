@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.15",
-  "note": "Marktbereitschaft als Gesamtstatus ergänzt: Supabase, Neon, Spiegelung, PC Manager, Kasse 1/2, Router, Bondrucker und Money Butler werden zu einer kompakten Aussage zusammengeführt. Fehlende Telemetrie bleibt neutral, verhindert aber ein voreiliges BEREIT; im aktiven Marktzeitraum zählen bereits angebundene, aber nicht aktive Komponenten als nicht bereit. 0.7.40 bleibt unverändert.",
+  "version": "0.8.0-beta.16",
+  "note": "Qualitätsrunde für den Betriebsleitstand: Betriebsübersicht nutzt den jüngsten bekannten Lauf, INFO/HINWEIS übersteuern keine gesunden Bereiche mehr, Geräte-Schwellen sind auf 90/180 Sekunden vereinheitlicht und Geräte-/Schema-Zusatzanzeigen werden nach jedem Parent-Render zuverlässig neu gezeichnet. 0.7.40 bleibt unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
