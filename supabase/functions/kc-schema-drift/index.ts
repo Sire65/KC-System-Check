@@ -8,6 +8,7 @@ const CORS={
   "Cache-Control":"no-store"
 };
 
+const MODE="mirror_compatible_v2";
 const okJson=(body:any,status=200)=>new Response(JSON.stringify(body),{status,headers:CORS});
 
 async function callerRole(req:Request,own:string,service:string){
@@ -59,21 +60,25 @@ function neonSignatureSql(tables:string[]){
 with requested(table_name) as (
   select unnest(array[${list}]::text[])
 ), cols as (
-  select c.table_name,c.ordinal_position,c.column_name,c.data_type,c.udt_name
+  select c.table_name,c.column_name,c.data_type,c.udt_name,
+         coalesce(c.character_maximum_length::text,'') as character_maximum_length,
+         coalesce(c.numeric_precision::text,'') as numeric_precision,
+         coalesce(c.numeric_scale::text,'') as numeric_scale,
+         coalesce(c.datetime_precision::text,'') as datetime_precision
   from information_schema.columns c
   join requested r on r.table_name=c.table_name
   where c.table_schema='public'
 ), canonical as (
-  select table_name,ordinal_position,
-         concat_ws('|',ordinal_position::text,column_name,data_type,udt_name) as line
+  select table_name,column_name,
+         concat_ws('|',column_name,data_type,udt_name,character_maximum_length,numeric_precision,numeric_scale,datetime_precision) as line
   from cols
 ), per_table as (
   select table_name,count(*)::int as column_count,
-         md5(string_agg(line,E'\\n' order by ordinal_position)) as signature
+         md5(string_agg(line,E'\\n' order by column_name)) as signature
   from canonical group by table_name
 )
 select jsonb_build_object(
-  'mode','mirror_compatible_v1',
+  'mode','${MODE}',
   'table_count',(select count(*) from per_table),
   'tables',coalesce((select jsonb_agg(jsonb_build_object(
     'table',table_name,'column_count',column_count,'signature',signature
@@ -114,14 +119,14 @@ function compare(source:any,target:any,latencyMs:number|null){
   const status=missing.length||different.length?"critical":"healthy";
   const detail=status==="healthy"
     ?`${sourceRows.length} aktive Spiegel-Tabellen strukturell kompatibel`
-    :`${missing.length} fehlen in Neon · ${different.length} mit abweichender Spaltenstruktur`;
+    :`${missing.length} fehlen in Neon · ${different.length} mit abweichender Spalten-/Typstruktur`;
   return{
     id:"schema_drift",name:"Schema-Drift Supabase ↔ Neon",kind:"database",
     status,health:status==="healthy"?100:35,latency:latencyMs,usage:null,
     capacityLabel:status==="healthy"?`${sourceRows.length}/${sourceRows.length} kompatibel`:`${missing.length+different.length} Abweichung(en)`,
     detail,
     metrics:{
-      mode:"mirror_compatible_v1",
+      mode:MODE,
       tables_compared:sourceRows.length,
       tables_different:different.length+missing.length,
       different_tables:different,
@@ -139,16 +144,16 @@ Deno.serve(async(req:Request)=>{
 
   const source=await rpc(own,service,"kc_system_check_schema_signature",{p_schema:"public",p_tables:null});
   if(!source.ok)return okJson({
-    result:{id:"schema_drift",name:"Schema-Drift Supabase ↔ Neon",kind:"database",status:"not_configured",health:null,latency:source.ms,usage:null,capacityLabel:"Signatur noch nicht eingespielt",detail:"Serververgleich vorbereitet; die Schema-Signatur ist noch nicht verfügbar",metrics:{mode:"mirror_compatible_v1"}}
+    result:{id:"schema_drift",name:"Schema-Drift Supabase ↔ Neon",kind:"database",status:"not_configured",health:null,latency:source.ms,usage:null,capacityLabel:"Signatur noch nicht eingespielt",detail:"Serververgleich vorbereitet; die Schema-Signatur ist noch nicht verfügbar",metrics:{mode:MODE}}
   });
 
   const rows=Array.isArray(source.data?.tables)?source.data.tables:[];
   const names=rows.map((x:any)=>String(x?.table||"")).filter((x:string)=>/^[A-Za-z_][A-Za-z0-9_]*$/.test(x)).slice(0,200);
-  if(!names.length)return okJson({result:{id:"schema_drift",name:"Schema-Drift Supabase ↔ Neon",kind:"database",status:"unknown",health:null,latency:source.ms,usage:null,capacityLabel:"Keine Vergleichstabellen",detail:"Es sind keine aktiven Spiegel-Tabellen für den Vergleich vorhanden",metrics:{mode:"mirror_compatible_v1"}}});
+  if(!names.length)return okJson({result:{id:"schema_drift",name:"Schema-Drift Supabase ↔ Neon",kind:"database",status:"unknown",health:null,latency:source.ms,usage:null,capacityLabel:"Keine Vergleichstabellen",detail:"Es sind keine aktiven Spiegel-Tabellen für den Vergleich vorhanden",metrics:{mode:MODE}}});
 
   const creds=await credentials(own,service),neonCred=creds.neon_mirror||null;
   const target=await neonSql(neonCred,neonSignatureSql(names));
-  if(!target.ok)return okJson({result:{id:"schema_drift",name:"Schema-Drift Supabase ↔ Neon",kind:"database",status:target.reason==="kein_zugang"?"not_configured":"unknown",health:null,latency:target.ms,usage:null,capacityLabel:"Vergleich nicht verfügbar",detail:target.reason==="kein_zugang"?"Neon-Zugang für den Schema-Vergleich ist nicht hinterlegt":"Neon-Schema konnte nicht gelesen werden",metrics:{mode:"mirror_compatible_v1",error:target.reason}}});
+  if(!target.ok)return okJson({result:{id:"schema_drift",name:"Schema-Drift Supabase ↔ Neon",kind:"database",status:target.reason==="kein_zugang"?"not_configured":"unknown",health:null,latency:target.ms,usage:null,capacityLabel:"Vergleich nicht verfügbar",detail:target.reason==="kein_zugang"?"Neon-Zugang für den Schema-Vergleich ist nicht hinterlegt":"Neon-Schema konnte nicht gelesen werden",metrics:{mode:MODE,error:target.reason}}});
 
   return okJson({result:compare(source.data,target.data,target.ms)});
 });
