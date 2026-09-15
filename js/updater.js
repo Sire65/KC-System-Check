@@ -5,7 +5,7 @@
 // Browser-Tab sendete weiter Heartbeats, obwohl GitHub Pages schon neuer war.
 import"./diagnostics-runtime.js";
 import{isNewerVersion}from"./version-compare.js";
-const CURRENT_VERSION="0.8.0-rc.1",VERSION_URL="./version.json";
+const CURRENT_VERSION="0.8.0",VERSION_URL="./version.json";
 const $=s=>document.querySelector(s);
 const SPAETER='kc-update-spaeter';
 const SPAETER_STUNDEN=12;
