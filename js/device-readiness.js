@@ -25,6 +25,12 @@ function metrics(h){if(!h)return null;return{
   free:num(h.storage_free_percent,h.free_storage_percent),
 };}
 function meter(name,value,suffix="%") {return value==null?`${name}: noch keine Telemetrie`:`${name}: ${Math.round(value)}${suffix}`}
+function activeConflictSlots(assigned){
+  return new Set((assigned?.conflicts||[]).filter(c=>{const a=ageMs(c?.duplicate?.measured_at||c?.duplicate?.received_at);return a!==null&&a<=CRIT_MS}).map(c=>c.slot));
+}
+function registerState(h,slot,conflictSlots){
+  const base=deviceState(h);return conflictSlots.has(slot)&&!base.startsWith("STÖRUNG")?`PRÜFEN · doppelte aktive Zuordnung · ${base}`:base;
+}
 
 function render(){
   if(typeof document==="undefined")return;
@@ -33,20 +39,21 @@ function render(){
   const data=liveData(),hs=Array.isArray(data?.heartbeats)?data.heartbeats:[];
   const pos=hs.filter(h=>/kasse|markt|pos/i.test(h?.program_id||""));
   const mgr=hs.filter(h=>/manager/i.test(h?.program_id||""));
-  const assigned=stableCashRegisterSlots(pos),posRows=assigned.instances;
-  const current=posRows.filter(h=>{const a=ageMs(h.measured_at||h.received_at);return a!==null&&a<=WARN_MS}).length;
+  const assigned=stableCashRegisterSlots(pos),posRows=assigned.instances,conflictSlots=activeConflictSlots(assigned);
+  const current=assigned.slots.filter(h=>{const a=ageMs(h?.measured_at||h?.received_at);return a!==null&&a<=WARN_MS}).length;
   const box=document.createElement("div");box.className="kc-ops-facts kc-device-facts";
-  box.append(row("Kassen",posRows.length?`${current}/${Math.max(2,posRows.length)} aktuell`:`0/2 · Anbindung vorbereitet`));
-  box.append(row("Kasse 1",deviceState(assigned.slots[0])));
-  box.append(row("Kasse 2",deviceState(assigned.slots[1])));
-  if(assigned.extras.length)box.append(row("Weitere Kassen",`${assigned.extras.length} zusätzliche Instanz(en) erkannt`));
+  box.append(row("Kassen",posRows.length?`${current}/2 aktuell`:`0/2 · Anbindung vorbereitet`));
+  box.append(row("Kasse 1",registerState(assigned.slots[0],1,conflictSlots)));
+  box.append(row("Kasse 2",registerState(assigned.slots[1],2,conflictSlots)));
+  if(conflictSlots.size)box.append(row("Kassen-Zuordnung",`PRÜFEN · ${conflictSlots.size} doppelte aktive Slot-Zuordnung(en)`));
+  if(assigned.extras.length)box.append(row("Weitere Kassen",`${assigned.extras.length} nicht zugeordnete Instanz(en) erkannt`));
   const mh=latest(latestInstances(mgr));box.append(row("PC Manager",deviceState(mh)));
   const newest=latest([...posRows,mh].filter(Boolean));
   box.append(row("Letzter Gerätekontakt",newest?ago(ageMs(newest.measured_at||newest.received_at)):"noch keiner"));
   const m=metrics(newest);
   const extra=document.createElement("div");extra.className="muted small";extra.textContent=m?[meter("Akku",m.battery),meter("WLAN",m.wifi),meter("Speicher frei",m.free)].join(" · "):"Akku · WLAN · Speicher: Telemetrie vorbereitet, aber noch nicht geliefert";
   box.append(extra);
-  const note=document.createElement("div");note.className="muted small";note.textContent="Kasse 1/2 werden stabil über explizite Kassen-/Terminalnummern oder ersatzweise über eine feste Gerätekennung zugeordnet; unterschiedliche Heartbeat-Zeitpunkte tauschen die Bezeichnungen nicht mehr. Bis 90 s aktuell, 90–180 s PRÜFEN, danach nicht aktiv. DP2 erzeugt keine Geräte-Störung.";box.append(note);
+  const note=document.createElement("div");note.className="muted small";note.textContent="Kasse 1/2 werden stabil über explizite Kassen-/Terminalnummern oder ersatzweise über eine feste Gerätekennung zugeordnet. Zwei gleichzeitig aktive Geräte mit derselben Kassennummer werden als Konflikt markiert und nicht auf Kasse 1/2 verteilt. Ein Ersatztablet sollte dieselbe logische Kassennummer weiterführen. Bis 90 s aktuell, 90–180 s PRÜFEN, danach nicht aktiv. DP2 erzeugt keine Geräte-Störung.";box.append(note);
   card.append(box);
 }
 
