@@ -27,11 +27,13 @@ function visual(status){
 }
 function summarize(results,group){
   const rows=results.filter(r=>group.ids.includes(r?.id));
-  if(!rows.length)return{status:"unknown",count:0,total:0};
+  if(!rows.length)return{status:"unknown",issues:0,hints:0,info:0,total:0};
   let worst="healthy";
   for(const row of rows){const s=norm(row.status);if(rank(s)>rank(worst))worst=s}
-  const count=rows.filter(row=>rank(norm(row.status))>0).length;
-  return{status:worst,count,total:rows.length};
+  const issues=rows.filter(row=>["warning","critical"].includes(norm(row.status))).length;
+  const hints=rows.filter(row=>norm(row.status)==="unknown").length;
+  const info=rows.filter(row=>norm(row.status)==="not_configured").length;
+  return{status:worst,issues,hints,info,total:rows.length};
 }
 function numberFrom(...values){for(const value of values){const n=Number(value);if(Number.isFinite(n))return n}return null}
 function minutesText(value){const n=numberFrom(value);if(n===null)return"Alter unbekannt";if(n<60)return`vor ${Math.max(0,Math.round(n))} min`;const h=n/60;if(h<48)return`vor ${h.toFixed(h<10?1:0).replace(".0","")} h`;return`vor ${Math.round(h/24)} T`}
@@ -46,16 +48,18 @@ function failoverFacts(results){
   const openTables=numberFrom(mirror?.metrics?.open_tables,mirror?.metrics?.stale_tables);
   const mirrorReady=norm(mirror?.status)==="healthy"&&(mismatch===null||mismatch===0)&&(openTables===null||openTables===0);
   const neonReady=norm(neon?.status)==="healthy";
-  const driftReady=!drift||norm(drift?.status)==="healthy"||norm(drift?.status)==="not_configured";
+  const driftKnown=Boolean(drift)&&norm(drift?.status)!=="not_configured"&&norm(drift?.status)!=="unknown";
+  const driftReady=driftKnown&&norm(drift?.status)==="healthy";
   const measured=Boolean(mirror&&neon);
-  const ready=measured&&mirrorReady&&neonReady&&driftReady;
-  const readiness=ready?"JA":measured?"NEIN":"NOCH NICHT BEWERTBAR";
+  const fullyMeasured=measured&&driftKnown;
+  const ready=fullyMeasured&&mirrorReady&&neonReady&&driftReady;
+  const readiness=ready?"JA":fullyMeasured?"NEIN":"NOCH NICHT VOLLSTÄNDIG BEWERTBAR";
   const detail=[];
   detail.push(`Primär Supabase: ${stateWord(primary)}`);
   detail.push(`Reserve Neon: ${stateWord(neon)}`);
   if(mirror){const bits=[`Spiegel: ${stateWord(mirror)}`];if(mismatch!==null)bits.push(`${mismatch} Abw.`);if(openTables!==null&&openTables>0)bits.push(`${openTables} offen`);if(age!==null)bits.push(minutesText(age));detail.push(bits.join(" · "))}else detail.push("Spiegel: noch keine Messung");
-  if(drift&&norm(drift.status)!=="not_configured")detail.push(`Schema: ${stateWord(drift)}`);
-  return{ready,measured,readiness,detail};
+  detail.push(`Schema: ${drift?stateWord(drift):"NOCH NICHT GEMESSEN"}`);
+  return{ready,fullyMeasured,readiness,detail};
 }
 function ensureHost(){
   const dashboard=document.querySelector("#dashboard");if(!dashboard)return null;
@@ -75,6 +79,15 @@ function appendFailover(card,results){
   for(const line of f.detail){const row=document.createElement("div");row.className="muted small";row.textContent=line;facts.appendChild(row)}
   card.appendChild(facts);
 }
+function summaryText(sum,v){
+  if(!sum.total)return`${v.text} · noch keine Messung`;
+  const parts=[v.text];
+  if(sum.issues)parts.push(`${sum.issues} auffällig`);
+  if(sum.hints)parts.push(`${sum.hints} Hinweis${sum.hints===1?"":"e"}`);
+  if(sum.info)parts.push(`${sum.info} Info`);
+  parts.push(`${sum.total} Prüfungen`);
+  return parts.join(" · ");
+}
 function render(){
   if(typeof document==="undefined")return;
   const host=ensureHost();if(!host)return;
@@ -85,7 +98,7 @@ function render(){
     const head=document.createElement("div");head.className="kc-ops-head";
     const title=document.createElement("strong");const dot=document.createElement("span");dot.className=`dot ${v.cls}`;title.append(dot,document.createTextNode(group.title));
     const tag=document.createElement("span");tag.className="kc-ops-tag";tag.textContent=v.tag;head.append(title,tag);
-    const detail=document.createElement("div");detail.className="muted small";detail.style.marginTop="6px";detail.textContent=sum.total?`${v.text}${sum.count?` · ${sum.count} auffällig`:""} · ${sum.total} Prüfungen`:`${v.text} · noch keine Messung`;
+    const detail=document.createElement("div");detail.className="muted small";detail.style.marginTop="6px";detail.textContent=summaryText(sum,v);
     card.append(head,detail);if(group.id==="failover")appendFailover(card,results);host.appendChild(card);
   }
 }
