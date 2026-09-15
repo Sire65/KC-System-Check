@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.5",
-  "note": "Schema-Drift serverseitig für den Beta-Weg vorbereitet: verglichen werden nur aktive Spiegel-Tabellen und nur die für die Spiegelung relevanten Strukturmerkmale Spaltenname, Reihenfolge und Datentyp. Lockerere Neon-Constraints erzeugen damit keine Fehlalarme. Der separate Read-only-Endpunkt bleibt bis zum gezielten Deploy ohne Einfluss auf 0.7.40.",
+  "version": "0.8.0-beta.6",
+  "note": "Schema-Drift weiter kalibriert: alle 68 aktiven Spiegel-Tabellen sind in Neon vorhanden. Reine Unterschiede der physischen Spaltenreihenfolge werden nicht mehr als Fehler gewertet; geprüft werden Spaltennamen und relevante PostgreSQL-Datentypdetails. Die produktive 0.7.40 bleibt unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
