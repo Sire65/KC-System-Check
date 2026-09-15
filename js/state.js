@@ -17,6 +17,7 @@ export const state={
   runtime:null,
   systems:[],
   history:safeJson("kc-system-history",[]),
+  remoteHistory:[],
   settings:{notifyYellow:true,notifyRed:true,warnUsage:70,critUsage:90,...safeJson("kc-system-settings",{})},
   lastRun:null,
   live:null,
@@ -34,4 +35,9 @@ export function saveAlarms(){try{localStorage.setItem("kc-alarm-memory",JSON.str
 const listeners=new Set();
 export function subscribe(listener){listeners.add(listener);try{listener(state)}catch(error){console.warn("[KC System Check] Zustands-Abonnent fehlgeschlagen",error)}return()=>listeners.delete(listener)}
 export function publish(){for(const listener of listeners){try{listener(state)}catch(error){console.warn("[KC System Check] Zustands-Abonnent fehlgeschlagen",error)}}}
-export function latestRun(){return state.lastRun||state.history[state.history.length-1]||null}
+function runTime(run){const t=Date.parse(run?.at||run?.checked_at||0);return Number.isFinite(t)?t:0}
+export function latestRun(){
+  const candidates=[state.lastRun,...(Array.isArray(state.remoteHistory)?state.remoteHistory:[]),...(Array.isArray(state.history)?state.history:[])].filter(Boolean);
+  if(!candidates.length)return null;
+  return candidates.reduce((best,run)=>runTime(run)>=runTime(best)?run:best,candidates[0]);
+}
