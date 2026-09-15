@@ -67,6 +67,14 @@ function latestMatches(rx){
   }
   return[...map.values()].sort((a,b)=>Date.parse(b?.measured_at||b?.received_at||0)-Date.parse(a?.measured_at||a?.received_at||0));
 }
+function activeConflictSlots(assigned){
+  return new Set((assigned?.conflicts||[]).filter(c=>{const age=ageMs(c?.duplicate?.measured_at||c?.duplicate?.received_at);return age!==null&&age<=FRESH_MS}).map(c=>c.slot));
+}
+function withRegisterConflict(base,slot,conflicts,active){
+  if(!conflicts.has(slot))return base;
+  if(base.state==="bad")return base;
+  return active?{state:"bad",text:`STÖRUNG · doppelte aktive Zuordnung · ${base.text}`}:{state:"warn",text:`PRÜFEN · doppelte aktive Zuordnung · ${base.text}`};
+}
 function readiness(components,active){
   const measured=components.filter(c=>!["prepared","unknown"].includes(c.state));
   const missing=components.length-measured.length;
@@ -97,7 +105,8 @@ function render(){
   const neon=resultState(resultById("neon"));
   const mirror=resultState(resultById("mirror"));
   const managers=latestMatches(/manager/i),manager=heartbeatState(managers[0]||null);
-  const kassen=latestMatches(/kasse|markt|pos/i),assigned=stableCashRegisterSlots(kassen),kasse1=heartbeatState(assigned.slots[0]),kasse2=heartbeatState(assigned.slots[1]);
+  const kassen=latestMatches(/kasse|markt|pos/i),assigned=stableCashRegisterSlots(kassen),conflicts=activeConflictSlots(assigned);
+  const kasse1=withRegisterConflict(heartbeatState(assigned.slots[0]),1,conflicts,active),kasse2=withRegisterConflict(heartbeatState(assigned.slots[1]),2,conflicts,active);
   const routers=latestMatches(/router|gateway|internet|network|netz/i),router=routerState(routers[0]||null);
   const printers=latestMatches(/printer|bondruck|receipt|tm[-_]?t88/i),printer=printerState(printers[0]||null);
   const butlers=latestMatches(/money[-_ ]?butler|cash[-_ ]?butler/i),butler=moneyButlerState(butlers[0]||null);
@@ -111,6 +120,7 @@ function render(){
   box.append(row("PC Manager",manager.text));
   box.append(row("Kasse 1",kasse1.text));
   box.append(row("Kasse 2",kasse2.text));
+  if(conflicts.size)box.append(row("Kassen-Zuordnung",`${active?"STÖRUNG":"PRÜFEN"} · ${conflicts.size} doppelte aktive Slot-Zuordnung(en)`));
   if(assigned.extras.length)box.append(row("Weitere Kassen",`${assigned.extras.length} zusätzliche Instanz(en) erkannt`));
   box.append(row("Router / Internet",router.text));
   box.append(row("Bondrucker",printer.text));
@@ -119,8 +129,8 @@ function render(){
 
   const note=document.createElement("div");note.className="muted small";
   note.textContent=active
-    ?"Im aktiven Marktzeitraum zählen echte Störungen, Warnungen und bereits angebundene aber nicht aktive Komponenten in die Marktbereitschaft. Kasse 1/2 bleiben über Kassen-/Terminalnummer oder feste Gerätekennung stabil zugeordnet. Fehlende, noch nicht angebundene Telemetrie bleibt neutral, verhindert aber ein vollständiges BEREIT."
-    :"In der Vorbereitung werden nur vorhandene Messwerte bewertet. Kasse 1/2 bleiben stabil zugeordnet; fehlende Telemetrie bleibt neutral und bereits bekannte, aber derzeit inaktive Komponenten werden nicht als BEREIT gewertet.";
+    ?"Im aktiven Marktzeitraum zählen echte Störungen, Warnungen, doppelte aktive Kassen-Zuordnungen und bereits angebundene aber nicht aktive Komponenten in die Marktbereitschaft. Fehlende, noch nicht angebundene Telemetrie bleibt neutral, verhindert aber ein vollständiges BEREIT."
+    :"In der Vorbereitung werden nur vorhandene Messwerte bewertet. Doppelte aktive Kassen-Zuordnungen werden als PRÜFEN markiert; fehlende Telemetrie bleibt neutral und bereits bekannte, aber derzeit inaktive Komponenten werden nicht als BEREIT gewertet.";
   box.append(note);
 }
 if(typeof document!=="undefined")subscribe(render);
