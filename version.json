@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.24",
-  "note": "Browser-TÜV für Beta-Prerelease nachgeschärft: Der mobile Smoke-Test akzeptiert jetzt SemVer-Prerelease-Kennungen wie beta.24. Versionsvertrag bleibt zwischen version.json, Updater, Service Worker und Heartbeat synchron; main/0.7.40 bleibt unverändert.",
+  "version": "0.8.0-rc.1",
+  "note": "Release Candidate 1: Beta-Funktionsumfang eingefroren und nach vollständig grünem beta.24-Prüflauf übernommen. Zusätzlich ist die Versionslogik jetzt SemVer-sicher, damit beta → rc → stable korrekt aktualisiert wird. main/0.7.40 bleibt unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
