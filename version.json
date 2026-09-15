@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.21",
-  "note": "Geräteidentität weiter abgesichert: Zwei verschiedene aktive Geräte mit derselben Kassen-/Terminalnummer werden als doppelte Slot-Zuordnung erkannt und nicht fälschlich auf Kasse 1 und Kasse 2 verteilt. Bei einem Ersatztablet gewinnt der jüngste Heartbeat derselben logischen Kassennummer; ältere/stale Geräte erzeugen keinen aktiven Konflikt. 0.7.40 bleibt unverändert.",
+  "version": "0.8.0-beta.22",
+  "note": "Kassen-Konflikte vollständig in die Marktbereitschaft übernommen: Zwei gleichzeitig aktive Geräte mit derselben logischen Kassen-/Terminalnummer erzeugen in der Vorbereitung PRÜFEN und im aktiven Marktzeitraum STÖRUNG/NICHT BEREIT. Alte Ersatzgeräte außerhalb des 180-Sekunden-Fensters lösen keinen aktiven Konflikt aus. 0.7.40 bleibt unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
