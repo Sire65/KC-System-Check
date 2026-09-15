@@ -1,4 +1,4 @@
-import{latestRun,subscribe}from"./state.js";
+import{latestResult,subscribe}from"./state.js";
 
 function norm(v){return String(v||"").toLowerCase()}
 function yes(v){return ["ok","pass","passed","success","healthy"].includes(norm(v))}
@@ -8,9 +8,8 @@ function render(){
   if(typeof document==="undefined")return;
   const card=findCard();if(!card)return;
   card.querySelector(".kc-recovery-facts")?.remove();
-  const run=latestRun(),results=Array.isArray(run?.results)?run.results:[];
-  const b2=results.find(r=>r?.id==="b2")||null;
-  const backup=results.find(r=>r?.id==="backup")||null;
+  const b2=latestResult("b2");
+  const backup=latestResult("backup");
   const integrity=b2?.metrics?.integrity||b2?.metrics?.verification_status||null;
   const restore=b2?.metrics?.restore||b2?.metrics?.restore_status||null;
   const verify=backup?.metrics?.verification_status||integrity||null;
