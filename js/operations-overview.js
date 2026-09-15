@@ -1,9 +1,10 @@
 import{state,subscribe}from"./state.js";
 import"./device-readiness.js";
+import"./schema-drift.js";
 
 const GROUPS=[
   {id:"systems",title:"Systeme",ids:["kc_core","future_academy","github","programs"]},
-  {id:"failover",title:"Datenbank & Failover",ids:["mirror","neon","db_capacity"]},
+  {id:"failover",title:"Datenbank & Failover",ids:["mirror","neon","db_capacity","schema_drift"]},
   {id:"devices",title:"Kassen & Geräte",ids:["programs","device_health","kicc_devices","cash_registers"]},
   {id:"backup",title:"Backup & Sicherheit",ids:["b2","r2","oci","db_security","endpoint_exposure","key_lifetime"]}
 ];
@@ -39,18 +40,21 @@ function failoverFacts(results){
   const primary=results.find(r=>r?.id==="kc_core")||null;
   const mirror=results.find(r=>r?.id==="mirror")||null;
   const neon=results.find(r=>r?.id==="neon")||null;
+  const drift=results.find(r=>r?.id==="schema_drift")||null;
   const mismatch=numberFrom(mirror?.metrics?.mismatch_count,mirror?.mismatch_count);
   const age=numberFrom(mirror?.metrics?.age_min,mirror?.metrics?.age_minutes,mirror?.age_min);
   const openTables=numberFrom(mirror?.metrics?.open_tables,mirror?.metrics?.stale_tables);
   const mirrorReady=norm(mirror?.status)==="healthy"&&(mismatch===null||mismatch===0)&&(openTables===null||openTables===0);
   const neonReady=norm(neon?.status)==="healthy";
+  const driftReady=!drift||norm(drift?.status)==="healthy"||norm(drift?.status)==="not_configured";
   const measured=Boolean(mirror&&neon);
-  const ready=measured&&mirrorReady&&neonReady;
+  const ready=measured&&mirrorReady&&neonReady&&driftReady;
   const readiness=ready?"JA":measured?"NEIN":"NOCH NICHT BEWERTBAR";
   const detail=[];
   detail.push(`Primär Supabase: ${stateWord(primary)}`);
   detail.push(`Reserve Neon: ${stateWord(neon)}`);
   if(mirror){const bits=[`Spiegel: ${stateWord(mirror)}`];if(mismatch!==null)bits.push(`${mismatch} Abw.`);if(openTables!==null&&openTables>0)bits.push(`${openTables} offen`);if(age!==null)bits.push(minutesText(age));detail.push(bits.join(" · "))}else detail.push("Spiegel: noch keine Messung");
+  if(drift&&norm(drift.status)!=="not_configured")detail.push(`Schema: ${stateWord(drift)}`);
   return{ready,measured,readiness,detail};
 }
 function ensureHost(){
