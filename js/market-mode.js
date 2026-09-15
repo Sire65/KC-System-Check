@@ -1,4 +1,4 @@
-import{state,subscribe}from"./state.js";
+import{state,subscribe,latestRun}from"./state.js";
 
 const MARKET_START=new Date(2026,11,4);
 const MARKET_END=new Date(2026,11,14);
@@ -8,7 +8,6 @@ const ageMs=v=>{const t=Date.parse(v||"");return Number.isFinite(t)?Math.max(0,D
 const ageText=ms=>ms===null?"Zeit unbekannt":ms<60000?`vor ${Math.max(1,Math.round(ms/1000))} s`:ms<3600000?`vor ${Math.round(ms/60000)} min`:ms<86400000?`vor ${Math.round(ms/3600000)} h`:`vor ${Math.round(ms/86400000)} T`;
 const norm=v=>{const s=String(v||"").toLowerCase();if(["healthy","ok"].includes(s))return"healthy";if(["warning","warn"].includes(s))return"warning";if(["critical","bad"].includes(s))return"critical";if(s==="not_configured")return"not_configured";return"unknown"};
 const num=(...values)=>{for(const value of values){const n=Number(value);if(Number.isFinite(n))return n}return null};
-function latestRun(){return state.lastRun||state.history?.at?.(-1)||state.history?.[state.history.length-1]||null}
 function liveData(){const x=state.live||{};return x.live&&typeof x.live==="object"?x.live:x}
 function heartbeats(){return Array.isArray(liveData()?.heartbeats)?liveData().heartbeats:[]}
 function resultById(id){const run=latestRun(),rows=Array.isArray(run?.results)?run.results:[];return rows.find(r=>r?.id===id)||null}
