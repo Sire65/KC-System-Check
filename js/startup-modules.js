@@ -1,6 +1,7 @@
 // Startreihenfolge: state.js darf keine Feature-Module importieren, sonst
 // laufen die Module vor dem Zustand an, den sie lesen wollen. Diese Datei
 // wird von app.js NACH state.js importiert.
+import"./startup-neutral.js";
 import"./health-assistant.js";
 import"./early-warning.js";
 import"./self-check.js";
