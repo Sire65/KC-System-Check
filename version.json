@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.22",
-  "note": "Kassen-Konflikte vollständig in die Marktbereitschaft übernommen: Zwei gleichzeitig aktive Geräte mit derselben logischen Kassen-/Terminalnummer erzeugen in der Vorbereitung PRÜFEN und im aktiven Marktzeitraum STÖRUNG/NICHT BEREIT. Alte Ersatzgeräte außerhalb des 180-Sekunden-Fensters lösen keinen aktiven Konflikt aus. 0.7.40 bleibt unverändert.",
+  "version": "0.8.0-beta.23",
+  "note": "Beta-Testpfad für den Browser-TÜV repariert: Service-Worker, Updater und eigener Programm-Heartbeat tragen jetzt dieselbe Beta-Version wie version.json. Der CI-Releasevertrag unterscheidet sauber zwischen unverbindlicher Beta und verbindlichem Stable-Kanal, sodass Syntax-, Bundle- und Playwright-Prüfungen wieder bis zum Browser-Test durchlaufen können. 0.7.40 auf main bleibt unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
