@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0-beta.6",
-  "note": "Schema-Drift weiter kalibriert: alle 68 aktiven Spiegel-Tabellen sind in Neon vorhanden. Reine Unterschiede der physischen Spaltenreihenfolge werden nicht mehr als Fehler gewertet; geprüft werden Spaltennamen und relevante PostgreSQL-Datentypdetails. Die produktive 0.7.40 bleibt unverändert.",
+  "version": "0.8.0-beta.7",
+  "note": "Backup & Recovery erweitert: die Schnellübersicht zeigt Recovery-Bereitschaft, Integritäts-/Verify-Ergebnis und Restore-Test nur aus vorhandener Telemetrie. Manuell gestartete Backup-Vault-Läufe bleiben korrekt von täglichen Pflichtläufen getrennt. 0.7.40 bleibt unverändert.",
   "channel": "beta",
   "installSekunden": 5,
   "verbindlich": false
