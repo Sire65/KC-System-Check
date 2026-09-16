@@ -20,7 +20,7 @@ const STATIC_ROUTES=[
 ];
 const ROUTE_BY_KEY=new Map(STATIC_ROUTES.map(r=>[`${r.from}>${r.to}`,r]));
 const activity=new Map(),counters=new Map(),seen=new Map();
-let snapshot=null,observer=null,queued=false,ws=null,wsTimer=null,wsHeartbeat=null,wsRuntimeKey="",realtimeState="aus";
+let snapshot=null,observer=null,queued=false,ws=null,wsTimer=null,wsHeartbeat=null,wsRuntimeKey="",realtimeState="aus",mapAnimationFrame=null;
 
 export function counterDelta(previous,current){
   const a=Number(previous),b=Number(current);
@@ -64,9 +64,9 @@ function backupTarget(b){const t=String(b?.storage_target||b?.backup_target||"")
 function ingestFlowRows(live){
   const backup=actualBackup(live),backupAt=parseTime(backup?.last_backup_at);
   for(const f of live?.flows||[]){
-    if(String(f.flow_type||"").toLowerCase()==="heartbeat_sync")continue; // kumulativer Zaehler ist kein Einzelereignis
+    if(String(f.flow_type||"").toLowerCase()==="heartbeat_sync")continue;
     const from=normalizeFlowNode(f.source_id||f.program_id),to=normalizeFlowNode(f.target_id);if(!from||!to||!ROUTE_BY_KEY.has(routeKey(from,to)))continue;
-    let at=parseTime(f.measured_at||f.received_at);if(from==="pc-backup"&&backupAt)at=backupAt; // Status-Telemetrie darf ein altes Backup nicht frisch machen
+    let at=parseTime(f.measured_at||f.received_at);if(from==="pc-backup"&&backupAt)at=backupAt;
     if(!at)continue;
     const id=`flow|${from}|${to}|${at}|${f.event_count||0}|${f.byte_count||0}|${f.status||""}`;if(seen.has(id))continue;rememberSeen(id,at);
     const events=Math.max(0,Number(f.event_count||0)),bytes=Math.max(0,Number(f.byte_count||0));if(events>0||bytes>0)touch(from,to,{at,events:events||1,bytes,bad:isBad(f.status),source:f.flow_type||"Flow-Telemetrie"});
@@ -92,7 +92,7 @@ function ingestBroadcast(p){
 function entries(){return STATIC_ROUTES.map(r=>({...r,state:activity.get(routeKey(r.from,r.to))||null,view:trafficView(activity.get(routeKey(r.from,r.to)))}))}
 function overall(list){return list.some(x=>x.view.bad)?"bad":list.some(x=>x.view.moving)?"live":"idle"}
 function ensureCss(){if(typeof document==="undefined"||document.querySelector("#kcFlowTruthCss"))return;const s=document.createElement("style");s.id="kcFlowTruthCss";s.textContent=`
-#kcdfKarteBadge{display:none!important}.kc-truth-list{display:grid;gap:8px;margin-top:10px}.kc-truth-row{display:grid;grid-template-columns:minmax(82px,1fr) minmax(70px,1.2fr) minmax(82px,1fr) auto;gap:8px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:13px;background:#0e1728}.kc-truth-node{font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis}.kc-truth-node.to{text-align:right}.kc-truth-line{height:5px;border-radius:999px;background:#30394a;position:relative;overflow:hidden}.kc-truth-line.active{background:var(--ok)}.kc-truth-line.bad{background:var(--bad)}.kc-truth-line.active:after{content:"";position:absolute;width:10px;height:10px;border-radius:50%;top:50%;left:-10px;transform:translateY(-50%);background:var(--ok);box-shadow:0 0 10px var(--ok);animation:kcTruthMove 1.35s linear infinite}.kc-truth-tag{font-size:9px;font-weight:900;padding:4px 6px;border:1px solid var(--line);border-radius:999px;white-space:nowrap}.kc-truth-meta{grid-column:1/-1;color:var(--muted);font-size:11px;margin-top:-3px}.kc-truth-map svg{display:block;width:100%;height:auto;max-width:900px;margin:0 auto}.kc-truth-legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:8px}.kc-truth-swatch{display:inline-block;width:20px;height:3px;border-radius:2px;background:#30394a;margin-right:5px;vertical-align:middle}.kc-truth-swatch.live{background:var(--ok)}.kc-truth-swatch.bad{background:var(--bad)}@keyframes kcTruthMove{to{left:100%}}@media(max-width:620px){.kc-truth-row{grid-template-columns:minmax(68px,1fr) 50px minmax(68px,1fr) auto;padding:9px 7px}.kc-truth-node{font-size:11px}}@media(prefers-reduced-motion:reduce){.kc-truth-line.active:after{animation:none;left:calc(50% - 5px)}}`;
+#kcdfKarteBadge{display:none!important}.kc-truth-list{display:grid;gap:8px;margin-top:10px}.kc-truth-row{display:grid;grid-template-columns:minmax(82px,1fr) minmax(70px,1.2fr) minmax(82px,1fr) auto;gap:8px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:13px;background:#0e1728}.kc-truth-node{font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis}.kc-truth-node.to{text-align:right}.kc-truth-line{height:5px;border-radius:999px;background:#30394a;position:relative;overflow:hidden}.kc-truth-line.active{background:var(--ok)}.kc-truth-line.bad{background:var(--bad)}.kc-truth-line.active:after{content:"";position:absolute;width:10px;height:10px;border-radius:50%;top:50%;left:-10px;transform:translateY(-50%);background:var(--ok);box-shadow:0 0 10px var(--ok);animation:kcTruthMove 1.35s linear infinite}.kc-truth-tag{font-size:9px;font-weight:900;padding:4px 6px;border:1px solid var(--line);border-radius:999px;white-space:nowrap}.kc-truth-meta{grid-column:1/-1;color:var(--muted);font-size:11px;margin-top:-3px}.kc-truth-map svg{display:block;width:100%;height:auto;max-width:900px;margin:0 auto}.kc-truth-map-dot{filter:drop-shadow(0 0 4px var(--ok))}.kc-truth-legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:8px}.kc-truth-swatch{display:inline-block;width:20px;height:3px;border-radius:2px;background:#30394a;margin-right:5px;vertical-align:middle}.kc-truth-swatch.live{background:var(--ok)}.kc-truth-swatch.bad{background:var(--bad)}@keyframes kcTruthMove{to{left:100%}}@media(max-width:620px){.kc-truth-row{grid-template-columns:minmax(68px,1fr) 50px minmax(68px,1fr) auto;padding:9px 7px}.kc-truth-node{font-size:11px}}@media(prefers-reduced-motion:reduce){.kc-truth-line.active:after{animation:none;left:calc(50% - 5px)}}`;
 document.head.appendChild(s)}
 function renderList(){
   if(typeof document==="undefined")return;const host=document.querySelector("#kcLiveFlowOverview");if(!host)return;ensureCss();host.dataset.kcFlowTruth="1";
@@ -104,11 +104,19 @@ const MAP_NODES={
   supabase:{x:385,y:190,label:"Supabase · KC Core"},"neon-mirror":{x:660,y:95,label:"Neon · Spiegel"},"neon-vault":{x:660,y:235,label:"Neon · Backup"},b2:{x:660,y:355,label:"Backblaze B2"}
 };
 function mapPath(a,b){const x1=a.x+72,x2=b.x-72,m=(x1+x2)/2;return`M${x1},${a.y} C${m},${a.y} ${m},${b.y} ${x2},${b.y}`}
+function animateMapDots(host){
+  if(mapAnimationFrame!=null)cancelAnimationFrame(mapAnimationFrame);mapAnimationFrame=null;
+  const dots=[...host.querySelectorAll(".kc-truth-map-dot")];if(!dots.length)return;
+  const started=performance.now(),duration=1500;
+  const tick=now=>{for(const dot of dots){const path=host.querySelector(`#${dot.dataset.pathId}`);if(!path)continue;const len=path.getTotalLength(),p=path.getPointAtLength(len*(((now-started)%duration)/duration));dot.setAttribute("cx",String(p.x));dot.setAttribute("cy",String(p.y))}mapAnimationFrame=requestAnimationFrame(tick)};
+  mapAnimationFrame=requestAnimationFrame(tick);
+}
 function renderMap(){
   if(typeof document==="undefined")return;const host=document.querySelector("#kcdfKarte");if(!host)return;ensureCss();host.dataset.kcFlowTruth="1";const list=entries(),o=overall(list),reduce=globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-  const paths=list.map((x,i)=>{const a=MAP_NODES[x.from],b=MAP_NODES[x.to],d=mapPath(a,b),v=x.view,stroke=v.bad?"var(--bad)":v.moving?"var(--ok)":"#30394a",width=v.moving?3.4:2.2,id=`kcTruthPath${i}`;const dot=v.moving&&!reduce?`<circle r="4" fill="var(--ok)"><animateMotion dur="1.5s" repeatCount="indefinite"><mpath href="#${id}"/></animateMotion></circle>`:"";return`<path id="${id}" d="${d}" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round"/>${dot}`}).join("");
+  const paths=list.map((x,i)=>{const a=MAP_NODES[x.from],b=MAP_NODES[x.to],d=mapPath(a,b),v=x.view,stroke=v.bad?"var(--bad)":v.moving?"var(--ok)":"#30394a",width=v.moving?3.4:2.2,id=`kcTruthPath${i}`;const dot=v.moving&&!reduce?`<circle class="kc-truth-map-dot" data-path-id="${id}" r="5" fill="var(--ok)" cx="0" cy="0"/>`:"";return`<path id="${id}" d="${d}" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round"/>${dot}`}).join("");
   const nodes=Object.values(MAP_NODES).map(n=>`<g transform="translate(${n.x-72} ${n.y-20})"><rect width="144" height="40" rx="9" fill="#0e1728" stroke="#52617a"/><text x="72" y="25" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="700">${esc(n.label)}</text></g>`).join("");
   host.innerHTML=`<div class="kc-truth-map"><div class="row between" style="margin-bottom:5px"><div class="muted small">Feste dunkelgraue Routen werden erst bei gemessenem Verkehr grün.</div><span class="badge${o==="live"?" live":""}">${o==="bad"?"STÖRUNG":o==="live"?"VERKEHR":"RUHE"}</span></div><svg viewBox="0 0 760 410" role="img" aria-label="KC Datenfluss: graue Routen ohne Verkehr, grüne Routen bei aktuellem Verkehr">${paths}${nodes}</svg><div class="kc-truth-legend"><span><i class="kc-truth-swatch"></i>kein Verkehr</span><span><i class="kc-truth-swatch live"></i>Verkehr ≤ 60 s</span><span><i class="kc-truth-swatch bad"></i>Fehler</span><span>Quelle: echter Snapshot-Zeitpunkt + Realtime + Zählerdifferenz</span></div></div>`;
+  if(reduce){if(mapAnimationFrame!=null)cancelAnimationFrame(mapAnimationFrame);mapAnimationFrame=null}else animateMapDots(host);
 }
 function renderAll(){renderList();renderMap()}
 function upgradeWhenReady(){if(typeof document==="undefined")return;const a=document.querySelector("#kcLiveFlowOverview"),b=document.querySelector("#kcdfKarte");if(a&&!a.dataset.kcFlowTruth||b&&!b.dataset.kcFlowTruth)renderAll()}
