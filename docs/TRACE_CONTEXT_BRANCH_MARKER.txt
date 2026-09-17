@@ -1,0 +1,4 @@
+feature/supabase-trace-safe
+Initial isolated Trace Context implementation present.
+No production deploy. No main change.
+Ready for branch-only regression gate.
