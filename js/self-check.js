@@ -6,6 +6,8 @@ const $=s=>document.querySelector(s);
 const STORE='kc-self-check-v1';
 const MAX_RUN_AGE=36*60*60*1000;
 const LONG_RUNNING=5*60*1000;
+const MARKET_START=new Date(2026,11,4);
+const MARKET_END=new Date(2026,11,14);
 
 function lastRunAt(){
   const run=latestRun();
@@ -13,7 +15,15 @@ function lastRunAt(){
   return Number.isFinite(value)?value:null;
 }
 
+function marketActive(now=new Date()){
+  return now>=MARKET_START&&now<MARKET_END;
+}
+
 function liveDisruption(){
+  // Kassen und PC-Manager sind nur waehrend des Weihnachtsmarkts Pflichtbetrieb.
+  // Ausserhalb dieses Fensters sind alte/fehlende Heartbeats "vorbereitet" bzw.
+  // "nicht aktiv" und duerfen die Gesamtampel nicht rot faerben.
+  if(!marketActive())return false;
   const live=state.live;
   if(!live)return false;
   const stale=t=>{const v=Date.parse(t||'');return Number.isFinite(v)?Date.now()-v>180000:true};
