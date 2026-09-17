@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import{classifyReviewedSecurityFindings}from'../supabase/functions/kc-system-check/security-reviewed-exceptions.ts';
+const now=Date.parse('2026-09-17T21:30:00Z');
+const finding={object_schema:'public',object_name:'kc_dp_report_error',finding_code:'security_definer_anon_execute',role:'anon'};
+const accepted={object_schema:'public',object_name:'kc_dp_report_error',finding_code:'security_definer_anon_execute',decision:'accepted_required',reason:'pre-login error reporting',active:true,review_after:'2027-03-16T00:00:00Z'};
+test('accepted review stays visible but is not actionable',()=>{const r=classifyReviewedSecurityFindings([finding],[accepted],now);assert.equal(r.all.length,1);assert.equal(r.reviewed.length,1);assert.equal(r.actionable.length,0);assert.equal(r.all[0].reviewed_exception,true)});
+test('missing registry fails open',()=>assert.equal(classifyReviewedSecurityFindings([finding],[],now).actionable.length,1));
+test('expired review fails open',()=>assert.equal(classifyReviewedSecurityFindings([finding],[{...accepted,review_after:'2026-09-17T20:00:00Z'}],now).actionable.length,1));
+test('fixed review does not suppress a still-present finding',()=>assert.equal(classifyReviewedSecurityFindings([finding],[{...accepted,decision:'fixed'}],now).actionable.length,1));
+test('finding code must match exactly',()=>assert.equal(classifyReviewedSecurityFindings([{...finding,finding_code:'security_definer_authenticated_execute'}],[accepted],now).actionable.length,1));
