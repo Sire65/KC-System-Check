@@ -23,3 +23,14 @@ export function withTraceHeaders(init: RequestInit = {}, trace: Record<string, s
   for (const [key, value] of Object.entries(trace)) headers.set(key, value);
   return { ...init, headers };
 }
+
+// Trace-Metadaten werden nur an das eigene Supabase-Projekt weitergereicht.
+// GitHub, Neon, B2/R2/OCI und andere externe Ziele bekommen sie nicht.
+export function withSupabaseTrace(url: string, supabaseUrl: string, init: RequestInit = {}, trace: Record<string, string> = {}): RequestInit {
+  try {
+    if (new URL(url).origin !== new URL(supabaseUrl).origin) return init;
+  } catch {
+    return init;
+  }
+  return withTraceHeaders(init, trace);
+}
