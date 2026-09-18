@@ -10,7 +10,7 @@ returns jsonb
 language sql
 stable
 security definer
-set search_path = pg_catalog, public
+set search_path = pg_catalog
 as $$
   with client_roles as (
     select r.oid, r.rolname
@@ -22,7 +22,7 @@ as $$
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = p_schema and p.prosecdef
-  ), direct_grants as (
+  ), effective_execute as (
     select f.object_schema, f.object_name, f.identity_arguments, cr.rolname as role_name
     from definer_functions f
     cross join client_roles cr
@@ -30,7 +30,7 @@ as $$
   ), findings as (
     select object_schema, object_name, identity_arguments, role_name,
            'security_definer_' || role_name || '_execute' as finding_code
-    from direct_grants
+    from effective_execute
   )
   select jsonb_build_object(
     'checked_at', now(),
