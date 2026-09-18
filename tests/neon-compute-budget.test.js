@@ -1,0 +1,14 @@
+const fs=require("fs"),assert=require("assert");
+const s=fs.readFileSync("supabase/functions/kc-system-check/index.ts","utf8");
+assert(s.includes("async function neonBudget(cred:any)"));
+assert(s.includes("console.neon.tech/api/v2/projects/"));
+assert(s.includes("compute_time_seconds"));
+assert(s.includes("consumption_period_end"));
+assert(s.includes("NEON_COMPUTE_LIMIT_CU_HOURS"));
+assert(s.includes('id="neon_compute_budget"')||s.includes('id:"neon_compute_budget"'));
+assert(s.includes('status:"unknown"'),"management API failure must not be green");
+assert(s.includes('Limit nicht konfiguriert'),"missing tariff limit must be explicit");
+assert(s.includes('u>=100?"critical":u>=90?"critical":u>=80||forecastRisk?"warning":"healthy"'));
+assert(s.includes("forecast_not_guarantee:true"));
+assert(s.includes("neon,neonComputeBudget,sicherung"),"budget result must be exposed in KC Check");
+console.log("Neon compute budget regression: OK");
