@@ -15,6 +15,13 @@ psql -v ON_ERROR_STOP=1 -q -c "drop database if exists ${PAKET};" -d postgres
 psql -v ON_ERROR_STOP=1 -q -c "create database ${PAKET};" -d postgres
 psql -v ON_ERROR_STOP=1 -q -d "${PAKET}" -f tests/sql/db-monitor.test.sql
 
+# Additive SECURITY-DEFINER-Execute-Pruefung separat testen. So bleiben die
+# bestehenden Audit-Regeln unveraendert und Regressionen sind eindeutig.
+SECDEF="${DB}_security_definer_execute"
+psql -v ON_ERROR_STOP=1 -q -c "drop database if exists ${SECDEF};" -d postgres
+psql -v ON_ERROR_STOP=1 -q -c "create database ${SECDEF};" -d postgres
+psql -v ON_ERROR_STOP=1 -q -d "${SECDEF}" -f tests/sql/security-definer-execute.test.sql
+
 # Datenfluss-Wahrheit in einer sauberen Minimaldatenbank: Heartbeat-Zaehler
 # duerfen kein Dauergruen erzeugen, Backup-Zeit ist der echte Abschlusszeitpunkt.
 FLOW="${DB}_flow_truth"
