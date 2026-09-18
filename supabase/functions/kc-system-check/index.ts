@@ -69,7 +69,7 @@ function classifySecurityFindings(findings:any[],review:any){
 function securityResult(res:any,executeRes:any={ok:true,status:200,data:[]},review:any={ok:false,status:0,rows:[]}){
   if(!res.ok)return notDeployed("db_security","Datenbank-Sicherheitslage","security",res.status);
   const d=res.data||{},rls=d.tables_without_rls||[],views=d.views_bypassing_rls||[],pol=d.permissive_policies||[],grants=d.public_grants||[];
-  const executeRaw=executeRes?.ok?(Array.isArray(executeRes.data)?executeRes.data:(executeRes.data?.security_definer_execute_findings||[])):[];
+  const executeRaw=executeRes?.ok?(Array.isArray(executeRes.data)?executeRes.data:(executeRes.data?.findings||executeRes.data?.security_definer_execute_findings||[])):[];
   const execute=classifySecurityFindings(executeRaw,review),actionable=execute.actionable,reviewed=execute.reviewed;
   const findings=rls.length+views.length+pol.length+grants.length+actionable.length;
   // Gepruefte Ausnahmen bleiben sichtbar, faerben die Ampel aber nicht. Wenn
