@@ -101,4 +101,4 @@ test('das Aufraeumen der Lebenszeichen ist eingeplant',()=>{const sql=fs.readFil
 test('die Einrichtung nennt die Verbrauchsmigration als Pflicht',()=>{const d=fs.readFileSync('docs/EINRICHTUNG.md','utf8'),block=d.slice(d.indexOf('## 1. Migrationen einspielen'),d.indexOf('Genau diese Reihenfolge'));assert.match(block,/202609060024_kc_verbrauch_und_lebenszeichen_aufraeumen\.sql/)});
 
 // SECURITY DEFINER wrapper returns {findings:[...]}; the Edge parser must consume it.
-test('SECURITY DEFINER RPC findings payload is consumed',()=>{assert.match(edge,/executeRes\.data\?\.findings\|\|executeRes\.data\?\.security_definer_execute_findings/)})
+test('SECURITY DEFINER RPC findings payload is consumed',()=>{const edge=fs.readFileSync('supabase/functions/kc-system-check/index.ts','utf8');assert.match(edge,/executeRes\.data\?\.findings\|\|executeRes\.data\?\.security_definer_execute_findings/)})
