@@ -13,10 +13,10 @@ assert(snapPos>=0 && historyPos>snapPos && neonWritePos>historyPos,"comparison m
 
 assert(src.includes('String(lastOk.source_rows??"")===sc'),"row count must match before skip");
 assert(src.includes('String((lastOk.metrics as any)?.source_hash??"")===sh'),"source hash must match before skip");
-assert(src.includes("if(!lastErr&&lastOk&&"),"history lookup error/missing history must fail open to normal mirror, never false-skip");
+assert(src.includes("const unchanged=!lastErr&&lastOk&&"),"history lookup error/missing history must fail open to normal mirror, never false-skip");
 assert(src.includes("if(neon)await neon.end"),"unused Neon client must not be created merely for cleanup");
 
-const unchangedBlock=src.slice(src.indexOf("if(!lastErr&&lastOk&&"),src.indexOf("const bytes=",src.indexOf("if(!lastErr&&lastOk&&")));
+const unchangedBlock=src.slice(src.indexOf("if(unchanged&&verificationFresh)"),src.indexOf("const bytes=",src.indexOf("if(unchanged&&verificationFresh)")));
 assert(!unchangedBlock.includes("getNeon()"),"unchanged path must not touch Neon");
 
 console.log("mirror efficiency regression: OK");
