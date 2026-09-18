@@ -20,8 +20,9 @@ assert.equal(Object.hasOwn(withTraceHeaders({x:'y'}, {}), 'traceparent'), false)
 
 const edge = (await import('node:fs')).readFileSync('supabase/functions/kc-system-check/index.ts','utf8');
 assert.match(edge, /traceparent, tracestate, baggage/);
-assert.match(edge, /activeTrace=\{traceparent:req\.headers\.get\("traceparent"\)/);
-assert.match(edge, /headers:traced\(init\.headers\|\|\{\}\)/);
+assert.match(edge, /const trace=\{traceparent:req\.headers\.get\("traceparent"\)/);
+assert.match(edge, /headers:withTraceHeaders\(init\.headers\|\|\{\},trace\)/);
+assert.doesNotMatch(edge, /let activeTrace|var activeTrace/);
 assert.doesNotMatch(edge, /randomUUID\(\).*trace|trace.*randomUUID\(/i);
 
 console.log('trace-context: OK');
