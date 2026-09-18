@@ -30,18 +30,27 @@ Deno.serve(async(req)=>{
   const syncU=async()=>{for(const s of ["kc_core_user_links","kc_dp_memberships","kc_manager_memberships"]){const {data,error}=await sb.from(s).select("org_id,user_id,active");if(error)throw new Error("user refs unavailable");for(const r of data??[])await getNeon().unsafe('insert into public.kc_mirror_user_refs(org_id,user_id,active,mirrored_at) values ($1,$2::uuid,$3,now()) on conflict (org_id,user_id) do update set active=excluded.active,mirrored_at=now()',[r.org_id,r.user_id,r.active]);}};
   try{
     for(let i=0;i<requested.length;i++){
-      const table=requested[i];if(personRefTables.has(table)&&!prs){await syncP();prs=true}if(userRefTables.has(table)&&!urs){await syncU();urs=true}
+      const table=requested[i];
       const startMs=Date.now(),started=new Date(startMs).toISOString();
       const {data:snap,error:se}=await sb.rpc("kc_db_mirror_snapshot",{p_table_name:table});if(se||!snap){results.push({table,status:"error",stage:"source_snapshot"});continue}
       const sc=String(snap.row_count??"0"),payload=String(snap.payload_text??"[]");let sh=String(snap.content_hash??"");
       if(stableHashTables.has(table)){const {data:stableHash,error:stableErr}=await sb.rpc("kc_db_mirror_stable_hash",{p_table_name:table});if(stableErr||!stableHash){results.push({table,status:"error",stage:"source_stable_hash"});continue}sh=String(stableHash)}
+      const hashMode=stableHashTables.has(table)?"stable_row_hash_v1":"legacy_row_json_v1";
       const {data:lastOk,error:lastErr}=await sb.from("kc_db_mirror_runs").select("source_rows,metrics,finished_at").eq("run_type","snapshot").eq("status","ok").eq("metrics->>table",table).order("started_at",{ascending:false}).limit(1).maybeSingle();
-      if(!lastErr&&lastOk&&String(lastOk.source_rows??"")===sc&&String((lastOk.metrics as any)?.source_hash??"")===sh){
-        results.push({table,status:"skipped",reason:"source_unchanged",source_rows:sc,source_hash:sh,last_verified_at:lastOk.finished_at,batch_id:batchId,batch_index:i+1,batch_total:batchTotal});
+      const {data:lastVerified,error:lastVerifiedErr}=await sb.from("kc_db_mirror_runs").select("finished_at,metrics").eq("run_type","snapshot").eq("status","ok").eq("metrics->>table",table).not("metrics->>target_hash","is",null).order("started_at",{ascending:false}).limit(1).maybeSingle();
+      const verifiedAt=lastVerified?.finished_at?Date.parse(String(lastVerified.finished_at)):NaN;
+      const verificationFresh=!lastVerifiedErr&&Number.isFinite(verifiedAt)&&(Date.now()-verifiedAt)<30*60*1000;
+      const unchanged=!lastErr&&lastOk&&String(lastOk.source_rows??"")===sc&&String((lastOk.metrics as any)?.source_hash??"")===sh&&String((lastOk.metrics as any)?.hash_mode??"")===hashMode;
+      if(unchanged&&verificationFresh){
+        const skipMetrics={table,batch_id:batchId,batch_index:i+1,batch_total:batchTotal,source_hash:sh,hash_mode:hashMode,transfer_mode:"unchanged_source_skip",target_verified:false,last_target_verified_at:lastVerified.finished_at};
+        const {error:skipErr}=await sb.from("kc_db_mirror_runs").insert({run_type:"snapshot",status:"ok",started_at:started,finished_at:new Date().toISOString(),source_rows:Number(sc),target_rows:Number(lastOk.source_rows??sc),mismatch_count:0,message:`${table}: source unchanged; target verification still fresh`,metrics:skipMetrics});
+        if(skipErr){results.push({table,status:"error",stage:"skip_audit",message:"unchanged run could not be persisted"});continue}
+        results.push({table,status:"skipped",reason:"source_unchanged",source_rows:sc,source_hash:sh,last_verified_at:lastVerified.finished_at,batch_id:batchId,batch_index:i+1,batch_total:batchTotal});
         continue;
       }
+      if(personRefTables.has(table)&&!prs){await syncP();prs=true}if(userRefTables.has(table)&&!urs){await syncU();urs=true}
       const bytes=new TextEncoder().encode(payload).byteLength,q=`"public".${qi(table)}`;
-      const runningMetrics={table,batch_id:batchId,batch_index:i+1,batch_total:batchTotal,payload_bytes:bytes,privacy_redacted:redactedTables.has(table),write_mode:table==="kc_core_organizations"?"upsert":"replace",hash_mode:stableHashTables.has(table)?"stable_row_hash_v1":"legacy_row_json_v1"};
+      const runningMetrics={table,batch_id:batchId,batch_index:i+1,batch_total:batchTotal,payload_bytes:bytes,privacy_redacted:redactedTables.has(table),write_mode:table==="kc_core_organizations"?"upsert":"replace",hash_mode:hashMode};
       const {data:runRow,error:runErr}=await sb.from("kc_db_mirror_runs").insert({run_type:"snapshot",status:"running",started_at:started,source_rows:Number(sc),mismatch_count:0,message:`${table}: transfer running`,metrics:runningMetrics}).select("id").single();const runId=runErr?null:runRow?.id;
       try{
         await getNeon().begin(async tx=>{if(table==="kc_core_organizations"){if(sc!=="0")await tx.unsafe(`insert into ${q}(org_id,name,active,created_at,updated_at) select x.org_id,x.name,x.active,x.created_at,x.updated_at from jsonb_populate_recordset(null::${q},(($1::jsonb #>> '{}')::jsonb)) x on conflict(org_id) do update set name=excluded.name,active=excluded.active,created_at=excluded.created_at,updated_at=excluded.updated_at`,[payload])}else{await tx.unsafe(`delete from ${q}`);if(sc!=="0")await tx.unsafe(`insert into ${q} overriding system value select x.* from jsonb_populate_recordset(null::${q},(($1::jsonb #>> '{}')::jsonb)) x`,[payload])}});
