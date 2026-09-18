@@ -32,12 +32,25 @@ begin
 end $$;
 
 revoke execute on function public.probe_definer() from anon, authenticated;
-do $$
+do $
 declare v jsonb := db_monitor.security_definer_execute_audit();
 begin
   assert jsonb_array_length(v -> 'findings') = 0,
     'revoked execute privilege must remove finding: ' || (v -> 'findings')::text;
-end $$;
+end $;
+
+-- has_function_privilege() measures effective privilege. A PUBLIC EXECUTE grant
+-- must therefore be visible for both client roles, just like the Supabase advisor.
+grant execute on function public.probe_definer() to public;
+do $
+declare v jsonb := db_monitor.security_definer_execute_audit();
+begin
+  assert v -> 'findings' @> '[{"object_name":"probe_definer","role":"anon"}]'::jsonb,
+    'PUBLIC execute must be effective for anon';
+  assert v -> 'findings' @> '[{"object_name":"probe_definer","role":"authenticated"}]'::jsonb,
+    'PUBLIC execute must be effective for authenticated';
+end $;
+revoke execute on function public.probe_definer() from public;
 
 -- The audit function itself must never become a client-callable surface.
 do $$
