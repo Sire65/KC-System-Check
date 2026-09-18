@@ -11,8 +11,8 @@ test('Backup Vault ingest uses existing paired machine authentication',()=>{
   assert.match(src,/machine\.status!==['"]active['"]/);
 });
 
-test('storage target ingest accepts only the three known technical targets',()=>{
-  for(const id of ['nas_backup','hidrive_1','hidrive_2']) assert.match(src,new RegExp(id));
+test('storage target ingest accepts only the four known technical targets',()=>{
+  for(const id of ['nas_backup','b2_backup','hidrive_1','hidrive_2']) assert.match(src,new RegExp(id));
   assert.match(src,/allowedTargetIds/);
   assert.match(src,/storage_targets:storageTargets/);
 });
@@ -38,7 +38,14 @@ test('provider status follows the real backup target so B2 is not left OFFEN',()
 });
 
 test('successful ingest returns only acknowledgement metadata, never telemetry payload',()=>{
-  assert.match(src,/return json\(\{ok:true,stored:true,liveStored:true,targetCount:storageTargets\.length\}\)/);
+  assert.match(src,/return json\(\{ok:true,stored:true,liveStored:true,runtimeStored:!!runtime,targetCount:storageTargets\.length\}\)/);
   assert.doesNotMatch(src,/return json\(row\)/);
   assert.doesNotMatch(src,/return json\(machineRow\)/);
+});
+
+test('runtime telemetry is sanitized and acknowledgement exposes only storage confirmation',()=>{
+  assert.match(src,/function cleanRuntime/);
+  assert.match(src,/cleanRuntime\(body\?\.details\?\.runtime\)/);
+  assert.match(src,/if\(runtime\)details\.runtime=runtime/);
+  assert.match(src,/runtimeStored:!!runtime/);
 });
