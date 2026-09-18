@@ -5,7 +5,7 @@
 // Browser-Tab sendete weiter Heartbeats, obwohl GitHub Pages schon neuer war.
 import"./diagnostics-runtime.js";
 import{isNewerVersion}from"./version-compare.js";
-const CURRENT_VERSION="0.8.0",VERSION_URL="./version.json";
+const CURRENT_VERSION="0.8.0",VERSION_URL="./version.json",REMOTE_VERSION_URL="https://raw.githubusercontent.com/Sire65/KC-System-Check/main/version.json",LOCAL_REPO_HOST=/^(?:127\.0\.0\.1|localhost)$/i.test(location.hostname)||location.protocol==="file:";
 const $=s=>document.querySelector(s);
 const SPAETER='kc-update-spaeter';
 const SPAETER_STUNDEN=12;
@@ -53,7 +53,7 @@ function balkenLaufenLassen(sekunden,fertig){
 export async function checkForAppUpdate({silent=true}={}){
   if(pruefungLaeuft)return null;pruefungLaeuft=true;
   try{
-    const r=await fetch(`${VERSION_URL}?t=${Date.now()}`,{cache:"no-store"});if(!r.ok)throw new Error(`HTTP ${r.status}`);
+    const source=LOCAL_REPO_HOST?REMOTE_VERSION_URL:VERSION_URL;const r=await fetch(`${source}?t=${Date.now()}`,{cache:"no-store"});if(!r.ok)throw new Error(`HTTP ${r.status}`);
     const info=await r.json();
     if(!isNewerVersion(info.version,CURRENT_VERSION)){spaeterVergessen();if(!silent)alert(`KC System Check ist aktuell (Version ${CURRENT_VERSION}).`);return null}
     if(silent&&!info.verbindlich&&spaeterGemerkt(info.version))return info;
@@ -63,6 +63,7 @@ export async function checkForAppUpdate({silent=true}={}){
 async function uebernehmen(){
   const install=$("#installUpdateBtn");
   try{
+    if(LOCAL_REPO_HOST){alert("Lokale KC-System-Check-Installation erkannt. Bitte GitHub Desktop öffnen, KC-System-Check auswählen, „Pull origin“ ausführen und anschließend neu laden.");return}
     if(pflichtTimer){clearTimeout(pflichtTimer);pflichtTimer=null}
     if(waitingWorker){waitingWorker.postMessage({type:"SKIP_WAITING"});setTimeout(()=>location.reload(),3000);return}
     const reg=await navigator.serviceWorker?.getRegistration();if(reg)await reg.update();location.reload();
