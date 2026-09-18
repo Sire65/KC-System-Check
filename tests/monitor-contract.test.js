@@ -99,3 +99,6 @@ test('das Aufraeumen der Lebenszeichen ist eingeplant',()=>{const sql=fs.readFil
 // Die Verbrauchszaehlung braucht nur kc_system_check_history - sie gehoert in
 // die Pflichtliste, sonst rechnet eine fremde Umgebung wieder aus 40 Zeilen.
 test('die Einrichtung nennt die Verbrauchsmigration als Pflicht',()=>{const d=fs.readFileSync('docs/EINRICHTUNG.md','utf8'),block=d.slice(d.indexOf('## 1. Migrationen einspielen'),d.indexOf('Genau diese Reihenfolge'));assert.match(block,/202609060024_kc_verbrauch_und_lebenszeichen_aufraeumen\.sql/)});
+
+// SECURITY DEFINER wrapper returns {findings:[...]}; the Edge parser must consume it.
+assert.match(edge,/executeRes\.data\?\.findings\|\|executeRes\.data\?\.security_definer_execute_findings/);
