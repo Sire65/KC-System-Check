@@ -406,7 +406,7 @@ if(kicc&&(!tele||Date.parse(kicc.measured_at||"")>Date.parse(tele.measured_at||"
 }const [neonDirect,b2Direct,r2Direct,ociDirect,repoConfig]=await Promise.all([optionalEndpoint("NEON"),optionalEndpoint("B2"),optionalEndpoint("R2"),optionalEndpoint("OCI"),publicConfig(gd)]);requests++;for(const x of[neonDirect,b2Direct,r2Direct,ociDirect])if(x)requests++;const futureBytes=Number(fd?.database_bytes??0),cu=pct(coreBytes,FREE_DB_BYTES),coreOk=!!core?.r?.ok,coreMs=core?.ms??null,coreStatus=coreOk?(coreMs!==null&&coreMs>3000?"warning":"healthy"):"critical",coreHealth=coreOk?(coreMs!==null&&coreMs>3000?82:coreMs!==null&&coreMs>1500?90:100):35;
 let neon=endpointResult("neon","Neon · Direktcheck","database",neonDirect,"Direktcheck vorbereitet; die Supabase→Neon-Spiegelung wird separat geprüft");if(!neonDirect&&tele?.neon_status){const t=telemetryState(tele.neon_status);neon={...neon,status:t.status,health:t.health,capacityLabel:"PC Backup Vault Telemetrie",detail:`Neon-Telemetrie: ${tele.neon_status}`,metrics:{direct_check:false,telemetry:true,measured_at:tele.measured_at}}}
 const neonCred=zugaenge.neon_mirror||null;
-const neonMgmtCred=zugaenge.neon_management||null;
+const neonMgmtCred=zugaenge.neon_management||((Deno.env.get("NEON_API_KEY")||"")?{secret:Deno.env.get("NEON_API_KEY"),project_id:"purple-hat-23047492",compute_limit_cu_hours:100}:null);
 const neonBudgetRes=await neonBudget(neonMgmtCred);requests++;
 const neonComputeBudget=neonBudgetResult(neonBudgetRes);
 let sicherung=backupResult({ok:false,reason:"kein_zugang"});
