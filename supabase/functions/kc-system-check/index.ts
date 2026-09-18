@@ -44,19 +44,43 @@ async function rpc(own:string,service:string,name:string){
 function notDeployed(id:string,name:string,kind:string,status:number){
   return{id,name,kind,status:"not_configured",health:null,latency:null,usage:null,capacityLabel:"Serverprüfung noch nicht eingespielt",detail:`${name} steht erst nach der Migration und einem Deploy zur Verfügung${status?` (HTTP ${status})`:""}`,metrics:{deployed:false}};
 }
-function securityResult(res:any){
+function reviewKey(f:any){return `${f?.object_schema||"public"}\u0000${f?.object_name||""}\u0000${f?.finding_code||""}`}
+async function reviewedSecurityExceptions(own:string,service:string){
+  try{
+    const x=await timed(`${own}/rest/v1/kc_security_reviewed_exceptions?select=object_schema,object_name,object_type,finding_code,decision,reason,reviewed_at,review_after,active`,{headers:{apikey:service,Authorization:`Bearer ${service}`}});
+    if(!x.r.ok)return{ok:false,status:x.r.status,rows:[]};
+    const rows=await x.r.json();return{ok:true,status:200,rows:Array.isArray(rows)?rows:[]};
+  }catch{return{ok:false,status:0,rows:[]}}
+}
+function classifySecurityFindings(findings:any[],review:any){
+  const now=Date.now(),idx=new Map<string,any>();
+  if(review?.ok)for(const row of review.rows||[]){
+    if(row?.active!==true||!["accepted_required","accepted_temporary"].includes(row?.decision))continue;
+    const expiry=row.review_after?Date.parse(row.review_after):null;
+    if(expiry!==null&&(!Number.isFinite(expiry)||expiry<=now))continue;
+    if(row.object_name&&row.finding_code)idx.set(reviewKey(row),row);
+  }
+  const all=(Array.isArray(findings)?findings:[]).map((f:any)=>{const row=idx.get(reviewKey(f));return row?{...f,reviewed_exception:true,review_decision:row.decision,review_reason:row.reason||"",reviewed_at:row.reviewed_at||null,review_after:row.review_after||null}:{...f,reviewed_exception:false}});
+  return{all,actionable:all.filter((f:any)=>!f.reviewed_exception),reviewed:all.filter((f:any)=>f.reviewed_exception)};
+}
+function securityResult(res:any,executeRes:any={ok:true,status:200,data:[]},review:any={ok:false,status:0,rows:[]}){
   if(!res.ok)return notDeployed("db_security","Datenbank-Sicherheitslage","security",res.status);
   const d=res.data||{},rls=d.tables_without_rls||[],views=d.views_bypassing_rls||[],pol=d.permissive_policies||[],grants=d.public_grants||[];
-  const findings=rls.length+views.length+pol.length+grants.length;
-  // Ungedeckter Zugriff ist eine Stoerung. Eine Policy mit using(true) kann
-  // beabsichtigt sein und gehoert geprueft - das ist eine Warnung, kein Ausfall.
-  const status=rls.length||views.length||grants.length?"critical":pol.length?"warning":"healthy";
+  const executeRaw=executeRes?.ok?(Array.isArray(executeRes.data)?executeRes.data:(executeRes.data?.security_definer_execute_findings||[])):[];
+  const execute=classifySecurityFindings(executeRaw,review),actionable=execute.actionable,reviewed=execute.reviewed;
+  const findings=rls.length+views.length+pol.length+grants.length+actionable.length;
+  // Gepruefte Ausnahmen bleiben sichtbar, faerben die Ampel aber nicht. Wenn
+  // Registry/Audit ausfallen, wird nichts verborgen.
+  const status=rls.length||views.length||grants.length?"critical":pol.length||actionable.length||!executeRes?.ok?"warning":"healthy";
   const parts=[];
   if(rls.length)parts.push(`${rls.length} Tabelle(n) ohne RLS: ${rls.slice(0,5).join(", ")}`);
   if(views.length)parts.push(`${views.length} View(s) umgehen RLS: ${views.slice(0,3).join(", ")}`);
   if(grants.length)parts.push(`${grants.length} ungedeckte Rechte für anon/authenticated`);
   if(pol.length)parts.push(`${pol.length} Policy(s) mit uneingeschränktem Lesezugriff · prüfen, ob gewollt`);
-  return{id:"db_security",name:"Datenbank-Sicherheitslage",kind:"security",status,health:status==="critical"?35:status==="warning"?72:100,latency:res.ms,usage:null,capacityLabel:findings?`${findings} Befund(e)`:"Keine Befunde",detail:parts.join(" · ")||"RLS aktiv, keine ungedeckten Rechte, keine uneingeschränkten Policies",metrics:{tables_without_rls:rls,views_bypassing_rls:views,permissive_policies:pol,public_grants:grants}};
+  if(actionable.length)parts.push(`${actionable.length} SECURITY-DEFINER-Ausführungsrecht(e) · prüfen`);
+  if(reviewed.length)parts.push(`${reviewed.length} geprüfte SECURITY-DEFINER-Ausnahme(n)`);
+  if(!executeRes?.ok)parts.push("SECURITY-DEFINER-Ausführungsrechte konnten nicht geprüft werden");
+  return{id:"db_security",name:"Datenbank-Sicherheitslage",kind:"security",status,health:status==="critical"?35:status==="warning"?72:100,latency:res.ms,usage:null,capacityLabel:findings?`${findings} Befund(e)`:reviewed.length?`${reviewed.length} geprüfte Ausnahme(n)`:"Keine Befunde",detail:parts.join(" · ")||"RLS aktiv, keine ungedeckten Rechte, keine uneingeschränkten Policies",metrics:{tables_without_rls:rls,views_bypassing_rls:views,permissive_policies:pol,public_grants:grants,security_definer_execute_findings:execute.all,security_definer_actionable:actionable,security_definer_reviewed:reviewed,review_registry_available:!!review?.ok}};
 }
 function capacityResult(res:any){
   if(!res.ok)return notDeployed("db_capacity","Datenbank-Kapazität","database",res.status);
@@ -347,5 +371,5 @@ if(neonCred){const [nq,bq]=await Promise.all([neonQuery(neonCred),backupQuery(ne
 let b2=endpointResult("b2","Backblaze B2","storage",b2Direct,"Adapter bereit; noch keine B2-Telemetrie oder sichere Read-only-Verbindung");if(!b2Direct&&tele?.b2_status){const t=telemetryState(tele.b2_status);b2={...b2,status:t.status,health:t.health,capacityLabel:tele.last_backup_stored_bytes?`${mb(Number(tele.last_backup_stored_bytes))} MB letzter Backup-Satz`:"PC Backup Vault Telemetrie",detail:`B2 ${tele.b2_status} · letzter Backup-Status ${tele.last_backup_status||"unbekannt"}${tele.integrity?` · Integrität ${tele.integrity}`:""}${tele.restore?` · Restore-Test ${tele.restore}`:""}${tele.app_version?` · App v${tele.app_version}`:""} · Backup Vault wird manuell gestartet`,metrics:{direct_check:false,telemetry:true,measured_at:tele.measured_at,last_backup_at:tele.last_backup_at,last_backup_status:tele.last_backup_status,last_backup_stored_bytes:tele.last_backup_stored_bytes,storage_target:tele.storage_target}}}
 if(!b2Direct){b2=backupAgeRules(b2,tele,masch)}
 const r2=endpointResult("r2","Cloudflare R2","storage",r2Direct,"Als Backup-/Failback-Anbieter vorbereitet; Scharfstellung nach Zugangseinrichtung"),oci=endpointResult("oci","Oracle OCI Object Storage","storage",ociDirect,"Als Reserve-Anbieter vorbereitet; Scharfstellung nach Zugangseinrichtung");
-const [securityRes,capacityRes,programRes,exposure]=await Promise.all([rpc(own,service,"kc_system_check_security_audit"),rpc(own,service,"kc_system_check_db_capacity"),rpc(own,service,"kc_system_check_programs"),exposureResult(own)]);requests+=5;const zweitesProjekt=secondProjectResult(futureCfg,fr,fd);const dbSecurity=securityResult(securityRes),dbCapacity=capacityResult(capacityRes),programme=programResult(programRes),keyLifetime=keyLifetimeResult();
+const [securityRes,securityDefinerRes,securityReviews,capacityRes,programRes,exposure]=await Promise.all([rpc(own,service,"kc_system_check_security_audit"),rpc(own,service,"kc_system_check_security_definer_execute_audit"),reviewedSecurityExceptions(own,service),rpc(own,service,"kc_system_check_db_capacity"),rpc(own,service,"kc_system_check_programs"),exposureResult(own)]);requests+=7;const zweitesProjekt=secondProjectResult(futureCfg,fr,fd);const dbSecurity=securityResult(securityRes,securityDefinerRes,securityReviews),dbCapacity=capacityResult(capacityRes),programme=programResult(programRes),keyLifetime=keyLifetimeResult();
 const all:any[]=[{id:"kc_core",name:"KC Core · Supabase",kind:"database",status:coreStatus,health:coreHealth,latency:coreMs,usage:snapFehlt?null:cu,capacityLabel:snapFehlt?"Kapazität nicht verfügbar":`${mb(coreBytes)} / 500 MB`,detail:coreOk?(snapFehlt?`Erreichbar, aber die Momentaufnahme fehlt (HTTP ${snapStatus||"Netz"}) · Kapazität und Spiegelung sind damit ungeprüft`:(coreMs!==null&&coreMs>3000?"Erreichbar, aber langsam":"KC Core erreichbar")):"KC Core nicht erreichbar",metrics:{database_bytes:coreBytes,free_tier_database_bytes:FREE_DB_BYTES,usage_percent:cu,latency_ms:coreMs,snapshot_latency_ms:sr?.ms??null,probe_http_status:core?.r?.status??null}},zweitesProjekt,{id:"mirror",name:"Spiegelung · Supabase → Neon",kind:"replication",status:mh.status,health:mh.health,latency:null,usage:null,capacityLabel:`${snap?.runs_24h??0} Läufe / 24 h`,detail:mirrorDetail(mh,snap,snapFehlt),metrics:{...snap?.mirror,age_min:mh.age_min,open_tables:mh.open_tables??0,runs_24h:snap?.runs_24h,non_ok_24h:snap?.non_ok_24h,mismatches_24h:snap?.mismatches_24h,last_issue:snap?.last_issue??null,snapshot_latency_ms:sr?.ms??null}},neon,sicherung,repoResult(gh,gd,repoConfig),b2,r2,oci,programme,dbSecurity,dbCapacity,exposure,keyLifetime];const aliases:any={supabase:["kc_core","future_academy"],sicherheit:["db_security","endpoint_exposure","key_lifetime"]},raw=u.searchParams.get("systems")?.split(",").filter(Boolean)||[],wanted=[...new Set(raw.flatMap(x=>aliases[x]||[x]))],results=wanted.length?all.filter(x=>wanted.includes(x.id)):all,status=worst(results),h=health(results),bekanntePruefungen=all.length,messbar=results.filter(x=>["healthy","warning","critical"].includes(x.status)).length,uebersprungen=all.filter(x=>!results.includes(x)).map(x=>x.id),coverage=Math.round(messbar/Math.max(1,bekanntePruefungen)*100),duration=Date.now()-started,payload:any={version:"0.4.1-live",status,health:h,coverage,selection:{selected:wanted.length>0,run:results.length,known:bekanntePruefungen,skipped:uebersprungen},checkedAt:new Date().toISOString(),duration_ms:duration,capacity:{kc_core_database_bytes:coreBytes,future_academy_database_bytes:futureBytes||null,free_database_bytes:FREE_DB_BYTES},resource_usage:{request_count:requests,estimated:true},provider_registry:{source:"PC Backup Vault",prepared:["b2","r2","oci"],no_test_uploads:true},results};const bytes=enc.encode(JSON.stringify(payload)).byteLength;payload.resource_usage.response_bytes=bytes;let recorded=false;if(u.searchParams.get("record")!=="0"){const who=await callerRole(req,own,service);let allowed=!!who.role;if(!allowed){let lastAt:any=null;try{const rows=await core?.r?.json();lastAt=rows?.[0]?.checked_at??null}catch{}const age=lastAt?Date.now()-Date.parse(lastAt):Number.POSITIVE_INFINITY;allowed=!(Number.isFinite(age)&&age<10*60*1000)}if(allowed){recorded=true;const trigger=["auto","selected"].includes(u.searchParams.get("trigger")||"")?u.searchParams.get("trigger"):"manual";await fetch(`${own}/rest/v1/kc_system_check_history`,{method:"POST",headers:{apikey:service,Authorization:`Bearer ${service}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({trigger_type:trigger,overall_status:status,health:h,duration_ms:duration,request_count:requests,response_bytes:bytes,results})}).catch(()=>null)}}payload.recorded=recorded;return new Response(JSON.stringify(payload),{headers:CORS})}catch(e){return new Response(JSON.stringify({version:"0.4.1-live",status:"critical",health:0,checkedAt:new Date().toISOString(),error:String((e as Error)?.message||e)}),{status:500,headers:CORS})}});
