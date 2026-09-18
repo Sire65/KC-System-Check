@@ -22,6 +22,16 @@ function sanitizeTarget(v:any){if(!v||typeof v!=='object'||Array.isArray(v))retu
 function sanitizeTargets(input:any){if(!Array.isArray(input))return[];const byId=new Map<string,any>();for(const raw of input.slice(0,12)){const row=sanitizeTarget(raw);if(row)byId.set(row.id,row)}return['nas_backup','b2_backup','hidrive_1','hidrive_2'].map(id=>byId.get(id)).filter(Boolean)}
 function iso(v:any){const s=safeText(v,60);if(!s)return null;const n=Date.parse(s);return Number.isFinite(n)?new Date(n).toISOString():null}
 function intOrNull(v:any){const n=Number(v);return Number.isFinite(n)&&n>=0?Math.trunc(n):null}
+function cleanRuntime(input:any){
+  if(!input||typeof input!=='object'||Array.isArray(input))return null;
+  const out:any={};
+  for(const k of ['files_done','files_total','bytes_done','bytes_total','speed_bps','percent','elapsed','eta_seconds']){
+    const n=Number(input[k]); if(Number.isFinite(n)&&n>=0)out[k]=Math.trunc(n);
+  }
+  for(const k of ['phase','target']){const v=safeText(input[k],80);if(v)out[k]=v}
+  return Object.keys(out).length?out:null;
+}
+
 function providerStatuses(target:unknown,status:unknown){
   const t=safeText(target,80).toLowerCase(),s=safeText(status,40).toUpperCase();
   return{
@@ -44,6 +54,11 @@ Deno.serve(async(req:Request)=>{
 
   const now=new Date().toISOString();
   const storageTargets=sanitizeTargets(body.storageTargets);
+  const runtime=cleanRuntime(body?.details?.runtime);
+  const details:any={};
+  if(body?.details?.backupMode!=null)details.backupMode=safeText(body.details.backupMode,40);
+  if(body?.details?.triggerType!=null)details.triggerType=safeText(body.details.triggerType,40);
+  if(runtime)details.runtime=runtime;
   const row={
     source_program:SOURCE,
     device_id:deviceId,
@@ -64,6 +79,7 @@ Deno.serve(async(req:Request)=>{
     rpo_seconds:intOrNull(body.rpoSeconds),
     rto_seconds:intOrNull(body.rtoSeconds),
     storage_targets:storageTargets,
+    details,
     updated_at:now
   };
 
@@ -107,5 +123,5 @@ Deno.serve(async(req:Request)=>{
   if(machineError)return json({error:'BACKUP_LIVE_TELEMETRY_STORE_FAILED',detail:safeText(machineError.message,240)},500);
 
   await client.from('kc_communication_machine_clients').update({last_seen_at:now,updated_at:now}).eq('id',machine.id);
-  return json({ok:true,stored:true,liveStored:true,targetCount:storageTargets.length});
+  return json({ok:true,stored:true,liveStored:true,runtimeStored:!!runtime,targetCount:storageTargets.length});
 });
