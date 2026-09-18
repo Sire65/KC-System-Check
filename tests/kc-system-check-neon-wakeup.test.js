@@ -1,0 +1,10 @@
+const fs=require("fs"),assert=require("assert");
+const s=fs.readFileSync("supabase/functions/kc-system-check/index.ts","utf8");
+assert(s.includes('const deepNeonCheck=u.searchParams.get("deep_neon")==="1"||u.searchParams.get("trigger")==="manual"'));
+assert(s.includes("if(neonCred&&deepNeonCheck)"));
+assert(s.includes("else if(neonCred)"));
+assert(s.includes("compute_wakeup_avoided:true"));
+const block=s.slice(s.indexOf("const neonCred="),s.indexOf('let b2=',s.indexOf("const neonCred=")));
+assert(block.indexOf("neonQuery(neonCred)")>block.indexOf("if(neonCred&&deepNeonCheck)"));
+assert(block.includes('status:"unknown"'),"skipped deep backup check must not be presented as healthy");
+console.log("KC Check Neon wakeup regression: OK");
