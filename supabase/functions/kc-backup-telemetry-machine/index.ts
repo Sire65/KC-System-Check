@@ -10,7 +10,7 @@ const SUPABASE_URL=Deno.env.get('SUPABASE_URL')||'';
 const SERVICE=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'';
 const SOURCE='pc-backup-vault';
 const uuidRe=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const allowedTargetIds=new Set(['nas_backup','hidrive_1','hidrive_2']);
+const allowedTargetIds=new Set(['nas_backup','b2_backup','hidrive_1','hidrive_2']);
 const allowedStatuses=new Set(['healthy','warning','critical','unknown','not_configured']);
 const forbiddenKey=/(password|passwd|secret|token|dsn|recovery|access[_-]?key|private[_-]?key|original[_-]?path|decrypted[_-]?path|file[_-]?name|username|user_name|endpoint|remote[_-]?root|local[_-]?path|unc[_-]?path|path)$/i;
 const safeText=(v:unknown,max=180)=>String(v??'').replace(/[\u0000-\u001f\u007f]/g,' ').slice(0,max);
@@ -19,7 +19,7 @@ async function sha256(v:string){const b=await crypto.subtle.digest('SHA-256',new
 async function lookupClient(client:any,deviceId:string,token:string){if(!uuidRe.test(deviceId)||token.length<32)return null;const tokenHash=await sha256(token);const {data}=await client.from('kc_communication_machine_clients').select('id,status,source_program,device_id').eq('source_program',SOURCE).eq('device_id',deviceId).eq('token_hash',tokenHash).maybeSingle();return data||null}
 function cleanStatus(v:unknown){const s=safeText(v,40).toLowerCase();return allowedStatuses.has(s)?s:'unknown'}
 function sanitizeTarget(v:any){if(!v||typeof v!=='object'||Array.isArray(v))return null;for(const k of Object.keys(v))if(forbiddenKey.test(k))return null;const id=safeText(v.id,40);if(!allowedTargetIds.has(id))return null;const latency=Number(v.latencyMs);return{id,name:safeText(v.name||id,80),kind:safeText(v.kind||'',30),status:cleanStatus(v.status),latencyMs:Number.isFinite(latency)&&latency>=0?Math.min(latency,600000):null,checkedAt:safeText(v.checkedAt,50),detail:safeText(v.detail,180)} }
-function sanitizeTargets(input:any){if(!Array.isArray(input))return[];const byId=new Map<string,any>();for(const raw of input.slice(0,12)){const row=sanitizeTarget(raw);if(row)byId.set(row.id,row)}return['nas_backup','hidrive_1','hidrive_2'].map(id=>byId.get(id)).filter(Boolean)}
+function sanitizeTargets(input:any){if(!Array.isArray(input))return[];const byId=new Map<string,any>();for(const raw of input.slice(0,12)){const row=sanitizeTarget(raw);if(row)byId.set(row.id,row)}return['nas_backup','b2_backup','hidrive_1','hidrive_2'].map(id=>byId.get(id)).filter(Boolean)}
 function iso(v:any){const s=safeText(v,60);if(!s)return null;const n=Date.parse(s);return Number.isFinite(n)?new Date(n).toISOString():null}
 function intOrNull(v:any){const n=Number(v);return Number.isFinite(n)&&n>=0?Math.trunc(n):null}
 function providerStatuses(target:unknown,status:unknown){
