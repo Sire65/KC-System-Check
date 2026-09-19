@@ -39,7 +39,8 @@ Deno.serve(async(req)=>{
       const {data:lastOk,error:lastErr}=await sb.from("kc_db_mirror_runs").select("source_rows,metrics,finished_at").eq("run_type","snapshot").eq("status","ok").eq("metrics->>table",table).order("started_at",{ascending:false}).limit(1).maybeSingle();
       const {data:lastVerified,error:lastVerifiedErr}=await sb.from("kc_db_mirror_runs").select("finished_at,metrics").eq("run_type","snapshot").eq("status","ok").eq("metrics->>table",table).not("metrics->>target_hash","is",null).order("started_at",{ascending:false}).limit(1).maybeSingle();
       const verifiedAt=lastVerified?.finished_at?Date.parse(String(lastVerified.finished_at)):NaN;
-      const verifyIntervalHours=Math.max(1,Number(Deno.env.get("KC_MIRROR_VERIFY_INTERVAL_HOURS")||"24"));\n      const verificationFresh=!lastVerifiedErr&&Number.isFinite(verifiedAt)&&(Date.now()-verifiedAt)<verifyIntervalHours*60*60*1000;
+      const verifyIntervalHours=Math.max(1,Number(Deno.env.get("KC_MIRROR_VERIFY_INTERVAL_HOURS")||"24"));
+      const verificationFresh=!lastVerifiedErr&&Number.isFinite(verifiedAt)&&(Date.now()-verifiedAt)<verifyIntervalHours*60*60*1000;
       const unchanged=!lastErr&&lastOk&&String(lastOk.source_rows??"")===sc&&String((lastOk.metrics as any)?.source_hash??"")===sh&&String((lastOk.metrics as any)?.hash_mode??"")===hashMode;
       if(unchanged&&verificationFresh){
         const skipMetrics={table,batch_id:batchId,batch_index:i+1,batch_total:batchTotal,source_hash:sh,hash_mode:hashMode,transfer_mode:"unchanged_source_skip",target_verified:false,last_target_verified_at:lastVerified.finished_at,verify_interval_hours:verifyIntervalHours};
