@@ -22,7 +22,8 @@ assert(!unchangedBlock.includes("getNeon()"),"unchanged path must not touch Neon
 console.log("mirror efficiency regression: OK");
 
 assert(src.includes("verificationFresh"),"skip requires a fresh target verification");
-assert(src.includes('Deno.env.get("KC_MIRROR_VERIFY_INTERVAL_HOURS")||"24"'),"target verification must default to the 24 hour conservation window");\nassert(src.includes("verifyIntervalHours*60*60*1000"),"target verification must use the configurable conservation window");
+assert(src.includes('Deno.env.get("KC_MIRROR_VERIFY_INTERVAL_HOURS")||"24"'),"target verification must default to the 24 hour conservation window");
+assert(src.includes("verifyIntervalHours*60*60*1000"),"target verification must use the configurable conservation window");
 assert(src.includes('transfer_mode:"unchanged_source_skip"'),"unchanged skips must be persisted/auditable");
 assert(src.includes("target_verified:false"),"skip must not masquerade as target verification");
 assert(src.indexOf("if(personRefTables.has(table)")>src.indexOf("if(unchanged&&verificationFresh)"),"reference sync must happen only after skip decision");
