@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0",
-  "note": "Stable 0.8.0: Der vollständig geprüfte Betriebsleitstand aus RC1 ist freigegeben. Enthalten sind Betriebsübersicht, Marktbereitschaft, Geräte-/Kassenbewertung, Recovery, Schema-Drift und SemVer-sichere Updates. Rückfallstand 0.7.40 bleibt in der Git-Historie erhalten.",
+  "version": "0.9.0",
+  "note": "Stable 0.9.0: Neon-Compute-Budget mit 100-CU-h-Standard und Frühwarnung, effizientere Neon-Spiegelung, Backup-Vault/B2-Live-Telemetrie, Datenbank-Performance- und Security-Prüfungen, Trace Context sowie LIVE- und Mobil-Korrekturen. Bestehende Betriebsfunktionen bleiben unverändert erhalten.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true
