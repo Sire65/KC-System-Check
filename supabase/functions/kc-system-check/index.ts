@@ -260,15 +260,15 @@ async function credentials(own:string,service:string){
 }
 async function neonBudget(cred:any){
   const token=String(cred?.secret||""),projectId=String(cred?.project_id||cred?.projectId||Deno.env.get("NEON_PROJECT_ID")||"");
-  const limit=Number(cred?.compute_limit_cu_hours||Deno.env.get("NEON_COMPUTE_LIMIT_CU_HOURS")||0);
+  const limit=Number(cred?.compute_limit_cu_hours||Deno.env.get("NEON_COMPUTE_LIMIT_CU_HOURS")||100);
   if(!token||!projectId)return{ok:false,reason:"management_zugang_fehlt",ms:null,data:null};
   const started=Date.now();
   try{
     const r=await fetch(`https://console.neon.tech/api/v2/projects/${encodeURIComponent(projectId)}`,{cache:"no-store",headers:{Authorization:`Bearer ${token}`,Accept:"application/json"}});
     const ms=Date.now()-started;if(!r.ok)return{ok:false,reason:`http_${r.status}`,ms,data:null};
-    const body=await r.json(),p=body?.project||body||{},used=Number(p.compute_time_seconds||0)/3600,start=Date.parse(p.consumption_period_start||""),end=Date.parse(p.consumption_period_end||"");
+    const body=await r.json(),p=body?.project||body||{},computeSeconds=Number(p.compute_time_seconds||0),cpuSeconds=Number(p.cpu_used_sec||0),used=(cpuSeconds>0?cpuSeconds:computeSeconds)/3600,start=Date.parse(p.consumption_period_start||""),end=Date.parse(p.consumption_period_end||"");
     const usage=limit>0?pct(used,limit):null,elapsed=Number.isFinite(start)?Math.max(0,(Date.now()-start)/86400000):null,remaining=limit>0?Math.max(0,limit-used):null,rate=elapsed&&elapsed>0?used/elapsed:null,daysLeft=rate&&remaining!==null?remaining/rate:null,resetDays=Number.isFinite(end)?Math.max(0,(end-Date.now())/86400000):null;
-    return{ok:true,reason:null,ms,data:{used_cu_hours:Math.round(used*100)/100,limit_cu_hours:limit>0?limit:null,usage_percent:usage,remaining_cu_hours:remaining===null?null:Math.round(remaining*100)/100,period_start:p.consumption_period_start||null,period_end:p.consumption_period_end||null,rate_cu_hours_per_day:rate===null?null:Math.round(rate*100)/100,projected_days_remaining:daysLeft===null?null:Math.round(daysLeft*10)/10,days_to_reset:resetDays===null?null:Math.round(resetDays*10)/10,subscription_type:p.owner?.subscription_type||null}};
+    return{ok:true,reason:null,ms,data:{used_cu_hours:Math.round(used*100)/100,limit_cu_hours:limit>0?limit:null,usage_percent:usage,remaining_cu_hours:remaining===null?null:Math.round(remaining*100)/100,period_start:p.consumption_period_start||null,period_end:p.consumption_period_end||null,rate_cu_hours_per_day:rate===null?null:Math.round(rate*100)/100,projected_days_remaining:daysLeft===null?null:Math.round(daysLeft*10)/10,days_to_reset:resetDays===null?null:Math.round(resetDays*10)/10,subscription_type:p.owner?.subscription_type||null,usage_source:cpuSeconds>0?"cpu_used_sec":"compute_time_seconds",compute_time_seconds:computeSeconds,cpu_used_sec:cpuSeconds}};
   }catch(e){return{ok:false,reason:String((e as Error)?.message||e),ms:Date.now()-started,data:null}}
 }
 function neonBudgetResult(res:any){
@@ -276,8 +276,8 @@ function neonBudgetResult(res:any){
   if(!res.ok)return{id,name,kind,status:"unknown",health:null,latency:res.ms,usage:null,capacityLabel:"Nicht prüfbar",detail:`Neon-Management-Verbrauch nicht abrufbar: ${res.reason}`,metrics:{management_api:true,error:res.reason}};
   const d=res.data||{},u=d.usage_percent;if(u===null)return{id,name,kind,status:"warning",health:72,latency:res.ms,usage:null,capacityLabel:`${d.used_cu_hours} CU-h · Limit nicht konfiguriert`,detail:"Verbrauch live abrufbar, aber die Tarifgrenze fehlt; keine Prozent- oder Restbudget-Aussage wird erfunden",metrics:{management_api:true,...d}};
   const forecastRisk=d.projected_days_remaining!==null&&d.days_to_reset!==null&&d.projected_days_remaining<d.days_to_reset;
-  const status=u>=100?"critical":u>=90?"critical":u>=80||forecastRisk?"warning":"healthy";
-  const detail=`${d.used_cu_hours} / ${d.limit_cu_hours} CU-h (${u} %) · Rest ${d.remaining_cu_hours} CU-h · Reset ${d.period_end||"unbekannt"}${d.rate_cu_hours_per_day!==null?` · bisher Ø ${d.rate_cu_hours_per_day} CU-h/Tag`:""}${forecastRisk?` · Hochrechnung: Restbudget vor Reset aufgebraucht`:""}`;
+  const status=u>=100?"critical":u>=95?"critical":u>=90?"critical":u>=80||forecastRisk?"warning":u>=70?"warning":"healthy";
+  const warnLabel=u>=100?"Kontingent erreicht":u>=95?"DRINGEND":u>=90?"KRITISCH":u>=80?"WARNUNG":u>=70?"BEOBACHTEN":""; const detail=`${warnLabel?warnLabel+" · ":""}${d.used_cu_hours} / ${d.limit_cu_hours} CU-h (${u} %) · Rest ${d.remaining_cu_hours} CU-h · Reset ${d.period_end||"unbekannt"}${d.rate_cu_hours_per_day!==null?` · bisher Ø ${d.rate_cu_hours_per_day} CU-h/Tag`:""}${forecastRisk?` · Hochrechnung: Restbudget vor Reset aufgebraucht`:""}`;
   return{id,name,kind,status,health:status==="critical"?35:status==="warning"?72:100,latency:res.ms,usage:u,capacityLabel:`${d.used_cu_hours} / ${d.limit_cu_hours} CU-h`,detail,metrics:{management_api:true,forecast_not_guarantee:true,...d}};
 }
 async function neonSql(cred:any,query:string,feld:string){
