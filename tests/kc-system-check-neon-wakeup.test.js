@@ -1,6 +1,7 @@
 const fs=require("fs"),assert=require("assert");
 const s=fs.readFileSync("supabase/functions/kc-system-check/index.ts","utf8");
-assert(s.includes('const deepNeonCheck=u.searchParams.get("deep_neon")==="1"||u.searchParams.get("trigger")==="manual"'));
+assert(s.includes('const deepNeonCheck=u.searchParams.get("deep_neon")==="1";'),"Neon SQL deep check must require explicit deep_neon=1");
+assert(!s.includes('||u.searchParams.get("trigger")==="manual"'),"plain manual One Touch must remain wake-free");
 assert(s.includes("if(neonCred&&deepNeonCheck)"));
 assert(s.includes("else if(neonCred)"));
 assert(s.includes("compute_wakeup_avoided:true"));
