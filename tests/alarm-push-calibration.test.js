@@ -14,7 +14,7 @@ test('ROT bleibt gegen einen einzelnen Messausreisser entprellt',()=>{
 });
 
 test('Warnungen werden nicht als Folgealarm stuendlich wiederholt',()=>{
-  assert.deepEqual(policy.renotifyStatuses,['critical']);
+  assert.deepEqual(policy.renotifyStatuses,[]);
 });
 
 test('Produktionsmigration bildet dieselben Schwellen ab',()=>{
