@@ -20,7 +20,7 @@ test('locked LIVE view also hides the new subnavigation and subviews',()=>{
   assert.match(layout,/#live\[data-locked=["']1["']\]>\.kc-live-subview/);
 });
 
-test('daily view is deliberately reduced to five operational checks',()=>{
+test('daily view exposes the five operational checks',()=>{
   for(const label of ['Systemprüfung','Spiegelung → Neon','Sicherung → Neon','PC Backup Vault','Kommunikation'])
     assert.match(layout,new RegExp(label));
   assert.match(layout,/Systemprüfung/);
