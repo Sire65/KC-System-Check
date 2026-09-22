@@ -19,7 +19,7 @@ test("selftest rolls back and leaves no probe row",()=>{
   assert.match(server,/rolledBack:true/);
 });
 test("gateway does not embed provider credentials",()=>{
-  assert.doesNotMatch(server,/supabase\.co|neon\.tech|backblaze|blitz\.cloud/i);
+  assert.doesNotMatch(server,/supabase\\.co|neon\\.tech|backblaze|blitz\\.cloud/i);
   assert.match(server,/process\.env\.DATABASE_URL/);
   assert.match(server,/process\.env\.KC_GATEWAY_TOKEN/);
 });
