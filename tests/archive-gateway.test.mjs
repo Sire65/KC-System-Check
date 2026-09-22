@@ -15,7 +15,7 @@ test("restore verifies stored SHA-256",()=>{
   assert.ok(server.includes("verified:true"));
 });
 test("selftest rolls back and leaves no probe row",()=>{
-  assert.ok(server.includes('client.query("rollback")'));
+  assert.ok(server.includes('await client.query("rollback")'));
   assert.ok(server.includes("rolledBack:true"));
 });
 test("gateway does not embed provider credentials",()=>{
