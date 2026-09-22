@@ -66,22 +66,10 @@ jobs:
           npm install --no-save @playwright/test@1.55.0
           npx playwright install --with-deps chromium
           python3 -m http.server 4173 >/tmp/kc-http.log 2>&1 &
-      - name: Playwright external smoke TÜV
-        id: playwright_external
-        run: |
-          npx playwright test tests/external-smoke.spec.js --reporter=line --workers=1 2>&1 | tee playwright-external.txt
-          rc=${PIPESTATUS[0]}
-          if [ "$rc" -ne 0 ]; then
-            echo '### Playwright external smoke failed' >> "$GITHUB_STEP_SUMMARY"
-            echo '```text' >> "$GITHUB_STEP_SUMMARY"
-            tail -n 160 playwright-external.txt >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-          fi
-          if [ "$rc" -ne 0 ]; then
-            echo '--- external smoke output ---'
-            cat playwright-external.txt
-          fi
-          exit "$rc"
+      - name: Playwright mobile smoke TÜV
+        run: npx playwright test tests/external-smoke.spec.js --grep "Mobile 390x844" --reporter=line --workers=1
+      - name: Playwright desktop smoke TÜV
+        run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900" --reporter=line --workers=1
       - name: Playwright hardening TÜV
         id: playwright_hardening
         run: npx playwright test tests/hardening-smoke.spec.js --reporter=line --workers=1
