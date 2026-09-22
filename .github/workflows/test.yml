@@ -68,6 +68,7 @@ jobs:
           python3 -m http.server 4173 >/tmp/kc-http.log 2>&1 &
       - name: Playwright external smoke TÜV
         id: playwright_external
+        continue-on-error: true
         run: |
           npx playwright test tests/external-smoke.spec.js --reporter=line --workers=1 2>&1 | tee playwright-external.txt
           rc=${PIPESTATUS[0]}
@@ -84,10 +85,22 @@ jobs:
           exit "$rc"
       - name: Playwright hardening TÜV
         id: playwright_hardening
+        continue-on-error: true
         run: npx playwright test tests/hardening-smoke.spec.js --reporter=line --workers=1
       - name: Playwright live access TÜV
         id: playwright_live
+        continue-on-error: true
         run: npx playwright test tests/live-access.spec.js --reporter=line --workers=1
+
+      - name: Browser TÜV final gate
+        if: always()
+        env:
+          EXT: ${{ steps.playwright_external.outcome }}
+          HARD: ${{ steps.playwright_hardening.outcome }}
+          LIVE: ${{ steps.playwright_live.outcome }}
+        run: |
+          echo "external=$EXT hardening=$HARD live=$LIVE"
+          [ "$EXT" = success ] && [ "$HARD" = success ] && [ "$LIVE" = success ]
 
   sql:
     runs-on: ubuntu-latest
