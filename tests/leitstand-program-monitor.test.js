@@ -11,3 +11,7 @@ test('stale communication state becomes neutral but remains history',()=>{const 
 test('backup snapshot contains read-only backup and restore telemetry',()=>{const m=fs.readFileSync('supabase/migrations/202609010918_kc_live_leitstand_v2_backup_programs.sql','utf8');assert.match(m,/kc_backup_machine_telemetry/);assert.match(m,/kicc_backup_telemetry/);assert.match(m,/last_restore_test/);assert.match(m,/integrity/);assert.doesNotMatch(m,/insert into|update public\.kc_backup/i)});
 
 test('live UI renders backup health without inventing green status',()=>{const s=fs.readFileSync('js/leitstand.js','utf8');assert.match(s,/renderBackup/);assert.match(s,/Noch keine Messwerte vorhanden/);assert.match(s,/B2\/Neon werden nicht künstlich grün angezeigt/);assert.match(s,/VERALTET/)});
+
+
+test('fresh Backup Vault heartbeat stays live even when last backup is older',()=>{const s=fs.readFileSync('js/leitstand.js','utf8');assert.match(s,/seenAt=b\.measured_at\|\|b\.updated_at/);assert.match(s,/telemetryStale=seenAge==null\|\|seenAge>180/);assert.match(s,/Lebenszeichen aktuell/);assert.doesNotMatch(s,/stale=lastAge!=null&&lastAge>86400/)});
+test('desktop hero has a stable shell host and one startup path',()=>{const html=fs.readFileSync('index.html','utf8'),startup=fs.readFileSync('js/startup-modules.js','utf8');assert.match(html,/id="kcDesktopHeroExtra"/);assert.doesNotMatch(html,/src="js\/desktop-layout\.js"/);assert.match(startup,/import"\.\/desktop-layout\.js"/)});
