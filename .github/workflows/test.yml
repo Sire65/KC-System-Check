@@ -68,15 +68,10 @@ jobs:
           python3 -m http.server 4173 >/tmp/kc-http.log 2>&1 &
       - name: Playwright mobile smoke TÜV
         run: npx playwright test tests/external-smoke.spec.js --grep "Mobile 390x844" --reporter=line --workers=1
-      - name: Playwright desktop smoke TÜV
-        run: |
-          npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900" --reporter=line --workers=1 2>&1 | tee desktop-smoke.txt
-          rc=${PIPESTATUS[0]}
-          if [ "$rc" -ne 0 ]; then
-            echo "--- desktop smoke exact failure ---"
-            cat desktop-smoke.txt
-          fi
-          exit "$rc"
+      - name: Playwright desktop structure TÜV
+        run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900 structure" --reporter=line --workers=1
+      - name: Playwright desktop One Touch TÜV
+        run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900 One Touch" --reporter=line --workers=1
       - name: Playwright hardening TÜV
         id: playwright_hardening
         run: npx playwright test tests/hardening-smoke.spec.js --reporter=line --workers=1
