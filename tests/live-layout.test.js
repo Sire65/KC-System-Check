@@ -30,7 +30,7 @@ test('daily view exposes the five operational checks',()=>{
 test('flow view uses real snapshot flows and never invents a green empty state',()=>{
   assert.match(layout,/snapshot\?\.live\?\.flows/);
   assert.match(layout,/LIVE_MS=60_000/);
-  assert.match(layout,/moving=!bad/);
+  assert.match(layout,/moving=!paused&&!bad/);
   assert.match(layout,/Noch keine Leitflüsse messbar/);
   assert.match(layout,/Die Ansicht bleibt neutral/);
 });
