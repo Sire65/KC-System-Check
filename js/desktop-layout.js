@@ -11,7 +11,7 @@ function installStyles(){if($('#kcDesktopLayoutStyles'))return;const s=document.
   .health-value{font-size:46px}.health-text{font-size:18px}.coverage{font-size:12px}
   .hero>#oneTouchBtn{grid-column:4;min-width:210px;padding:14px 20px;font-size:14px}
   .kc-evidence{font-size:11px!important}
-  .desktop-hero-extra{grid-column:3;grid-row:1;display:grid;gap:7px;align-self:stretch;min-width:0}
+  .desktop-hero-extra{grid-column:3;grid-row:1;display:grid!important;gap:7px;align-self:stretch;min-width:0;visibility:visible!important;opacity:1!important}
   .desktop-hero-extra-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;padding:7px 11px;border:1px solid var(--line);border-radius:10px;background:#0e1728;min-width:0}
   .desktop-hero-extra-row .k{font-size:11px;color:var(--muted)}.desktop-hero-extra-row .v{font-size:13px;font-weight:800;text-align:right;white-space:nowrap;overflow:visible;text-overflow:clip;min-width:0}
   .tabs{grid-template-columns:repeat(6,minmax(120px,1fr));gap:10px;margin:14px 0}.tab{padding:11px 8px;font-size:13px}
