@@ -10,7 +10,9 @@ test('Mobile 390x844 shell, One Touch and settings',async({browser})=>withPage(b
 
 test('Desktop 1440x900 shell',async({browser})=>withPage(browser,{width:1440,height:900},async page=>{await page.goto(URL);await expect(page.locator('#kcDesktopOverview')).toBeAttached({timeout:15000});expect(await page.evaluate(()=>window.innerWidth)).toBe(1440);await expect(page.locator('#kcDesktopOverview')).toBeVisible();await expect(page.locator('.desktop-overview-card')).toHaveCount(5,{timeout:15000})}));
 
-test('Desktop 1440x900 hero',async({browser})=>withPage(browser,{width:1440,height:900},async page=>{await page.goto(URL);await expect(page.locator('#kcDesktopHeroExtra')).toBeVisible({timeout:15000});await expect(page.locator('.desktop-hero-extra-row')).toHaveCount(2,{timeout:15000})}));
+test('Desktop 1440x900 hero container',async({browser})=>withPage(browser,{width:1440,height:900},async page=>{await page.goto(URL);await expect(page.locator('#kcDesktopHeroExtra')).toBeVisible({timeout:15000})}));
+
+test('Desktop 1440x900 hero rows',async({browser})=>withPage(browser,{width:1440,height:900},async page=>{await page.goto(URL);await expect(page.locator('.desktop-hero-extra-row')).toHaveCount(2,{timeout:15000})}));
 
 test('Desktop 1440x900 geometry',async({browser})=>withPage(browser,{width:1440,height:900},async page=>{await page.goto(URL);const systems=page.locator('#dashboard>.gauges+.card'),chart=page.locator('#dashboard>.gauges+.card+.card');await expect(systems).toBeVisible({timeout:15000});await expect(chart).toBeVisible({timeout:15000});const a=await systems.boundingBox(),b=await chart.boundingBox(),main=await page.locator('main').boundingBox();expect(a).toBeTruthy();expect(b).toBeTruthy();expect(main).toBeTruthy();expect(Math.abs(a.y-b.y)).toBeLessThan(16);expect(b.x).toBeGreaterThan(a.x+a.width-12);expect(main.width).toBeGreaterThanOrEqual(960)}));
 
