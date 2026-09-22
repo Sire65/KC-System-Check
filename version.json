@@ -1,6 +1,6 @@
 {
-  "version": "0.9.0",
-  "note": "Stable 0.9.0: Neon-Compute-Budget mit 100-CU-h-Standard und Frühwarnung, effizientere Neon-Spiegelung, Backup-Vault/B2-Live-Telemetrie, Datenbank-Performance- und Security-Prüfungen, Trace Context sowie LIVE- und Mobil-Korrekturen. Bestehende Betriebsfunktionen bleiben unverändert erhalten.",
+  "version": "0.9.1",
+  "note": "Stable 0.9.1: KC Archiv-Datenbank und provider-neutraler Archive Gateway vorbereitet, Backblaze-B2-Speichertelemetrie erweitert und Archivstatus in KC Check integriert. Supabase/Neon-Betrieb bleibt unverändert.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true
