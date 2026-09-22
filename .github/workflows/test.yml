@@ -94,7 +94,7 @@ jobs:
       - name: Playwright TÜV Gesamtergebnis
         if: always()
         run: |
-          echo "external=${{ steps.playwright_external.outcome }} hardening=${{ steps.playwright_hardening.outcome }} live=${{ steps.playwright_live.outcome }}"
+          echo "external=${{ steps.playwright_external.conclusion }} hardening=${{ steps.playwright_hardening.conclusion }} live=${{ steps.playwright_live.conclusion }}"
           test "${{ steps.playwright_external.outcome }}" = success
           test "${{ steps.playwright_hardening.outcome }}" = success
           test "${{ steps.playwright_live.outcome }}" = success
