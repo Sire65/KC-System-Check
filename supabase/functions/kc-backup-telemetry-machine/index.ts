@@ -12,6 +12,8 @@ const SOURCE='pc-backup-vault';
 const uuidRe=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const allowedTargetIds=new Set(['nas_backup','b2_backup','hidrive_1','hidrive_2','kc_archive_db','kc_edge']);
 const allowedStatuses=new Set(['healthy','warning','critical','unknown','not_configured']);
+function iso(v:any){const s=safeText(v,60);if(!s)return null;const n=Date.parse(s);return Number.isFinite(n)?new Date(n).toISOString():null}
+function intOrNull(v:any){const n=Number(v);return Number.isFinite(n)&&n>=0?Math.trunc(n):null}
 const forbiddenKey=/(password|passwd|secret|token|dsn|recovery|access[_-]?key|private[_-]?key|original[_-]?path|decrypted[_-]?path|file[_-]?name|username|user_name|endpoint|remote[_-]?root|local[_-]?path|unc[_-]?path|path)$/i;
 const safeText=(v:unknown,max=180)=>String(v??'').replace(/[\u0000-\u001f\u007f]/g,' ').slice(0,max);
 const db=()=>createClient(SUPABASE_URL,SERVICE,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -20,8 +22,6 @@ async function lookupClient(client:any,deviceId:string,token:string){if(!uuidRe.
 function cleanStatus(v:unknown){const s=safeText(v,40).toLowerCase();return allowedStatuses.has(s)?s:'unknown'}
 function sanitizeTarget(v:any){if(!v||typeof v!=='object'||Array.isArray(v))return null;for(const k of Object.keys(v))if(forbiddenKey.test(k))return null;const id=safeText(v.id,40);if(!allowedTargetIds.has(id))return null;const latency=Number(v.latencyMs);const out:any={id,name:safeText(v.name||id,80),kind:safeText(v.kind||'',30),status:cleanStatus(v.status),latencyMs:Number.isFinite(latency)&&latency>=0?Math.min(latency,600000):null,checkedAt:safeText(v.checkedAt,50),detail:safeText(v.detail,180)};if(id==='kc_archive_db'){out.provider=safeText(v.provider,40);out.archivePackages=intOrNull(v.archivePackages);out.storedBytes=intOrNull(v.storedBytes);out.newestArchiveAt=iso(v.newestArchiveAt)}if(id==='kc_edge'){out.provider=safeText(v.provider,40);for(const k of ['worker','hyperdrive','kv'])out[k]=cleanStatus(v[k]);out.account=safeText(v.account,80)}return out}
 function sanitizeTargets(input:any){if(!Array.isArray(input))return[];const byId=new Map<string,any>();for(const raw of input.slice(0,12)){const row=sanitizeTarget(raw);if(row)byId.set(row.id,row)}return['nas_backup','b2_backup','hidrive_1','hidrive_2','kc_archive_db','kc_edge'].map(id=>byId.get(id)).filter(Boolean)}
-function iso(v:any){const s=safeText(v,60);if(!s)return null;const n=Date.parse(s);return Number.isFinite(n)?new Date(n).toISOString():null}
-function intOrNull(v:any){const n=Number(v);return Number.isFinite(n)&&n>=0?Math.trunc(n):null}
 function cleanRuntime(input:any){
   if(!input||typeof input!=='object'||Array.isArray(input))return null;
   const out:any={};
