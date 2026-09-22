@@ -62,4 +62,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Migrationen und Serverfunktionen gegen PostgreSQL pruefen
-        run: tests/sql/run.sh
+        run: |
+          node --test tests/*.test.js
+          node --test tests/*.test.mjs
