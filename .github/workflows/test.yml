@@ -6,7 +6,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test: [cloudflare-edge, alarm-chain, alarm-policy, alarm-push-calibration, backup-state, backup-telemetry-ingest, backup-vault-adapter, backup-vault-manual, datenfluss, db-monitor-package, desktop-layout, early-warning, flow-live-v4-hotfix, flow-live-v4, health-assistant, heartbeat-package, kasse-interval-traffic, kc-system-check-neon-wakeup, leitstand-program-monitor, live-derived-flows, live-layout, mail-values-program-health, mirror-detail, mirror-efficiency, monitor-contract, monitoring-runs-sync, neon-compute-budget, neon-mirror-wakeup, programs-heartbeat, public-exposure, quality-tools, release-hardening, runtime-config, safe-html, security-reviewed-exceptions-edge, security-reviewed-exceptions, selection-visibility, status-model, storage-backup-live, trace-context, updater]
+        test: [cloudflare-edge, backup-telemetry-edge-sanitizer, alarm-chain, alarm-policy, alarm-push-calibration, backup-state, backup-telemetry-ingest, backup-vault-adapter, backup-vault-manual, datenfluss, db-monitor-package, desktop-layout, early-warning, flow-live-v4-hotfix, flow-live-v4, health-assistant, heartbeat-package, kasse-interval-traffic, kc-system-check-neon-wakeup, leitstand-program-monitor, live-derived-flows, live-layout, mail-values-program-health, mirror-detail, mirror-efficiency, monitor-contract, monitoring-runs-sync, neon-compute-budget, neon-mirror-wakeup, programs-heartbeat, public-exposure, quality-tools, release-hardening, runtime-config, safe-html, security-reviewed-exceptions-edge, security-reviewed-exceptions, selection-visibility, status-model, storage-backup-live, trace-context, updater]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
