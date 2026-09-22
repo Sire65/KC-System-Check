@@ -13,7 +13,16 @@ jobs:
         with:
           node-version: 24
       - name: Run ${{ matrix.test }}
-        run: node --test tests/${{ matrix.test }}.test.js
+        run: |
+          node --test tests/${{ matrix.test }}.test.js 2>&1 | tee test-output.txt
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            echo "### ${{ matrix.test }} failed" >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 120 test-output.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$rc"
 
   test:
     runs-on: ubuntu-latest
