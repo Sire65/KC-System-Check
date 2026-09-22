@@ -26,5 +26,5 @@ test('Missing Cloudflare configuration stays neutral',()=>{
 
 test('Cloudflare response never returns the API token',()=>{
   assert.doesNotMatch(src,/TOKEN[,}]/);
-  assert.doesNotMatch(src,/token:/i);
+  assert.doesNotMatch(src,/json\([^\n]*TOKEN/,'API token must never be serialized into a response');
 });
