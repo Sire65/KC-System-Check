@@ -1,6 +1,6 @@
 {
-  "version": "0.9.1",
-  "note": "Stable 0.9.1: KC Archiv-Datenbank und provider-neutraler Archive Gateway vorbereitet, Backblaze-B2-Speichertelemetrie erweitert und Archivstatus in KC Check integriert. Supabase/Neon-Betrieb bleibt unverändert.",
+  "version": "0.9.2",
+  "note": "0.9.2: Live-Datenflüsse für PC Backup Vault zu HiDrive 1/2, Backblaze B2 und NAS; korrigiertes Vault-Lebenszeichen und konsolidierter Desktop-TÜV.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true
