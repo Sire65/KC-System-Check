@@ -61,7 +61,6 @@ jobs:
           grep -q '100% bedeutet 100% der definierten' js/verification-profile.js
           grep -q 'keine absolute Fehlerfreiheitsgarantie' docs/VERIFICATION_PROFILE.md
       - name: Playwright external mobile browser TÜV
-        continue-on-error: true
         run: |
           npm init -y >/dev/null 2>&1
           npm install --no-save @playwright/test@1.55.0
