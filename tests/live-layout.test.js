@@ -40,3 +40,6 @@ test('old noisy detail cards are moved out of the daily view',()=>{
   assert.match(layout,/#kcdfKarte/);
   assert.match(layout,/kc-live-head-card #liveKpis\{display:none!important\}/);
 });
+
+
+test('Vault storage targets are rendered as real backup flow lanes',()=>{const s=fs.readFileSync('js/live-layout-v2.js','utf8');for(const id of ['hidrive_1','hidrive_2','nas_backup','b2_backup'])assert.match(s,new RegExp(id));assert.match(s,/kind:"backup-target"/);assert.match(s,/f\.kind!=="backup-target"\|\|f\.active===true/);assert.match(s,/Backup läuft/)});
