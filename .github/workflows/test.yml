@@ -9,7 +9,15 @@ jobs:
         with:
           node-version: 24
       - name: JS unit regression tests
-        run: node --test tests/*.test.js
+        run: |
+          set +e
+          rc=0
+          for f in tests/*.test.js; do
+            echo "::group::$f"
+            node --test "$f" || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc
       - name: Archive gateway regression tests
         run: node --test tests/archive-gateway.test.mjs
       - name: Local updater regression check
