@@ -70,8 +70,10 @@ jobs:
         run: npx playwright test tests/external-smoke.spec.js --grep "Mobile 390x844" --reporter=line --workers=1
       - name: Playwright desktop shell TÜV
         run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900 shell" --reporter=line --workers=1
-      - name: Playwright desktop hero TÜV
-        run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900 hero" --reporter=line --workers=1
+      - name: Playwright desktop hero container TÜV
+        run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900 hero container" --reporter=line --workers=1
+      - name: Playwright desktop hero rows TÜV
+        run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900 hero rows" --reporter=line --workers=1
       - name: Playwright desktop geometry TÜV
         run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900 geometry" --reporter=line --workers=1
       - name: Playwright desktop One Touch TÜV
