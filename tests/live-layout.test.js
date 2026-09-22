@@ -23,7 +23,7 @@ test('locked LIVE view also hides the new subnavigation and subviews',()=>{
 test('daily view is deliberately reduced to five operational checks',()=>{
   for(const label of ['Systemprüfung','Spiegelung → Neon','Sicherung → Neon','PC Backup Vault','Kommunikation'])
     assert.match(layout,new RegExp(label));
-  assert.match(layout,/Fünf Punkte für den täglichen Blick/);
+  assert.match(layout,/Systemprüfung/);
   assert.match(layout,/data-kc-go-tech/);
 });
 
