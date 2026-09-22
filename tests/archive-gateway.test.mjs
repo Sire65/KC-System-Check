@@ -11,12 +11,12 @@ test("archive gateway has authenticated archive, restore and selftest routes",()
   assert.ok(server.includes('app.post("/v1/selftest",auth'));
 });
 test("restore verifies stored SHA-256",()=>{
-  assert.match(server,/stored checksum mismatch/);
-  assert.match(server,/verified:true/);
+  assert.ok(server.includes("stored checksum mismatch"));
+  assert.ok(server.includes("verified:true"));
 });
 test("selftest rolls back and leaves no probe row",()=>{
   assert.ok(server.includes('query("rollback")'));
-  assert.match(server,/rolledBack:true/);
+  assert.ok(server.includes("rolledBack:true"));
 });
 test("gateway does not embed provider credentials",()=>{
   assert.equal(["supabase.co","neon.tech","backblaze","blitz.cloud"].some(x=>server.toLowerCase().includes(x)),false);
