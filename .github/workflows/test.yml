@@ -68,8 +68,12 @@ jobs:
           python3 -m http.server 4173 >/tmp/kc-http.log 2>&1 &
       - name: Playwright mobile smoke TÜV
         run: npx playwright test tests/external-smoke.spec.js --grep "Mobile 390x844" --reporter=line --workers=1
-      - name: Playwright desktop structure TÜV
-        run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900 structure" --reporter=line --workers=1
+      - name: Playwright desktop shell TÜV
+        run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900 shell" --reporter=line --workers=1
+      - name: Playwright desktop hero TÜV
+        run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900 hero" --reporter=line --workers=1
+      - name: Playwright desktop geometry TÜV
+        run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900 geometry" --reporter=line --workers=1
       - name: Playwright desktop One Touch TÜV
         run: npx playwright test tests/external-smoke.spec.js --grep "Desktop 1440x900 One Touch" --reporter=line --workers=1
       - name: Playwright hardening TÜV
