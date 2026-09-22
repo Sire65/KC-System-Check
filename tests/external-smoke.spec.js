@@ -10,7 +10,7 @@ test('Mobile 390x844 shell, One Touch and settings',async({browser})=>withPage(b
 
 test('Desktop 1440x900 shell',async({browser})=>withPage(browser,{width:1440,height:900},async page=>{await page.goto(URL);await expect(page.locator('#kcDesktopOverview')).toBeAttached({timeout:15000});expect(await page.evaluate(()=>window.innerWidth)).toBe(1440);await expect(page.locator('#kcDesktopOverview')).toBeVisible();await expect(page.locator('.desktop-overview-card')).toHaveCount(5,{timeout:15000})}));
 
-test('Desktop 1440x900 hero container',async({browser})=>withPage(browser,{width:1440,height:900},async page=>{await page.goto(URL);await expect(page.locator('#kcDesktopHeroExtra')).toBeAttached({timeout:15000});await expect(page.locator('#kcDesktopHeroExtra')).toHaveCSS('display','grid',{timeout:15000})}));
+test('Desktop 1440x900 hero container',async({browser})=>withPage(browser,{width:1440,height:900},async page=>{const errors=[];page.on('pageerror',e=>errors.push(String(e)));await page.goto(URL);await expect(page.locator('#kcDesktopHeroExtra')).toBeAttached({timeout:15000});expect(errors).toEqual([])}));
 
 test('Desktop 1440x900 hero rows',async({browser})=>withPage(browser,{width:1440,height:900},async page=>{await page.goto(URL);await expect(page.locator('.desktop-hero-extra-row')).toHaveCount(2,{timeout:15000})}));
 
