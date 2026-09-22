@@ -9,7 +9,11 @@ jobs:
         with:
           node-version: 24
       - name: Unit regression tests
-        run: node --test tests/*.test.js && node --test tests/archive-gateway.test.mjs && node tests/local-remote-update-check.test.mjs
+        run: |
+          set -o pipefail
+          node --test tests/*.test.js
+          node --test tests/archive-gateway.test.mjs
+          node tests/local-remote-update-check.test.mjs
       - name: Frontend syntax
         run: |
           for f in js/*.js js/adapters/*.js; do node --check "$f"; done
