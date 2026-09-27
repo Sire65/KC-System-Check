@@ -523,6 +523,8 @@ public class MainActivity extends Activity {
         long projectRootsSeen = 0;
         long possibleOldProjectDirs = 0;
         long possibleOldProjectBytes = 0;
+        long unpackedKcProgramDirs = 0;
+        long unpackedKcProgramBytes = 0;
         long downloadFilesSeen = 0;
         long downloadDirsSeen = 0;
         long downloadArchivesSeen = 0;
@@ -596,7 +598,7 @@ public class MainActivity extends Activity {
             if (isDirectoryInDownloadTree(file)) state.downloadDirsSeen++;
             recordProjectDirCandidate(file, state);
 
-            if (isNestedDuplicateProjectDir(file)) {
+            if (isNestedDuplicateProjectDir(file) && findTopUnpackedKcCleanupRoot(file) == null) {
                 long sz = folderSize(file, 0);
                 scanArchivesOnly(file, state, 0);
                 state.nestedDuplicateFolders++;
@@ -772,8 +774,16 @@ public class MainActivity extends Activity {
         boolean projectMarkers = inDownload && hasProjectMarkers(dir);
         int dlDepth = downloadDepth(dir);
 
+        // Für die auf diesem Gerät nicht benötigten KC-Programmstände nur den
+        // obersten entpackten Hauptordner erfassen. Unterordner wie kasse-git
+        // und pc-manager dürfen denselben Speicher nicht noch einmal zählen.
+        File cleanupRoot = findTopUnpackedKcCleanupRoot(dir);
+        if (cleanupRoot != null && !samePath(dir, cleanupRoot)) return;
+
         boolean projectRoot = false;
-        if (devDepth == 1 && (strongProjectName || versionLike || projectMarkers)) {
+        if (cleanupRoot != null) {
+            projectRoot = true;
+        } else if (devDepth == 1 && (strongProjectName || versionLike || projectMarkers)) {
             projectRoot = true; // direkter echter Projektstand unter Entwicklung/Projekte
         } else if (devDepth >= 2 && devDepth <= 8 &&
                 (nestedDuplicate || (strongProjectName && (versionLike || projectMarkers)))) {
@@ -873,10 +883,80 @@ public class MainActivity extends Activity {
         return n.startsWith("kc") || n.contains("marktkasse") || n.contains("kasse") ||
                 n.contains("dienstplan") || n.contains("dp2") || n.contains("dp3") ||
                 n.contains("futura") || n.contains("verwaltung") || n.contains("manager") ||
-                n.contains("kommunikation") || n.contains("communication") ||
+                n.contains("moneybutler") || n.contains("kommunikation") || n.contains("communication") ||
                 n.contains("framework") || n.contains("bilderrechner") ||
                 n.contains("speichercheck") || n.contains("systemcheck") ||
                 n.contains("inventar") || n.contains("weihnachtsmarkt");
+    }
+
+    private String unpackedKcCleanupKind(File dir) {
+        if (dir == null || !dir.isDirectory() || !isDirectoryInDownloadTree(dir)) return null;
+        String n = normalizeProjectToken(dir.getName()).replace(" ", "");
+
+        if (n.contains("kcverwaltung") || n.equals("verwaltung") || n.startsWith("verwaltungv")) {
+            return "KC Verwaltung";
+        }
+        if (n.contains("moneybutler") || n.contains("kcmoneybutler")) {
+            return "Money Butler";
+        }
+        if (n.contains("marktkasse") || n.equals("kasse") || n.startsWith("kassegit")) {
+            return "Kasse/MarktKasse";
+        }
+        if (n.contains("pcmanager") || n.equals("kcmanager") || n.startsWith("kcmanagerv")) {
+            return "PC Manager";
+        }
+        return null;
+    }
+
+    private boolean hasProjectMarkersWithin(File dir, int depth) {
+        if (dir == null || !dir.isDirectory() || depth < 0) return false;
+        if (hasProjectMarkers(dir)) return true;
+        if (depth == 0) return false;
+
+        File[] children;
+        try { children = dir.listFiles(); } catch (SecurityException e) { return false; }
+        if (children == null) return false;
+
+        int inspected = 0;
+        for (File child : children) {
+            if (child != null && child.isDirectory()) {
+                String n = child.getName() == null ? "" : child.getName().toLowerCase(Locale.ROOT);
+                if (!GENERATED_DIRS.contains(n) && hasProjectMarkersWithin(child, depth - 1)) return true;
+            }
+            if (++inspected >= 120) break;
+        }
+        return false;
+    }
+
+    private boolean isUnpackedKcCleanupRoot(File dir) {
+        String kind = unpackedKcCleanupKind(dir);
+        if (kind == null) return false;
+
+        // Ein bloßer Ordnername wie "Kasse" reicht nicht. Es muss zusätzlich
+        // nach Entwicklungs-/Versionsstand aussehen oder Projektmarker enthalten.
+        return isVersionLikeProjectName(dir.getName()) ||
+                developmentDepth(dir) >= 0 ||
+                hasProjectMarkersWithin(dir, 2);
+    }
+
+    private File findTopUnpackedKcCleanupRoot(File dir) {
+        if (dir == null || !dir.isDirectory() || !isDirectoryInDownloadTree(dir)) return null;
+        File top = null;
+        File current = dir;
+        int hops = 0;
+        while (current != null && hops++ < 12 && isDirectoryInDownloadTree(current)) {
+            if (isUnpackedKcCleanupRoot(current)) top = current;
+            File parent = current.getParentFile();
+            if (parent == null || !isDirectoryInDownloadTree(parent)) break;
+            current = parent;
+        }
+        return top;
+    }
+
+    private boolean samePath(File a, File b) {
+        return a != null && b != null &&
+                a.getAbsolutePath().replace('\\', '/').equalsIgnoreCase(
+                        b.getAbsolutePath().replace('\\', '/'));
     }
 
     private boolean isVersionLikeProjectName(String raw) {
@@ -1014,10 +1094,26 @@ public class MainActivity extends Activity {
                 setScanPhase("4/6 KC-/Projektstände … " + done + "/" + total);
             }
             FolderStats stats = folderStats(dir, state, 0);
-            String key = projectGroupKey(dir.getName());
+            File cleanupRoot = findTopUnpackedKcCleanupRoot(dir);
+            String cleanupKind = cleanupRoot != null && samePath(dir, cleanupRoot)
+                    ? unpackedKcCleanupKind(dir) : null;
+            String key = cleanupKind != null ? normalizeProjectToken(cleanupKind) : projectGroupKey(dir.getName());
             ProjectDirEntry entry = new ProjectDirEntry(dir, key, stats, developmentDepth(dir));
             state.projectDirs.add(entry);
             state.projectRootsSeen++;
+
+            if (cleanupKind != null) {
+                entry.assessment = "LOESCHBAR – entpackter " + cleanupKind +
+                        "-Programmstand im Download-Baum; nur oberster Hauptordner wird gezählt";
+                state.unpackedKcProgramDirs++;
+                state.unpackedKcProgramBytes += stats.bytes;
+                addCandidate(dir, stats.bytes, Risk.GREEN,
+                        "Entpackter KC-Programmordner im Download-Baum (" + cleanupKind +
+                                "); Download-/Entwicklungsstand – kompletter Hauptordner zum Löschen freigegeben",
+                        state);
+                continue;
+            }
+
             groups.computeIfAbsent(key, k -> new ArrayList<>()).add(entry);
         }
 
@@ -1524,6 +1620,8 @@ public class MainActivity extends Activity {
                 "\nEntwicklungs-Unterordner: " + st.developmentDirsSeen +
                 " · Projektwurzeln: " + st.projectRootsSeen +
                 " · mögliche Altstände: " + st.possibleOldProjectDirs +
+                "\nEntpackte KC-Programmordner: " + st.unpackedKcProgramDirs +
+                " · " + Formatter.formatFileSize(this, st.unpackedKcProgramBytes) +
                 "\nDoppelte Projektordner: " + st.nestedDuplicateFolders;
         summary.setText("Gefunden (max. " + MAX_VISIBLE + " größte Treffer):\n" +
                 "🟢 " + gc + " · " + Formatter.formatFileSize(this, green) + "   " +
@@ -1591,6 +1689,12 @@ public class MainActivity extends Activity {
         if (c == null || c.risk == Risk.RED) return false;
 
         String reason = c.reason == null ? "" : c.reason;
+
+        if (c.file.isDirectory() && reason.startsWith("Entpackter KC-Programmordner im Download-Baum")) {
+            File top = findTopUnpackedKcCleanupRoot(c.file);
+            return c.risk == Risk.GREEN && top != null && samePath(c.file, top);
+        }
+
         if (reason.startsWith("KC-Entwicklungsarchiv im Download-Baum")) {
             return isInDownloadTree(c.file) && isKcDevelopmentArchive(c.file);
         }
@@ -1643,10 +1747,11 @@ public class MainActivity extends Activity {
         String msg = safe.size() + " eindeutig freigegebene Treffer mit insgesamt " +
                 Formatter.formatFileSize(this, bytes) + " werden dauerhaft gelöscht.\n\n" +
                 "Automatisch gelöscht werden nur:\n" +
+                "• entpackte Hauptordner von KC Verwaltung, Money Butler, Kasse/MarktKasse und PC Manager im Download-Baum; verschachtelte Unterordner werden nicht doppelt gezählt\n" +
                 "• KC-/Entwicklungsarchive (ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ) im Download-Baum, unabhängig vom Alter\n" +
                 "• alte ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ-Archive direkt im Download-Ordner – auch kleine Dateien unter 1 MB\n" +
                 "• byte-identische Dubletten direkt im Download-Ordner, wenn eine andere Kopie erhalten bleibt\n\n" +
-                "Entpackte KC-Projektordner, WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents, Orbit sowie APK/AAB-Dateien bleiben geschützt.\n\n" +
+                "Andere entpackte Projektordner, WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents, Orbit sowie APK/AAB-Dateien bleiben geschützt.\n\n" +
                 "Der Vorgang kann nicht rückgängig gemacht werden.";
 
         new AlertDialog.Builder(this)
@@ -1762,6 +1867,8 @@ public class MainActivity extends Activity {
             sb.append("Erkannte Projektwurzeln: ").append(st.projectRootsSeen).append("\n");
             sb.append("Mögliche alte/doppelte Projektstände: ").append(st.possibleOldProjectDirs)
                     .append(" | ").append(st.possibleOldProjectBytes).append(" Bytes\n");
+            sb.append("Entpackte KC-Programmordner löschbar: ").append(st.unpackedKcProgramDirs)
+                    .append(" | ").append(st.unpackedKcProgramBytes).append(" Bytes\n");
             sb.append("Download im Hauptscan: ").append(st.downloadFilesSeen).append(" Dateien, ")
                     .append(st.downloadDirsSeen).append(" Ordner, ")
                     .append(st.downloadArchivesSeen).append(" Archive\n");
