@@ -13,6 +13,7 @@ Android-App zum Prüfen des gemeinsamen Gerätespeichers.
 - Byte-identische Dubletten werden in Gruppen geführt; die Referenzkopie, die erhalten bleibt, wird angezeigt.
 - Verschachtelte gleichnamige Entwicklungsordner werden als möglicher kompletter doppelter Projektstand erkannt und nur manuell zur Prüfung angeboten.
 - Zweite Sicherheitsabfrage vor jeder dauerhaften Löschung.
+- Kleine alte Archive direkt im Download-Ordner werden ab 14 Tagen unabhängig von ihrer Dateigröße erfasst und können automatisch bereinigt werden.
 - **Sicher automatisch bereinigen**: löscht ohne Einzelauswahl nur streng freigegebene Treffer direkt im Download-Ordner (alte Archive und byte-identische Dubletten).
 - Automatik-Schutz: WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents, Entwicklung, Orbit, Projekt-Unterordner sowie APK/AAB-Dateien werden nicht automatisch gelöscht.
 - Ausschluss von \`/Android/data\` und \`/Android/obb\`.
