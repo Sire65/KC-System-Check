@@ -22,6 +22,9 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.provider.MediaStore;
 import android.database.Cursor;
@@ -112,6 +115,18 @@ public class MainActivity extends Activity {
     private TextView summary;
     private ProgressBar progress;
     private ListView list;
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
+    private volatile int scanProgressPercent = 0;
+    private volatile String scanProgressPhase = "Bereit";
+    private volatile long scanStartedAtElapsed = 0L;
+    private final Runnable scanElapsedTicker = new Runnable() {
+        @Override
+        public void run() {
+            if (!scanning) return;
+            renderScanProgress();
+            uiHandler.postDelayed(this, 1000L);
+        }
+    };
     private Button permissionButton;
     private Button scanButton;
     private Button autoCleanButton;
@@ -268,7 +283,9 @@ public class MainActivity extends Activity {
         root.addView(status);
 
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setIndeterminate(true);
+        progress.setIndeterminate(false);
+        progress.setMax(100);
+        progress.setProgress(0);
         progress.setVisibility(View.GONE);
         root.addView(progress, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(8)));
 
@@ -613,6 +630,58 @@ public class MainActivity extends Activity {
         Toast.makeText(this, "Dateipfad kopiert.", Toast.LENGTH_SHORT).show();
     }
 
+    private void beginScanProgress() {
+        scanStartedAtElapsed = SystemClock.elapsedRealtime();
+        scanProgressPercent = 0;
+        scanProgressPhase = "Vorbereitung";
+        progress.setIndeterminate(false);
+        progress.setMax(100);
+        progress.setProgress(0);
+        progress.setVisibility(View.VISIBLE);
+        uiHandler.removeCallbacks(scanElapsedTicker);
+        renderScanProgress();
+        uiHandler.postDelayed(scanElapsedTicker, 1000L);
+    }
+
+    private void setScanProgress(int percent, String phase) {
+        int bounded = Math.max(0, Math.min(99, percent));
+        if (bounded > scanProgressPercent) scanProgressPercent = bounded;
+        if (phase != null && !phase.trim().isEmpty()) scanProgressPhase = phase;
+        runOnUiThread(this::renderScanProgress);
+    }
+
+    private void renderScanProgress() {
+        if (progress == null || status == null) return;
+        progress.setProgress(Math.max(0, Math.min(100, scanProgressPercent)));
+        long elapsed = scanStartedAtElapsed > 0
+                ? Math.max(0L, SystemClock.elapsedRealtime() - scanStartedAtElapsed) : 0L;
+        status.setText(scanProgressPercent + "% · Laufzeit " +
+                formatElapsed(elapsed) + " · " + scanProgressPhase);
+    }
+
+    private String formatElapsed(long millis) {
+        long seconds = Math.max(0L, millis / 1000L);
+        long hours = seconds / 3600L;
+        long minutes = (seconds % 3600L) / 60L;
+        long secs = seconds % 60L;
+        if (hours > 0) {
+            return String.format(Locale.GERMANY, "%02d:%02d:%02d", hours, minutes, secs);
+        }
+        return String.format(Locale.GERMANY, "%02d:%02d", minutes, secs);
+    }
+
+    private void finishScanProgress(ScanState state) {
+        uiHandler.removeCallbacks(scanElapsedTicker);
+        scanProgressPercent = 100;
+        scanProgressPhase = "Fertig – alle Treffer sind aufgelistet";
+        progress.setProgress(100);
+        long elapsed = scanStartedAtElapsed > 0
+                ? Math.max(0L, SystemClock.elapsedRealtime() - scanStartedAtElapsed) : 0L;
+        status.setText("100% · Laufzeit " + formatElapsed(elapsed) +
+                " · Scan abgeschlossen: " + state.files + " Dateien, " +
+                state.dirs + " Ordner geprüft.");
+    }
+
     private void requestHomeScreenShortcut(boolean automaticFirstRun) {
         SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
         if (automaticFirstRun && p.getBoolean("shortcut_prompted", false)) return;
@@ -693,6 +762,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        uiHandler.removeCallbacks(scanElapsedTicker);
         try { unregisterReceiver(updateDownloadReceiver); } catch (Exception ignored) { }
         super.onDestroy();
     }
@@ -714,8 +784,7 @@ public class MainActivity extends Activity {
         displayRows.clear();
         list.clearChoices();
         adapter.notifyDataSetChanged();
-        progress.setVisibility(View.VISIBLE);
-        status.setText("Scan läuft …");
+        beginScanProgress();
         summary.setText("Dateien werden geprüft.");
         scanButton.setEnabled(false);
         deleteButton.setEnabled(false);
@@ -727,48 +796,65 @@ public class MainActivity extends Activity {
             ScanState state = new ScanState();
             File root = Environment.getExternalStorageDirectory();
 
-            setScanPhase("1/6 Hauptscan des Gerätespeichers …");
+            setScanProgress(1, "1/7 Hauptscan des Gerätespeichers");
             scanTree(root, state);
+            setScanProgress(31, "1/7 Hauptscan abgeschlossen");
 
-            // Zweiter Kontrolllauf speziell für Download. In v1.3.9 ist dieser
-            // absichtlich schlank: keine erneute Projektanalyse pro Ordner.
-            setScanPhase("2/6 Download-Unterordner werden kontrolliert …");
+            // Kontrolllauf speziell für Download.
+            setScanProgress(32, "2/7 Download-Unterordner werden kontrolliert");
             File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
             auditDownloadTree(downloads, state, 0);
+            setScanProgress(44, "2/7 Download-Kontrollscan abgeschlossen");
 
             // Androids Download-Index als zusätzlicher Fallback.
-            setScanPhase("3/6 Android-Download-Index wird geprüft …");
+            setScanProgress(45, "3/7 Android-Download-Index wird geprüft");
             scanDownloadMediaStoreFallback(state);
+            setScanProgress(52, "3/7 Android-Download-Index abgeschlossen");
 
-            setScanPhase("4/6 KC-/Projektstände werden ausgewertet …");
+            setScanProgress(53, "4/7 KC-/Projektstände werden ausgewertet");
             analyzeProjectDirectories(state);
+            setScanProgress(70, "4/7 KC-/Projektstände ausgewertet");
 
-            setScanPhase("5/6 WhatsApp-Dubletten werden geprüft …");
+            setScanProgress(71, "5/7 WhatsApp-Dubletten werden geprüft");
             findWhatsAppPhotoDuplicates(state);
+            setScanProgress(81, "5/7 WhatsApp-Dubletten geprüft");
 
-            setScanPhase("6/6 Dateidubletten werden geprüft …");
+            setScanProgress(82, "6/7 Dateidubletten werden geprüft");
             findDuplicates(state);
+            setScanProgress(94, "6/7 Dateidubletten geprüft");
 
             lastScanState = state;
 
+            setScanProgress(95, "7/7 Treffer werden sortiert");
             Collections.sort(candidates, Comparator.comparingLong((Candidate c) -> c.size).reversed());
+            setScanProgress(96, "7/7 Treffer werden vorbereitet");
             if (candidates.size() > MAX_VISIBLE) {
                 candidates.subList(MAX_VISIBLE, candidates.size()).clear();
             }
+            setScanProgress(97, "7/7 Treffer werden aufgelistet");
 
             runOnUiThread(() -> {
                 displayRows.clear();
-                for (Candidate c : candidates) displayRows.add(c.display(this));
+                int totalRows = candidates.size();
+                int row = 0;
+                for (Candidate c : candidates) {
+                    displayRows.add(c.display(this));
+                    row++;
+                    if (totalRows > 0 && (row % 50 == 0 || row == totalRows)) {
+                        scanProgressPercent = row == totalRows ? 99 : 98;
+                        scanProgressPhase = "7/7 Treffer werden aufgelistet · " + row + "/" + totalRows;
+                        renderScanProgress();
+                    }
+                }
                 adapter.notifyDataSetChanged();
-                progress.setVisibility(View.GONE);
                 scanning = false;
                 scanButton.setEnabled(true);
                 deleteButton.setEnabled(!candidates.isEmpty());
                 updateAutoCleanButton();
                 reportButton.setEnabled(!candidates.isEmpty());
                 shareReportButton.setEnabled(!candidates.isEmpty());
-                status.setText("Scan abgeschlossen: " + state.files + " Dateien, " + state.dirs + " Ordner geprüft.");
                 updateOverallSummary();
+                finishScanProgress(state);
             });
         }).start();
     }
@@ -941,7 +1027,8 @@ public class MainActivity extends Activity {
         classifyFile(file, size, state);
         if (state.files % 500 == 0) {
             long f = state.files;
-            runOnUiThread(() -> status.setText("Scan läuft … " + f + " Dateien geprüft"));
+            int pct = 2 + Math.min(28, (int) (f / 1000L));
+            setScanProgress(pct, "1/7 Hauptscan · " + f + " Dateien geprüft");
         }
     }
 
@@ -972,8 +1059,10 @@ public class MainActivity extends Activity {
         if (state.downloadAuditFiles % 250 == 0) {
             long n = state.downloadAuditFiles;
             long a = state.downloadAuditArchives;
-            setScanPhase("2/6 Download-Kontrollscan … " + n +
-                    " Dateien, " + a + " Archive gesehen");
+            long expected = Math.max(1L, state.downloadFilesSeen);
+            int pct = 32 + (int) Math.min(12L, (12L * n) / expected);
+            setScanProgress(pct, "2/7 Download-Kontrollscan · " + n +
+                    " Dateien, " + a + " Archive");
         }
     }
 
@@ -1001,13 +1090,16 @@ public class MainActivity extends Activity {
 
             int nameCol = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME);
             int relCol = cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH);
+            int mediaTotalRows = Math.max(1, cursor.getCount());
             while (cursor.moveToNext()) {
                 state.mediaStoreDownloadRows++;
                 if (state.mediaStoreDownloadRows % 250 == 0) {
                     long n = state.mediaStoreDownloadRows;
                     long added = state.mediaStoreFilesAdded;
-                    setScanPhase("3/6 Android-Download-Index … " + n +
-                            " Einträge, " + added + " zusätzlich");
+                    int pct = 45 + (int) Math.min(7L,
+                            (7L * state.mediaStoreDownloadRows) / mediaTotalRows);
+                    setScanProgress(pct, "3/7 Android-Download-Index · " + n +
+                            "/" + mediaTotalRows + " Einträge, " + added + " zusätzlich");
                 }
                 String name = nameCol >= 0 ? cursor.getString(nameCol) : null;
                 String rel = relCol >= 0 ? cursor.getString(relCol) : null;
@@ -1467,7 +1559,8 @@ public class MainActivity extends Activity {
             analyzed++;
             if (analyzed == 1 || analyzed % 5 == 0 || analyzed == total) {
                 final int done = analyzed;
-                setScanPhase("4/6 KC-/Projektstände … " + done + "/" + total);
+                int pct = 53 + (int) ((17L * done) / Math.max(1, total));
+                setScanProgress(pct, "4/7 KC-/Projektstände · " + done + "/" + total);
             }
             FolderStats stats = folderStats(dir, state, 0);
             File cleanupRoot = findTopUnpackedKcCleanupRoot(dir);
@@ -1523,7 +1616,7 @@ public class MainActivity extends Activity {
                     continue;
                 }
 
-                setScanPhase("4/6 Projektvergleich per SHA-256 … " + e.dir.getName());
+                setScanPhase("4/7 Projektvergleich per SHA-256 · " + e.dir.getName());
                 FolderCompareResult cmp = compareProjectDirectory(e.dir, keep.dir, state);
                 e.comparison = cmp;
 
@@ -1737,7 +1830,9 @@ public class MainActivity extends Activity {
             checkedGroups++;
             if (checkedGroups == 1 || checkedGroups % 100 == 0 || checkedGroups == totalGroups) {
                 final int done = checkedGroups;
-                setScanPhase("5/6 WhatsApp-Dubletten … " + done + "/" + totalGroups + " Größengruppen");
+                int pct = 71 + (int) ((10L * done) / Math.max(1, totalGroups));
+                setScanProgress(pct, "5/7 WhatsApp-Dubletten · " + done + "/" +
+                        totalGroups + " Größengruppen");
             }
             List<File> same = e.getValue();
             if (same.size() < 2) continue;
@@ -1779,7 +1874,9 @@ public class MainActivity extends Activity {
             scannedSizeGroups++;
             if (scannedSizeGroups == 1 || scannedSizeGroups % 50 == 0 || scannedSizeGroups == totalSizeGroups) {
                 final int done = scannedSizeGroups;
-                setScanPhase("6/6 Dateidubletten … " + done + "/" + totalSizeGroups + " Größengruppen");
+                int pct = 82 + (int) ((12L * done) / Math.max(1, totalSizeGroups));
+                setScanProgress(pct, "6/7 Dateidubletten · " + done + "/" +
+                        totalSizeGroups + " Größengruppen");
             }
             List<File> same = e.getValue();
             if (same.size() < 2 || e.getKey() < MB) continue;
@@ -1806,8 +1903,9 @@ public class MainActivity extends Activity {
 
     private void setScanPhase(String text) {
         if (text == null) return;
+        scanProgressPhase = text;
         runOnUiThread(() -> {
-            if (scanning && status != null) status.setText(text);
+            if (scanning) renderScanProgress();
         });
     }
 
