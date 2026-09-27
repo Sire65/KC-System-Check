@@ -15,6 +15,7 @@ Android-App zum Prüfen des gemeinsamen Gerätespeichers.
 - Zweite Sicherheitsabfrage vor jeder dauerhaften Löschung.
 - Kleine alte Archive direkt im Download-Ordner werden ab 14 Tagen unabhängig von ihrer Dateigröße erfasst und können automatisch bereinigt werden.
 - **Sicher automatisch bereinigen**: löscht ohne Einzelauswahl nur streng freigegebene Treffer. Dazu gehören sichere Altstände/Archive sowie leere Ordner bzw. reine Leerordner-Bäume außerhalb geschützter Android-, System-, App- und Medienbereiche.
+- **Hauptverzeichnis-Diagnose**: bewertet jeden direkt unter „Interner Speicher“ sichtbaren Ordner als geschützt, belegt, wirklich leer/löschbar oder nicht lesbar. Die Diagnose wird im Bericht mit direkter Elementzahl und Pfad ausgegeben.
 - Automatik-Schutz: Android-/App-Strukturen, versteckte Ordner, MIUI/Xiaomi, downloaded_rom, WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents sowie APK/AAB-Dateien werden nicht automatisch gelöscht. Leere Ordner werden unmittelbar vor dem Löschen erneut geprüft.
 - Ausschluss von \`/Android/data\` und \`/Android/obb\`.
 - Scanbericht als TXT unter \`Dokumente/KC_SpeicherCheck/\`.
@@ -35,4 +36,4 @@ Für eine neue Version müssen dort \`versionCode\`, \`versionName\`, \`apkUrl\`
 ## Installation/Build
 Projekt in Android Studio öffnen und APK bauen. Min SDK 26, Target/Compile SDK 35.
 
-Aktuelle Quellversion: **1.1.0** (\`versionCode 2\`).
+Aktuelle Quellversion: **1.4.6** (\`versionCode 24\`).
