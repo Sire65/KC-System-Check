@@ -74,7 +74,12 @@ public class MainActivity extends Activity {
 
         String display(Activity a) {
             String mark = risk == Risk.GREEN ? "🟢" : risk == Risk.YELLOW ? "🟡" : "🔴";
-            return mark + "  " + Formatter.formatFileSize(a, size) + "\n" + reason + "\n" + file.getAbsolutePath();
+            String type = file.isDirectory() ? "ORDNER" : "DATEI";
+            String name = file.getName();
+            if (name == null || name.trim().isEmpty()) name = file.getAbsolutePath();
+            return mark + "  " + name + "\n"
+                    + type + " · " + Formatter.formatFileSize(a, size) + " · " + reason + "\n"
+                    + file.getAbsolutePath();
         }
     }
 
@@ -214,6 +219,21 @@ public class MainActivity extends Activity {
         legend.setTextSize(13);
         root.addView(legend);
 
+        LinearLayout selectRow = new LinearLayout(this);
+        selectRow.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button selectAllButton = new Button(this);
+        selectAllButton.setText("Alle markieren");
+        selectAllButton.setOnClickListener(v -> setAllChecked(true));
+        selectRow.addView(selectAllButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        Button selectNoneButton = new Button(this);
+        selectNoneButton.setText("Keine markieren");
+        selectNoneButton.setOnClickListener(v -> setAllChecked(false));
+        selectRow.addView(selectNoneButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        root.addView(selectRow);
+
         list = new ListView(this);
         list.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
         adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_multiple_choice, displayRows) {
@@ -223,6 +243,9 @@ public class MainActivity extends Activity {
                 TextView tv = (TextView) v;
                 tv.setTextSize(13);
                 tv.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+                tv.setSingleLine(false);
+                tv.setMaxLines(6);
+                tv.setMinHeight(dp(86));
                 tv.setPadding(dp(8), dp(8), dp(8), dp(8));
                 Candidate c = candidates.get(position);
                 if (c.risk == Risk.GREEN) tv.setTextColor(Color.rgb(27, 94, 32));
@@ -520,6 +543,14 @@ public class MainActivity extends Activity {
                 "🟢 " + gc + " · " + Formatter.formatFileSize(this, green) + "   " +
                 "🟡 " + yc + " · " + Formatter.formatFileSize(this, yellow) + "   " +
                 "🔴 " + rc + " · " + Formatter.formatFileSize(this, red));
+    }
+
+    private void setAllChecked(boolean checked) {
+        if (list == null) return;
+        for (int i = 0; i < candidates.size(); i++) {
+            list.setItemChecked(i, checked);
+        }
+        updateSelectedSummary();
     }
 
     private List<Integer> selectedPositions() {
