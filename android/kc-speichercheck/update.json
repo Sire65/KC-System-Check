@@ -1,8 +1,8 @@
 {
-  "versionCode": 9,
-  "versionName": "1.3.1",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.3.1-STABIL.apk",
-  "sha256": "a2a069d2e8c689c90c948fad5c5437c2b9b8c5eb483a117b604df08b00307290",
-  "notes": "Neu: kompaktere Bedienoberfläche mit mehreren schmalen Tasten nebeneinander. KC-Entwicklungs-ZIPs im Download-Baum, auch in Entwicklung-Unterordnern, werden unabhängig vom Alter erkannt und für die sichere automatische Bereinigung freigegeben. Entpackte Projektordner, persönliche Dateien, WhatsApp, Kamera, Bilder, Documents, Orbit sowie APK/AAB bleiben geschützt.",
+  "versionCode": 11,
+  "versionName": "1.3.3",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.3.3-STABIL.apk",
+  "sha256": "814b65103def2911d7a6fabd8dcf1cd3d6e7ff1c4315b8cd67a77a038da99a6d",
+  "notes": "Neu: robustere Erkennung von KC-/Entwicklungsarchiven (ZIP, RAR, 7Z, TAR, GZ, TGZ, BZ2, XZ) im Download-Baum. Zusätzlich werden byte-identische WhatsApp-Fotodubletten (JPG/JPEG, PNG, WEBP, HEIC, HEIF) ab 64 KB erkannt und als GELB/manuell angezeigt; sie werden nicht automatisch gelöscht. Der Bericht zeigt außerdem Archiv- und WhatsApp-Dublettenzähler.",
   "published": "2026-09-27"
 }
