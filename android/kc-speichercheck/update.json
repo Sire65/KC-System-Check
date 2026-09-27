@@ -1,8 +1,8 @@
 {
-  "versionCode": 4,
-  "versionName": "1.1.2",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.1.2.apk",
-  "sha256": "41f0dff0f6f0ddac5d1e2f8cc308bdede01d937870e45a9ce14616df65e7b488",
-  "notes": "Dateiname und vollständiger Pfad sind sichtbar. Zusätzlich gibt es 'Alle markieren' und 'Keine markieren'.",
+  "versionCode": 3,
+  "versionName": "1.1.1",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.1.1.apk",
+  "sha256": "f66827b464a43e6b843986abc7240c3a4c339c209b1b9743e90f52429ba1593f",
+  "notes": "Update-Kanal wird auf eine dauerhaft signierte Release-Version umgestellt.",
   "published": "2026-09-27"
 }
