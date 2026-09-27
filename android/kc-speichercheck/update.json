@@ -1,8 +1,8 @@
 {
-  "versionCode": 2,
-  "versionName": "1.1.0",
-  "apkUrl": "",
-  "sha256": "",
-  "notes": "Update-Funktion hinzugefügt: GitHub-Versionsprüfung, Freigabe vor Download und SHA-256-Prüfung vor der Installation.",
+  "versionCode": 3,
+  "versionName": "1.1.1",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.1.1.apk",
+  "sha256": "156575b8b096f3aadb991622cf9a3aeec1bf1253873a090f033f36bb1766a1bd",
+  "notes": "Eigenes App-Icon und Funktion zum Anheften auf dem Android-Startbildschirm hinzugefügt.",
   "published": "2026-09-27"
 }
