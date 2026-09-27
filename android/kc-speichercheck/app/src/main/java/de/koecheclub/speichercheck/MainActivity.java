@@ -162,6 +162,7 @@ public class MainActivity extends Activity {
 
     private static final long MB = 1024L * 1024L;
     private static final long DAY = 24L * 60L * 60L * 1000L;
+    private static final long RECENT_ARCHIVE_PROTECTION = 3L * DAY;
     private static final int MAX_VISIBLE = 500;
 
     private static final Set<String> GENERATED_DIRS = new HashSet<>();
@@ -445,6 +446,7 @@ public class MainActivity extends Activity {
                 List<File> found = new ArrayList<>();
                 long[] checked = new long[] {0L, 0L};
                 searchFiles(Environment.getExternalStorageDirectory(), query, found, 0, checked);
+                augmentFileSearchFromMediaStore(query, found, checked);
 
                 found.sort((a, b) -> {
                     int byDate = Long.compare(b.lastModified(), a.lastModified());
@@ -502,6 +504,54 @@ public class MainActivity extends Activity {
                 }
             });
         }
+    }
+
+    private void augmentFileSearchFromMediaStore(String query, List<File> found, long[] checked) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || found == null) return;
+
+        Set<String> known = new HashSet<>();
+        for (File f : found) {
+            if (f != null) known.add(f.getAbsolutePath());
+        }
+
+        Uri uri = MediaStore.Files.getContentUri("external");
+        String[] projection = new String[] {
+                MediaStore.Files.FileColumns.DATA,
+                MediaStore.MediaColumns.DISPLAY_NAME,
+                MediaStore.MediaColumns.RELATIVE_PATH
+        };
+
+        try (Cursor cursor = getContentResolver().query(uri, projection, null, null, null)) {
+            if (cursor == null) return;
+            int dataCol = cursor.getColumnIndex(MediaStore.Files.FileColumns.DATA);
+            int nameCol = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME);
+            int relCol = cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH);
+
+            while (cursor.moveToNext()) {
+                String name = nameCol >= 0 ? cursor.getString(nameCol) : null;
+                String data = dataCol >= 0 ? cursor.getString(dataCol) : null;
+                String rel = relCol >= 0 ? cursor.getString(relCol) : null;
+                File candidate = resolveIndexedFile(data, rel, name);
+                if (candidate == null || !candidate.exists() || !candidate.isFile()) continue;
+                if (isExcludedPath(candidate.getAbsolutePath())) continue;
+                checked[0]++;
+                if (matchesFileSearch(candidate, query) && known.add(candidate.getAbsolutePath())) {
+                    found.add(candidate);
+                }
+            }
+        } catch (Exception ignored) { }
+    }
+
+    private File resolveIndexedFile(String data, String relativePath, String displayName) {
+        if (data != null && !data.trim().isEmpty()) {
+            File direct = new File(data);
+            if (direct.exists()) return direct;
+        }
+        if (displayName == null || displayName.trim().isEmpty()) return null;
+        if (relativePath != null && !relativePath.trim().isEmpty()) {
+            return new File(Environment.getExternalStorageDirectory(), relativePath + displayName);
+        }
+        return new File(Environment.getExternalStorageDirectory(), displayName);
     }
 
     private boolean matchesFileSearch(File file, String rawQuery) {
@@ -796,42 +846,48 @@ public class MainActivity extends Activity {
             ScanState state = new ScanState();
             File root = Environment.getExternalStorageDirectory();
 
-            setScanProgress(1, "1/7 Hauptscan des Gerätespeichers");
+            setScanProgress(1, "1/8 Hauptscan des Gerätespeichers");
             scanTree(root, state);
-            setScanProgress(31, "1/7 Hauptscan abgeschlossen");
+            setScanProgress(27, "1/8 Hauptscan abgeschlossen");
 
             // Kontrolllauf speziell für Download.
-            setScanProgress(32, "2/7 Download-Unterordner werden kontrolliert");
+            setScanProgress(28, "2/8 Download-Unterordner werden kontrolliert");
             File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
             auditDownloadTree(downloads, state, 0);
-            setScanProgress(44, "2/7 Download-Kontrollscan abgeschlossen");
+            setScanProgress(38, "2/8 Download-Kontrollscan abgeschlossen");
 
             // Androids Download-Index als zusätzlicher Fallback.
-            setScanProgress(45, "3/7 Android-Download-Index wird geprüft");
+            setScanProgress(39, "3/8 Android-Download-Index wird geprüft");
             scanDownloadMediaStoreFallback(state);
-            setScanProgress(52, "3/7 Android-Download-Index abgeschlossen");
+            setScanProgress(45, "3/8 Android-Download-Index abgeschlossen");
 
-            setScanProgress(53, "4/7 KC-/Projektstände werden ausgewertet");
+            // Globaler Android-Dateiindex: findet insbesondere Archive, die
+            // Xiaomi/Android im Dateimanager kennt, aber der File-Baum nicht sah.
+            setScanProgress(46, "4/8 Globaler Android-Dateiindex · Archive");
+            scanGlobalArchiveMediaStoreFallback(state);
+            setScanProgress(58, "4/8 Globaler Archivindex abgeschlossen");
+
+            setScanProgress(59, "5/8 KC-/Projektstände werden ausgewertet");
             analyzeProjectDirectories(state);
-            setScanProgress(70, "4/7 KC-/Projektstände ausgewertet");
+            setScanProgress(75, "5/8 KC-/Projektstände ausgewertet");
 
-            setScanProgress(71, "5/7 WhatsApp-Dubletten werden geprüft");
+            setScanProgress(76, "6/8 WhatsApp-Dubletten werden geprüft");
             findWhatsAppPhotoDuplicates(state);
-            setScanProgress(81, "5/7 WhatsApp-Dubletten geprüft");
+            setScanProgress(84, "6/8 WhatsApp-Dubletten geprüft");
 
-            setScanProgress(82, "6/7 Dateidubletten werden geprüft");
+            setScanProgress(85, "7/8 Dateidubletten werden geprüft");
             findDuplicates(state);
-            setScanProgress(94, "6/7 Dateidubletten geprüft");
+            setScanProgress(94, "7/8 Dateidubletten geprüft");
 
             lastScanState = state;
 
-            setScanProgress(95, "7/7 Treffer werden sortiert");
+            setScanProgress(95, "8/8 Treffer werden sortiert");
             Collections.sort(candidates, Comparator.comparingLong((Candidate c) -> c.size).reversed());
-            setScanProgress(96, "7/7 Treffer werden vorbereitet");
+            setScanProgress(96, "8/8 Treffer werden vorbereitet");
             if (candidates.size() > MAX_VISIBLE) {
                 candidates.subList(MAX_VISIBLE, candidates.size()).clear();
             }
-            setScanProgress(97, "7/7 Treffer werden aufgelistet");
+            setScanProgress(97, "8/8 Treffer werden aufgelistet");
 
             runOnUiThread(() -> {
                 displayRows.clear();
@@ -842,7 +898,7 @@ public class MainActivity extends Activity {
                     row++;
                     if (totalRows > 0 && (row % 50 == 0 || row == totalRows)) {
                         scanProgressPercent = row == totalRows ? 99 : 98;
-                        scanProgressPhase = "7/7 Treffer werden aufgelistet · " + row + "/" + totalRows;
+                        scanProgressPhase = "8/8 Treffer werden aufgelistet · " + row + "/" + totalRows;
                         renderScanProgress();
                     }
                 }
@@ -893,6 +949,11 @@ public class MainActivity extends Activity {
         long mediaStoreFilesAdded = 0;
         long mediaStoreArchivesAdded = 0;
         long mediaStoreQueryErrors = 0;
+        long mediaStoreGlobalRows = 0;
+        long mediaStoreGlobalArchivesSeen = 0;
+        long mediaStoreGlobalArchivesAdded = 0;
+        long mediaStoreGlobalPathMisses = 0;
+        long mediaStoreGlobalQueryErrors = 0;
         int duplicateGroupSeq = 0;
         final Map<Long, List<File>> sameSize = new HashMap<>();
         final Map<Long, List<File>> whatsappPhotoSameSize = new HashMap<>();
@@ -1027,8 +1088,8 @@ public class MainActivity extends Activity {
         classifyFile(file, size, state);
         if (state.files % 500 == 0) {
             long f = state.files;
-            int pct = 2 + Math.min(28, (int) (f / 1000L));
-            setScanProgress(pct, "1/7 Hauptscan · " + f + " Dateien geprüft");
+            int pct = 2 + Math.min(24, (int) (f / 1200L));
+            setScanProgress(pct, "1/8 Hauptscan · " + f + " Dateien geprüft");
         }
     }
 
@@ -1060,8 +1121,8 @@ public class MainActivity extends Activity {
             long n = state.downloadAuditFiles;
             long a = state.downloadAuditArchives;
             long expected = Math.max(1L, state.downloadFilesSeen);
-            int pct = 32 + (int) Math.min(12L, (12L * n) / expected);
-            setScanProgress(pct, "2/7 Download-Kontrollscan · " + n +
+            int pct = 28 + (int) Math.min(10L, (10L * n) / expected);
+            setScanProgress(pct, "2/8 Download-Kontrollscan · " + n +
                     " Dateien, " + a + " Archive");
         }
     }
@@ -1096,9 +1157,9 @@ public class MainActivity extends Activity {
                 if (state.mediaStoreDownloadRows % 250 == 0) {
                     long n = state.mediaStoreDownloadRows;
                     long added = state.mediaStoreFilesAdded;
-                    int pct = 45 + (int) Math.min(7L,
-                            (7L * state.mediaStoreDownloadRows) / mediaTotalRows);
-                    setScanProgress(pct, "3/7 Android-Download-Index · " + n +
+                    int pct = 39 + (int) Math.min(6L,
+                            (6L * state.mediaStoreDownloadRows) / mediaTotalRows);
+                    setScanProgress(pct, "3/8 Android-Download-Index · " + n +
                             "/" + mediaTotalRows + " Einträge, " + added + " zusätzlich");
                 }
                 String name = nameCol >= 0 ? cursor.getString(nameCol) : null;
@@ -1129,6 +1190,75 @@ public class MainActivity extends Activity {
             }
         } catch (Exception e) {
             state.mediaStoreQueryErrors++;
+        }
+    }
+
+    private void scanGlobalArchiveMediaStoreFallback(ScanState state) {
+        if (state == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
+
+        Uri uri = MediaStore.Files.getContentUri("external");
+        String[] projection = new String[] {
+                MediaStore.Files.FileColumns.DATA,
+                MediaStore.MediaColumns.DISPLAY_NAME,
+                MediaStore.MediaColumns.RELATIVE_PATH,
+                MediaStore.MediaColumns.SIZE
+        };
+
+        try (Cursor cursor = getContentResolver().query(uri, projection, null, null, null)) {
+            if (cursor == null) {
+                state.mediaStoreGlobalQueryErrors++;
+                return;
+            }
+
+            int dataCol = cursor.getColumnIndex(MediaStore.Files.FileColumns.DATA);
+            int nameCol = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME);
+            int relCol = cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH);
+            int total = Math.max(1, cursor.getCount());
+
+            while (cursor.moveToNext()) {
+                state.mediaStoreGlobalRows++;
+                String name = nameCol >= 0 ? cursor.getString(nameCol) : null;
+                if (name == null || name.trim().isEmpty()) continue;
+
+                String ext = extension(name.toLowerCase(Locale.ROOT));
+                if (!ARCHIVE_EXT.contains(ext)) {
+                    if (state.mediaStoreGlobalRows % 1000 == 0) {
+                        int pct = 46 + (int) Math.min(12L,
+                                (12L * state.mediaStoreGlobalRows) / total);
+                        setScanProgress(pct, "4/8 Globaler Dateiindex · " +
+                                state.mediaStoreGlobalRows + "/" + total +
+                                " Einträge · " + state.mediaStoreGlobalArchivesSeen + " Archive");
+                    }
+                    continue;
+                }
+
+                state.mediaStoreGlobalArchivesSeen++;
+                String data = dataCol >= 0 ? cursor.getString(dataCol) : null;
+                String rel = relCol >= 0 ? cursor.getString(relCol) : null;
+                File candidate = resolveIndexedFile(data, rel, name);
+                if (candidate == null || !candidate.exists() || !candidate.isFile()) {
+                    state.mediaStoreGlobalPathMisses++;
+                    continue;
+                }
+                if (isExcludedPath(candidate.getAbsolutePath())) continue;
+
+                boolean wasSeen = state.seenFilePaths.contains(candidate.getAbsolutePath());
+                registerScannedFile(candidate, state, false);
+                if (!wasSeen && state.archivePaths.contains(candidate.getAbsolutePath())) {
+                    state.mediaStoreGlobalArchivesAdded++;
+                }
+
+                if (state.mediaStoreGlobalRows % 250 == 0) {
+                    int pct = 46 + (int) Math.min(12L,
+                            (12L * state.mediaStoreGlobalRows) / total);
+                    setScanProgress(pct, "4/8 Globaler Dateiindex · " +
+                            state.mediaStoreGlobalRows + "/" + total +
+                            " Einträge · " + state.mediaStoreGlobalArchivesSeen +
+                            " Archive · " + state.mediaStoreGlobalArchivesAdded + " zusätzlich");
+                }
+            }
+        } catch (Exception e) {
+            state.mediaStoreGlobalQueryErrors++;
         }
     }
 
@@ -1559,8 +1689,8 @@ public class MainActivity extends Activity {
             analyzed++;
             if (analyzed == 1 || analyzed % 5 == 0 || analyzed == total) {
                 final int done = analyzed;
-                int pct = 53 + (int) ((17L * done) / Math.max(1, total));
-                setScanProgress(pct, "4/7 KC-/Projektstände · " + done + "/" + total);
+                int pct = 59 + (int) ((16L * done) / Math.max(1, total));
+                setScanProgress(pct, "5/8 KC-/Projektstände · " + done + "/" + total);
             }
             FolderStats stats = folderStats(dir, state, 0);
             File cleanupRoot = findTopUnpackedKcCleanupRoot(dir);
@@ -1616,7 +1746,7 @@ public class MainActivity extends Activity {
                     continue;
                 }
 
-                setScanPhase("4/7 Projektvergleich per SHA-256 · " + e.dir.getName());
+                setScanPhase("5/8 Projektvergleich per SHA-256 · " + e.dir.getName());
                 FolderCompareResult cmp = compareProjectDirectory(e.dir, keep.dir, state);
                 e.comparison = cmp;
 
@@ -1691,9 +1821,12 @@ public class MainActivity extends Activity {
             return "GESCHUETZT – APK/AAB wird nicht automatisch gelöscht";
         }
         if (isKcDevelopmentArchive(file)) {
-            return isInDownloadTree(file)
-                    ? "LOESCHBAR – KC-Entwicklungsarchiv im Download-Baum"
-                    : "PRUEFEN – KC-/Entwicklungsarchiv außerhalb des Download-Baums";
+            if (isInDownloadTree(file)) {
+                return age >= RECENT_ARCHIVE_PROTECTION
+                        ? "LOESCHBAR – altes KC-/Entwicklungsarchiv im Download-Baum"
+                        : "GESCHUETZT – frisch heruntergeladenes Entwicklungsarchiv";
+            }
+            return "PRUEFEN – KC-/Entwicklungsarchiv außerhalb des Download-Baums";
         }
         if (isAutoCleanupArchiveExtension(ext) && age > 14 * DAY && isDirectDownloadFile(file)) {
             return "LOESCHBAR – altes Archiv direkt im Download-Ordner (>14 Tage)";
@@ -1719,9 +1852,12 @@ public class MainActivity extends Activity {
         if (isKcDevelopmentArchive(file)) {
             state.developmentArchivesSeen++;
             state.developmentArchiveBytes += size;
-            if (isInDownloadTree(file)) {
+            if (isInDownloadTree(file) && age >= RECENT_ARCHIVE_PROTECTION) {
                 addCandidate(file, size, Risk.GREEN,
-                        "KC-Entwicklungsarchiv im Download-Baum; alter Entwicklungsstand – zum Löschen freigegeben", state);
+                        "Altes KC-Entwicklungsarchiv im Download-Baum (>3 Tage); Entwicklungsstand – zum Löschen freigegeben", state);
+            } else if (isInDownloadTree(file)) {
+                addCandidate(file, size, Risk.YELLOW,
+                        "Frisches KC-/Entwicklungsarchiv im Download-Baum (<3 Tage); geschützt, damit aktuelle Claude-/Code-Übergaben nicht gelöscht werden", state);
             } else {
                 addCandidate(file, size, Risk.YELLOW,
                         "KC-/Entwicklungsarchiv außerhalb des Download-Baums; alter Entwicklungsstand möglich – manuell prüfen", state);
@@ -1830,8 +1966,8 @@ public class MainActivity extends Activity {
             checkedGroups++;
             if (checkedGroups == 1 || checkedGroups % 100 == 0 || checkedGroups == totalGroups) {
                 final int done = checkedGroups;
-                int pct = 71 + (int) ((10L * done) / Math.max(1, totalGroups));
-                setScanProgress(pct, "5/7 WhatsApp-Dubletten · " + done + "/" +
+                int pct = 76 + (int) ((8L * done) / Math.max(1, totalGroups));
+                setScanProgress(pct, "6/8 WhatsApp-Dubletten · " + done + "/" +
                         totalGroups + " Größengruppen");
             }
             List<File> same = e.getValue();
@@ -1874,8 +2010,8 @@ public class MainActivity extends Activity {
             scannedSizeGroups++;
             if (scannedSizeGroups == 1 || scannedSizeGroups % 50 == 0 || scannedSizeGroups == totalSizeGroups) {
                 final int done = scannedSizeGroups;
-                int pct = 82 + (int) ((12L * done) / Math.max(1, totalSizeGroups));
-                setScanProgress(pct, "6/7 Dateidubletten · " + done + "/" +
+                int pct = 85 + (int) ((9L * done) / Math.max(1, totalSizeGroups));
+                setScanProgress(pct, "7/8 Dateidubletten · " + done + "/" +
                         totalSizeGroups + " Größengruppen");
             }
             List<File> same = e.getValue();
@@ -2178,10 +2314,14 @@ public class MainActivity extends Activity {
         boolean kcNamed = compactName.startsWith("kc_") || compactName.startsWith("kc-") ||
                 compactName.startsWith("kc.");
         boolean projectNamed = kcNamed || compactName.contains("marktkasse") || compactName.contains("kasse") ||
-                compactName.contains("dienstplan") || compactName.contains("dp2") ||
-                compactName.contains("futura") || compactName.contains("verwaltung") ||
-                compactName.contains("manager") || compactName.contains("communication") ||
-                compactName.contains("kommunikation");
+                compactName.contains("dienstplan") || compactName.contains("dp2") || compactName.contains("dp3") ||
+                compactName.contains("futura") || compactName.contains("academy") ||
+                compactName.contains("verwaltung") || compactName.contains("manager") ||
+                compactName.contains("communication") || compactName.contains("kommunikation") ||
+                compactName.contains("framework") || compactName.contains("reiseassistent") ||
+                compactName.contains("bilderrechner") || compactName.contains("systemcheck") ||
+                compactName.contains("speichercheck") || compactName.contains("inventar") ||
+                compactName.contains("weihnachtsmarkt");
         boolean versionNamed = compactName.matches(".*(v[0-9]+([._-][0-9]+)*|20[0-9]{2}[-_.][0-9]{1,2}[-_.][0-9]{1,2}|backup|sicherung|alt|old|komplett|zusammengefuehrt).*");
         return developmentFolder || kcNamed || (projectNamed && versionNamed);
     }
@@ -2210,8 +2350,10 @@ public class MainActivity extends Activity {
                     !isDescendantOf(c.referenceCopy, c.file) && !samePath(c.file, c.referenceCopy);
         }
 
-        if (reason.startsWith("KC-Entwicklungsarchiv im Download-Baum")) {
-            return isInDownloadTree(c.file) && isKcDevelopmentArchive(c.file);
+        if (reason.startsWith("Altes KC-Entwicklungsarchiv im Download-Baum")) {
+            long age = System.currentTimeMillis() - c.file.lastModified();
+            return age >= RECENT_ARCHIVE_PROTECTION &&
+                    isInDownloadTree(c.file) && isKcDevelopmentArchive(c.file);
         }
 
         if (!isDirectDownloadFile(c.file)) return false;
