@@ -458,6 +458,7 @@ public class MainActivity extends Activity {
             ScanState state = new ScanState();
             File root = Environment.getExternalStorageDirectory();
             scanTree(root, state);
+            analyzeProjectDirectories(state);
             findWhatsAppPhotoDuplicates(state);
             findDuplicates(state);
             lastScanState = state;
@@ -498,13 +499,45 @@ public class MainActivity extends Activity {
         long whatsappPhotoDuplicateBytes = 0;
         long nestedDuplicateFolders = 0;
         long nestedDuplicateFolderBytes = 0;
+        long developmentDirsSeen = 0;
+        long projectRootsSeen = 0;
+        long possibleOldProjectDirs = 0;
+        long possibleOldProjectBytes = 0;
         int duplicateGroupSeq = 0;
         final Map<Long, List<File>> sameSize = new HashMap<>();
         final Map<Long, List<File>> whatsappPhotoSameSize = new HashMap<>();
         final Map<String, Long> archiveCountByExt = new HashMap<>();
         final List<ArchiveEntry> archives = new ArrayList<>();
         final Set<String> archivePaths = new HashSet<>();
+        final List<File> projectDirCandidates = new ArrayList<>();
+        final Set<String> projectDirPaths = new HashSet<>();
+        final List<ProjectDirEntry> projectDirs = new ArrayList<>();
+        final Map<String, FolderStats> folderStatsCache = new HashMap<>();
         final Set<String> candidatePaths = new HashSet<>();
+    }
+
+    static class FolderStats {
+        long bytes = 0;
+        int files = 0;
+        int dirs = 0;
+        long newestModified = 0;
+    }
+
+    static class ProjectDirEntry {
+        final File dir;
+        final String key;
+        final FolderStats stats;
+        final int developmentDepth;
+        String assessment;
+        File reference;
+
+        ProjectDirEntry(File dir, String key, FolderStats stats, int developmentDepth) {
+            this.dir = dir;
+            this.key = key;
+            this.stats = stats;
+            this.developmentDepth = developmentDepth;
+            this.assessment = "INFO – Projektordner erkannt";
+        }
     }
 
     static class ArchiveEntry {
@@ -528,6 +561,7 @@ public class MainActivity extends Activity {
 
         if (file.isDirectory()) {
             state.dirs++;
+            recordProjectDirCandidate(file, state);
 
             if (isNestedDuplicateProjectDir(file)) {
                 long sz = folderSize(file, 0);
@@ -572,6 +606,231 @@ public class MainActivity extends Activity {
     private boolean isExcludedPath(String path) {
         String p = path.replace('\\', '/');
         return p.contains("/Android/data") || p.contains("/Android/obb") || p.contains("/Android/.Trash");
+    }
+
+    private void recordProjectDirCandidate(File dir, ScanState state) {
+        if (dir == null || state == null || !dir.isDirectory()) return;
+
+        int devDepth = developmentDepth(dir);
+        if (devDepth >= 0) state.developmentDirsSeen++;
+
+        String name = dir.getName() == null ? "" : dir.getName();
+        boolean versionLike = isVersionLikeProjectName(name);
+        boolean nestedDuplicate = isNestedDuplicateProjectDir(dir);
+        boolean strongProjectName = isStrongProjectName(name);
+        boolean inDownload = isDirectoryInDownloadTree(dir);
+
+        boolean projectRoot = false;
+        if (devDepth == 1) {
+            projectRoot = true; // jeder direkte Unterordner eines Entwicklungs-/Projektbereichs
+        } else if (devDepth >= 2 && devDepth <= 4 && (versionLike || nestedDuplicate)) {
+            projectRoot = true; // tiefere Versions-/Kopie-Stände flexibel erfassen
+        } else if (inDownload && strongProjectName && versionLike) {
+            projectRoot = true; // KC-Projektstände auch außerhalb eines expliziten "Entwicklung"-Ordners
+        }
+
+        if (!projectRoot) return;
+        String path = dir.getAbsolutePath();
+        if (state.projectDirPaths.add(path)) state.projectDirCandidates.add(dir);
+    }
+
+    private boolean isDirectoryInDownloadTree(File dir) {
+        if (dir == null || !dir.isDirectory()) return false;
+        String p = dir.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        if (downloads != null) {
+            String d = downloads.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+            if (p.equals(d) || p.startsWith(d + "/")) return true;
+        }
+        return p.contains("/download/") || p.endsWith("/download") ||
+                p.contains("/downloads/") || p.endsWith("/downloads");
+    }
+
+    private int developmentDepth(File dir) {
+        if (dir == null) return -1;
+        File current = dir;
+        int depth = 0;
+        while (current != null && depth <= 12) {
+            if (isDevelopmentAnchorName(current.getName())) return depth;
+            current = current.getParentFile();
+            depth++;
+        }
+        return -1;
+    }
+
+    private boolean isDevelopmentAnchorName(String raw) {
+        String n = normalizeProjectToken(raw);
+        return n.equals("entwicklung") || n.startsWith("entwicklung ") ||
+                n.equals("development") || n.startsWith("development ") ||
+                n.equals("projekte") || n.equals("projects") || n.equals("project") ||
+                n.equals("dev") || n.equals("orbit") || n.equals("github") ||
+                n.equals("quellcode") || n.equals("source");
+    }
+
+    private boolean isStrongProjectName(String raw) {
+        String n = normalizeProjectToken(raw).replace(" ", "");
+        return n.startsWith("kc") || n.contains("marktkasse") || n.contains("kasse") ||
+                n.contains("dienstplan") || n.contains("dp2") || n.contains("dp3") ||
+                n.contains("futura") || n.contains("verwaltung") || n.contains("manager") ||
+                n.contains("kommunikation") || n.contains("communication") ||
+                n.contains("framework") || n.contains("bilderrechner") ||
+                n.contains("speichercheck") || n.contains("systemcheck") ||
+                n.contains("inventar") || n.contains("weihnachtsmarkt");
+    }
+
+    private boolean isVersionLikeProjectName(String raw) {
+        if (raw == null) return false;
+        String n = raw.toLowerCase(Locale.ROOT).trim();
+        return n.matches(".*\\bv[0-9]+([._-][0-9]+)*\\b.*") ||
+                n.matches(".*20[0-9]{2}[-_.][0-9]{1,2}[-_.][0-9]{1,2}.*") ||
+                n.matches(".*[0-9]{1,2}[-_.][0-9]{1,2}[-_.]20[0-9]{2}.*") ||
+                n.matches(".*\\([0-9]+\\).*") ||
+                n.matches(".*[-_ ]copy([0-9]*)?$") ||
+                n.matches(".*[-_ ]kopie([0-9]*)?$") ||
+                n.contains("backup") || n.contains("sicherung") || n.contains("_old") ||
+                n.contains("-old") || n.contains(" alt") || n.contains("_alt") ||
+                n.contains("komplett") || n.contains("zusammengefuehrt") ||
+                n.contains("zusammengeführt") || n.contains("stand ");
+    }
+
+    private String normalizeProjectToken(String raw) {
+        if (raw == null) return "";
+        return raw.toLowerCase(Locale.ROOT)
+                .replace('ä', 'a').replace('ö', 'o').replace('ü', 'u').replace('ß', 's')
+                .replaceAll("[^a-z0-9]+", " ")
+                .trim().replaceAll("\\s+", " ");
+    }
+
+    private String projectGroupKey(String raw) {
+        String n = normalizeProjectToken(raw);
+        n = n.replaceAll("\\b20[0-9]{2}[ ]+[0-9]{1,2}[ ]+[0-9]{1,2}\\b", " ");
+        n = n.replaceAll("\\b[0-9]{1,2}[ ]+[0-9]{1,2}[ ]+20[0-9]{2}\\b", " ");
+        n = n.replaceAll("\\bv[0-9]+(?:[ ]+[0-9]+)*\\b", " ");
+        n = n.replaceAll("\\b(copy|kopie|backup|sicherung|old|alt|komplett|zusammengefuehrt|zusammengefuhrt)\\b", " ");
+        n = n.replaceAll("\\bstand[ ]*[0-9]*\\b", " ");
+        n = n.replaceAll("\\s+", " ").trim();
+        if (n.length() < 3) n = normalizeProjectToken(raw);
+        return n;
+    }
+
+    private FolderStats folderStats(File file, ScanState state, int depth) {
+        FolderStats empty = new FolderStats();
+        if (file == null || !file.exists() || depth > 50 || isExcludedPath(file.getAbsolutePath())) return empty;
+
+        String key = file.getAbsolutePath();
+        FolderStats cached = state.folderStatsCache.get(key);
+        if (cached != null) return cached;
+
+        FolderStats out = new FolderStats();
+        out.newestModified = Math.max(0L, file.lastModified());
+        if (file.isFile()) {
+            out.bytes = file.length();
+            out.files = 1;
+            state.folderStatsCache.put(key, out);
+            return out;
+        }
+
+        out.dirs = 1;
+        File[] children;
+        try { children = file.listFiles(); } catch (SecurityException e) { return out; }
+        if (children != null) {
+            for (File child : children) {
+                FolderStats c = folderStats(child, state, depth + 1);
+                out.bytes += c.bytes;
+                out.files += c.files;
+                out.dirs += c.dirs;
+                out.newestModified = Math.max(out.newestModified, c.newestModified);
+            }
+        }
+        state.folderStatsCache.put(key, out);
+        return out;
+    }
+
+    private boolean isDescendantOf(File child, File parent) {
+        if (child == null || parent == null) return false;
+        String c = child.getAbsolutePath().replace('\\', '/');
+        String p = parent.getAbsolutePath().replace('\\', '/');
+        return !c.equals(p) && c.startsWith(p + "/");
+    }
+
+    private ProjectDirEntry chooseProjectReference(List<ProjectDirEntry> group) {
+        ProjectDirEntry best = null;
+        for (ProjectDirEntry e : group) {
+            boolean nestedInsideGroup = false;
+            for (ProjectDirEntry other : group) {
+                if (other != e && isDescendantOf(e.dir, other.dir)) {
+                    nestedInsideGroup = true;
+                    break;
+                }
+            }
+            if (best == null) {
+                best = e;
+                continue;
+            }
+            boolean bestNested = false;
+            for (ProjectDirEntry other : group) {
+                if (other != best && isDescendantOf(best.dir, other.dir)) {
+                    bestNested = true;
+                    break;
+                }
+            }
+            if (bestNested && !nestedInsideGroup) {
+                best = e;
+            } else if (bestNested == nestedInsideGroup &&
+                    e.stats.newestModified > best.stats.newestModified) {
+                best = e;
+            }
+        }
+        return best;
+    }
+
+    private void analyzeProjectDirectories(ScanState state) {
+        if (state == null || state.projectDirCandidates.isEmpty()) return;
+
+        Map<String, List<ProjectDirEntry>> groups = new HashMap<>();
+        for (File dir : state.projectDirCandidates) {
+            FolderStats stats = folderStats(dir, state, 0);
+            String key = projectGroupKey(dir.getName());
+            ProjectDirEntry entry = new ProjectDirEntry(dir, key, stats, developmentDepth(dir));
+            state.projectDirs.add(entry);
+            state.projectRootsSeen++;
+            groups.computeIfAbsent(key, k -> new ArrayList<>()).add(entry);
+        }
+
+        for (List<ProjectDirEntry> group : groups.values()) {
+            if (group.isEmpty()) continue;
+            ProjectDirEntry keep = chooseProjectReference(group);
+
+            if (group.size() == 1) {
+                ProjectDirEntry e = group.get(0);
+                if (isVersionLikeProjectName(e.dir.getName())) {
+                    e.assessment = "INFO – einzelner Versions-/Kopieordner; kein paralleler Vergleichsstand erkannt";
+                } else {
+                    e.assessment = "BEHALTEN – einzelner erkannter Projektstand";
+                }
+                continue;
+            }
+
+            keep.assessment = "REFERENZ – bevorzugter Stand innerhalb dieser Projektgruppe";
+            for (ProjectDirEntry e : group) {
+                if (e == keep) continue;
+                e.reference = keep.dir;
+                e.assessment = isDescendantOf(e.dir, keep.dir)
+                        ? "PRUEFEN – verschachtelter Projektstand innerhalb der Referenz"
+                        : "PRUEFEN – weiterer/älterer Parallelstand; Referenz bleibt erhalten";
+                state.possibleOldProjectDirs++;
+                state.possibleOldProjectBytes += e.stats.bytes;
+                addCandidate(e.dir, e.stats.bytes, Risk.YELLOW,
+                        "Möglicher alter/doppelter Projektstand; Vergleichsordner bleibt erhalten",
+                        keep.dir, 0, state);
+            }
+        }
+
+        state.projectDirs.sort((a, b) -> {
+            int k = a.key.compareToIgnoreCase(b.key);
+            if (k != 0) return k;
+            return Long.compare(b.stats.newestModified, a.stats.newestModified);
+        });
     }
 
     private void scanArchivesOnly(File file, ScanState state, int depth) {
@@ -889,7 +1148,7 @@ public class MainActivity extends Activity {
             sb.append("\n\nDublettengruppe: ").append(c.duplicateGroup);
         }
         if (c.referenceCopy != null) {
-            sb.append("\n\nReferenzkopie, die erhalten bleibt:\n")
+            sb.append("\n\nReferenz, die erhalten bleibt:\n")
                     .append(c.referenceCopy.getAbsolutePath());
         }
         return sb.toString();
@@ -1017,6 +1276,9 @@ public class MainActivity extends Activity {
                 "\nWhatsApp-Fotos: " + st.whatsappPhotosSeen +
                 " · Dubletten: " + st.whatsappPhotoDuplicates +
                 " · Gruppen: " + st.duplicateGroupSeq +
+                "\nEntwicklungs-Unterordner: " + st.developmentDirsSeen +
+                " · Projektwurzeln: " + st.projectRootsSeen +
+                " · mögliche Altstände: " + st.possibleOldProjectDirs +
                 "\nDoppelte Projektordner: " + st.nestedDuplicateFolders;
         summary.setText("Gefunden (max. " + MAX_VISIBLE + " größte Treffer):\n" +
                 "🟢 " + gc + " · " + Formatter.formatFileSize(this, green) + "   " +
@@ -1251,6 +1513,36 @@ public class MainActivity extends Activity {
             sb.append("Dublettengruppen: ").append(st.duplicateGroupSeq).append("\n");
             sb.append("Doppelte/verschachtelte Projektordner: ").append(st.nestedDuplicateFolders)
                     .append(" | ").append(st.nestedDuplicateFolderBytes).append(" Bytes\n");
+            sb.append("Entwicklungs-Unterordner gesehen: ").append(st.developmentDirsSeen).append("\n");
+            sb.append("Erkannte Projektwurzeln: ").append(st.projectRootsSeen).append("\n");
+            sb.append("Mögliche alte/doppelte Projektstände: ").append(st.possibleOldProjectDirs)
+                    .append(" | ").append(st.possibleOldProjectBytes).append(" Bytes\n");
+
+            sb.append("\nPROJEKTORDNER-DIAGNOSE – Unterverzeichnisse und Versionsstände\n");
+            if (st.projectDirs.isEmpty()) {
+                sb.append("Keine Projektordner-Wurzeln erkannt.\n");
+            } else {
+                SimpleDateFormat projectDate = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMANY);
+                int pi = 1;
+                for (ProjectDirEntry p : st.projectDirs) {
+                    sb.append(pi++).append(". ").append(p.assessment).append("\n");
+                    sb.append("Name: ").append(p.dir.getName()).append("\n");
+                    sb.append("Pfad: ").append(p.dir.getAbsolutePath()).append("\n");
+                    sb.append("Projektgruppe: ").append(p.key).append("\n");
+                    sb.append("Tiefe unter Entwicklungsbereich: ").append(p.developmentDepth).append("\n");
+                    sb.append("Inhalt: ").append(p.stats.files).append(" Dateien, ")
+                            .append(Math.max(0, p.stats.dirs - 1)).append(" Unterordner, ")
+                            .append(p.stats.bytes).append(" Bytes\n");
+                    if (p.stats.newestModified > 0) {
+                        sb.append("Neueste Änderung im Ordnerbaum: ")
+                                .append(projectDate.format(new Date(p.stats.newestModified))).append("\n");
+                    }
+                    if (p.reference != null) {
+                        sb.append("Referenzordner: ").append(p.reference.getAbsolutePath()).append("\n");
+                    }
+                    sb.append("\n");
+                }
+            }
 
             sb.append("\nARCHIVDIAGNOSE – alle im Scan erreichbaren Archive\n");
             sb.append("Ausgenommen bleiben Android/data, Android/obb und Android/.Trash.\n");
