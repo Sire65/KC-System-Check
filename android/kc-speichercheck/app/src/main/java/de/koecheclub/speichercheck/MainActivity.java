@@ -21,6 +21,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
+import android.provider.MediaStore;
 import android.database.Cursor;
 import android.text.format.Formatter;
 import android.view.GestureDetector;
@@ -458,6 +459,17 @@ public class MainActivity extends Activity {
             ScanState state = new ScanState();
             File root = Environment.getExternalStorageDirectory();
             scanTree(root, state);
+
+            // Zweiter, unabhängiger Kontrolllauf speziell für Download:
+            // Er darf keine Unterordner wegen Projekt-/Buildlogik überspringen.
+            File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            auditDownloadTree(downloads, state, 0);
+
+            // Androids Download-Index als zusätzlicher Fallback. Damit werden auch
+            // Einträge sichtbar, die ein Hersteller-Dateimanager zeigt, der klassische
+            // File-Baum aber ggf. nicht geliefert hat.
+            scanDownloadMediaStoreFallback(state);
+
             analyzeProjectDirectories(state);
             findWhatsAppPhotoDuplicates(state);
             findDuplicates(state);
@@ -503,6 +515,16 @@ public class MainActivity extends Activity {
         long projectRootsSeen = 0;
         long possibleOldProjectDirs = 0;
         long possibleOldProjectBytes = 0;
+        long downloadFilesSeen = 0;
+        long downloadDirsSeen = 0;
+        long downloadArchivesSeen = 0;
+        long downloadAuditFiles = 0;
+        long downloadAuditDirs = 0;
+        long downloadAuditArchives = 0;
+        long mediaStoreDownloadRows = 0;
+        long mediaStoreFilesAdded = 0;
+        long mediaStoreArchivesAdded = 0;
+        long mediaStoreQueryErrors = 0;
         int duplicateGroupSeq = 0;
         final Map<Long, List<File>> sameSize = new HashMap<>();
         final Map<Long, List<File>> whatsappPhotoSameSize = new HashMap<>();
@@ -514,6 +536,7 @@ public class MainActivity extends Activity {
         final List<ProjectDirEntry> projectDirs = new ArrayList<>();
         final Map<String, FolderStats> folderStatsCache = new HashMap<>();
         final Set<String> candidatePaths = new HashSet<>();
+        final Set<String> seenFilePaths = new HashSet<>();
     }
 
     static class FolderStats {
@@ -561,6 +584,7 @@ public class MainActivity extends Activity {
 
         if (file.isDirectory()) {
             state.dirs++;
+            if (isDirectoryInDownloadTree(file)) state.downloadDirsSeen++;
             recordProjectDirCandidate(file, state);
 
             if (isNestedDuplicateProjectDir(file)) {
@@ -585,21 +609,116 @@ public class MainActivity extends Activity {
             if (children == null) { state.unreadableDirs++; return; }
             for (File child : children) scanTree(child, state);
         } else {
-            state.files++;
-            long size = file.length();
-            state.totalBytes += size;
-            if (size >= MB) state.sameSize.computeIfAbsent(size, k -> new ArrayList<>()).add(file);
-            if (isWhatsAppPhoto(file)) {
-                state.whatsappPhotosSeen++;
-                if (size >= 64L * 1024L) {
-                    state.whatsappPhotoSameSize.computeIfAbsent(size, k -> new ArrayList<>()).add(file);
+            registerScannedFile(file, state, false);
+        }
+    }
+
+    private void registerScannedFile(File file, ScanState state, boolean supplemental) {
+        if (file == null || state == null || !file.isFile()) return;
+        String path = file.getAbsolutePath();
+        if (isExcludedPath(path)) return;
+        if (!state.seenFilePaths.add(path)) return;
+
+        state.files++;
+        long size = file.length();
+        state.totalBytes += size;
+
+        if (isInDownloadTree(file)) {
+            state.downloadFilesSeen++;
+            String ext = extension(file.getName().toLowerCase(Locale.ROOT));
+            if (ARCHIVE_EXT.contains(ext)) state.downloadArchivesSeen++;
+        }
+        if (supplemental) state.mediaStoreFilesAdded++;
+
+        if (size >= MB) state.sameSize.computeIfAbsent(size, k -> new ArrayList<>()).add(file);
+        if (isWhatsAppPhoto(file)) {
+            state.whatsappPhotosSeen++;
+            if (size >= 64L * 1024L) {
+                state.whatsappPhotoSameSize.computeIfAbsent(size, k -> new ArrayList<>()).add(file);
+            }
+        }
+        classifyFile(file, size, state);
+        if (state.files % 500 == 0) {
+            long f = state.files;
+            runOnUiThread(() -> status.setText("Scan läuft … " + f + " Dateien geprüft"));
+        }
+    }
+
+    private void auditDownloadTree(File file, ScanState state, int depth) {
+        if (file == null || state == null || !file.exists() || depth > 80) return;
+        if (isExcludedPath(file.getAbsolutePath())) return;
+
+        if (file.isDirectory()) {
+            state.downloadAuditDirs++;
+            recordProjectDirCandidate(file, state);
+            File[] children;
+            try { children = file.listFiles(); }
+            catch (SecurityException e) { state.unreadableDirs++; return; }
+            if (children == null) { state.unreadableDirs++; return; }
+            for (File child : children) auditDownloadTree(child, state, depth + 1);
+            return;
+        }
+
+        state.downloadAuditFiles++;
+        String ext = extension(file.getName().toLowerCase(Locale.ROOT));
+        if (ARCHIVE_EXT.contains(ext)) state.downloadAuditArchives++;
+        registerScannedFile(file, state, false);
+    }
+
+    private void scanDownloadMediaStoreFallback(ScanState state) {
+        if (state == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
+
+        Uri uri;
+        try {
+            uri = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+        } catch (Exception e) {
+            uri = MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+        }
+
+        String[] projection = new String[] {
+                MediaStore.MediaColumns.DISPLAY_NAME,
+                MediaStore.MediaColumns.RELATIVE_PATH,
+                MediaStore.MediaColumns.SIZE
+        };
+
+        try (Cursor cursor = getContentResolver().query(uri, projection, null, null, null)) {
+            if (cursor == null) {
+                state.mediaStoreQueryErrors++;
+                return;
+            }
+
+            int nameCol = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME);
+            int relCol = cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH);
+            while (cursor.moveToNext()) {
+                state.mediaStoreDownloadRows++;
+                String name = nameCol >= 0 ? cursor.getString(nameCol) : null;
+                String rel = relCol >= 0 ? cursor.getString(relCol) : null;
+                if (name == null || name.trim().isEmpty()) continue;
+                if (rel == null || rel.trim().isEmpty()) rel = Environment.DIRECTORY_DOWNLOADS + "/";
+
+                File candidate = new File(Environment.getExternalStorageDirectory(), rel + name);
+                if (!candidate.exists() || !candidate.isFile()) continue;
+                if (isExcludedPath(candidate.getAbsolutePath())) continue;
+
+                String ext = extension(candidate.getName().toLowerCase(Locale.ROOT));
+                boolean archive = ARCHIVE_EXT.contains(ext);
+                boolean wasSeen = state.seenFilePaths.contains(candidate.getAbsolutePath());
+                registerScannedFile(candidate, state, true);
+                if (archive && !wasSeen && state.archivePaths.contains(candidate.getAbsolutePath())) {
+                    state.mediaStoreArchivesAdded++;
+                }
+
+                // Auch Elternordner bis Download mit prüfen, damit ausgepackte
+                // KC-Projekte aus dem Index nicht verloren gehen.
+                File parent = candidate.getParentFile();
+                int hops = 0;
+                while (parent != null && hops++ < 8 && isDirectoryInDownloadTree(parent)) {
+                    recordProjectDirCandidate(parent, state);
+                    parent = parent.getParentFile();
                 }
             }
-            classifyFile(file, size, state);
-            if (state.files % 500 == 0) {
-                long f = state.files;
-                runOnUiThread(() -> status.setText("Scan läuft … " + f + " Dateien geprüft"));
-            }
+        } catch (Exception e) {
+            state.mediaStoreQueryErrors++;
         }
     }
 
@@ -619,14 +738,20 @@ public class MainActivity extends Activity {
         boolean nestedDuplicate = isNestedDuplicateProjectDir(dir);
         boolean strongProjectName = isStrongProjectName(name);
         boolean inDownload = isDirectoryInDownloadTree(dir);
+        boolean projectMarkers = inDownload && hasProjectMarkers(dir);
+        int dlDepth = downloadDepth(dir);
 
         boolean projectRoot = false;
-        if (devDepth == 1) {
-            projectRoot = true; // jeder direkte Unterordner eines Entwicklungs-/Projektbereichs
-        } else if (devDepth >= 2 && devDepth <= 4 && (versionLike || nestedDuplicate)) {
-            projectRoot = true; // tiefere Versions-/Kopie-Stände flexibel erfassen
-        } else if (inDownload && strongProjectName && versionLike) {
-            projectRoot = true; // KC-Projektstände auch außerhalb eines expliziten "Entwicklung"-Ordners
+        if (devDepth == 1 && (strongProjectName || versionLike || projectMarkers)) {
+            projectRoot = true; // direkter echter Projektstand unter Entwicklung/Projekte
+        } else if (devDepth >= 2 && devDepth <= 8 &&
+                (nestedDuplicate || (strongProjectName && (versionLike || projectMarkers)))) {
+            projectRoot = true; // tiefe KC-/Versions-/Kopie-Stände
+        } else if (inDownload && strongProjectName &&
+                (versionLike || projectMarkers || (dlDepth >= 1 && dlDepth <= 3))) {
+            projectRoot = true; // ausgepackte KC-Projekte auch ohne Versionswort
+        } else if (inDownload && projectMarkers && versionLike && dlDepth >= 1 && dlDepth <= 4) {
+            projectRoot = true;
         }
 
         if (!projectRoot) return;
@@ -644,6 +769,51 @@ public class MainActivity extends Activity {
         }
         return p.contains("/download/") || p.endsWith("/download") ||
                 p.contains("/downloads/") || p.endsWith("/downloads");
+    }
+
+    private int downloadDepth(File dir) {
+        if (dir == null) return -1;
+        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        if (downloads == null) return -1;
+        String target = downloads.getAbsolutePath().replace('\\', '/');
+        File current = dir;
+        int depth = 0;
+        while (current != null && depth <= 30) {
+            String p = current.getAbsolutePath().replace('\\', '/');
+            if (p.equalsIgnoreCase(target)) return depth;
+            current = current.getParentFile();
+            depth++;
+        }
+        return -1;
+    }
+
+    private boolean hasProjectMarkers(File dir) {
+        if (dir == null || !dir.isDirectory()) return false;
+        File[] children;
+        try { children = dir.listFiles(); } catch (SecurityException e) { return false; }
+        if (children == null) return false;
+
+        int inspected = 0;
+        for (File child : children) {
+            if (child == null) continue;
+            String n = child.getName() == null ? "" : child.getName().toLowerCase(Locale.ROOT);
+            if (child.isFile()) {
+                if (n.equals("package.json") || n.equals("build.gradle") || n.equals("settings.gradle") ||
+                        n.equals("gradlew") || n.equals("gradlew.bat") || n.equals("pom.xml") ||
+                        n.equals("pyproject.toml") || n.equals("requirements.txt") ||
+                        n.equals("pubspec.yaml") || n.equals("cargo.toml") ||
+                        n.equals("composer.json") || n.equals("index.html")) {
+                    return true;
+                }
+            } else if (child.isDirectory()) {
+                if (n.equals(".git") || n.equals("src") || n.equals("app") ||
+                        n.equals("backend") || n.equals("frontend")) {
+                    return true;
+                }
+            }
+            if (++inspected >= 250) break;
+        }
+        return false;
     }
 
     private int developmentDepth(File dir) {
@@ -703,11 +873,27 @@ public class MainActivity extends Activity {
 
     private String projectGroupKey(String raw) {
         String n = normalizeProjectToken(raw);
+
+        // Bei Namen wie framework_studio_v1_38_7_... ist der stabile
+        // Projektname der Teil VOR der Versionsnummer. So werden verschiedene
+        // 1.38.x-Stände tatsächlich miteinander verglichen.
+        String[] versionSplit = n.split("\\bv[0-9]+(?:[ ]+[0-9]+)*\\b", 2);
+        if (versionSplit.length > 1) {
+            String prefix = versionSplit[0].replaceAll("\\s+", " ").trim();
+            int words = prefix.isEmpty() ? 0 : prefix.split(" ").length;
+            if (prefix.length() >= 3 && words <= 4 && !prefix.matches(".*\\b20[0-9]{2}\\b.*")) {
+                return prefix;
+            }
+        }
+
         n = n.replaceAll("\\b20[0-9]{2}[ ]+[0-9]{1,2}[ ]+[0-9]{1,2}\\b", " ");
         n = n.replaceAll("\\b[0-9]{1,2}[ ]+[0-9]{1,2}[ ]+20[0-9]{2}\\b", " ");
         n = n.replaceAll("\\bv[0-9]+(?:[ ]+[0-9]+)*\\b", " ");
         n = n.replaceAll("\\b(copy|kopie|backup|sicherung|old|alt|komplett|zusammengefuehrt|zusammengefuhrt)\\b", " ");
         n = n.replaceAll("\\bstand[ ]*[0-9]*\\b", " ");
+        if (raw != null && raw.toLowerCase(Locale.ROOT).matches(".*(\\([0-9]+\\)|[-_ ][0-9]+)$")) {
+            n = n.replaceAll("\\b[0-9]+\\b$", " ");
+        }
         n = n.replaceAll("\\s+", " ").trim();
         if (n.length() < 3) n = normalizeProjectToken(raw);
         return n;
@@ -1517,6 +1703,16 @@ public class MainActivity extends Activity {
             sb.append("Erkannte Projektwurzeln: ").append(st.projectRootsSeen).append("\n");
             sb.append("Mögliche alte/doppelte Projektstände: ").append(st.possibleOldProjectDirs)
                     .append(" | ").append(st.possibleOldProjectBytes).append(" Bytes\n");
+            sb.append("Download im Hauptscan: ").append(st.downloadFilesSeen).append(" Dateien, ")
+                    .append(st.downloadDirsSeen).append(" Ordner, ")
+                    .append(st.downloadArchivesSeen).append(" Archive\n");
+            sb.append("Download-Kontrollscan: ").append(st.downloadAuditFiles).append(" Dateien, ")
+                    .append(st.downloadAuditDirs).append(" Ordner, ")
+                    .append(st.downloadAuditArchives).append(" Archive\n");
+            sb.append("Android Download-Index: ").append(st.mediaStoreDownloadRows).append(" Einträge; ")
+                    .append(st.mediaStoreFilesAdded).append(" zusätzlich erfasste Dateien; ")
+                    .append(st.mediaStoreArchivesAdded).append(" zusätzliche Archive; Fehler ")
+                    .append(st.mediaStoreQueryErrors).append("\n");
 
             sb.append("\nPROJEKTORDNER-DIAGNOSE – Unterverzeichnisse und Versionsstände\n");
             if (st.projectDirs.isEmpty()) {
