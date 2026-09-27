@@ -9,6 +9,9 @@ Android-App zum Prüfen des gemeinsamen Gerätespeichers.
   - GELB: Archive, APKs, Backups und byte-identische Dubletten, die geprüft werden sollten.
   - ROT: sehr große unbekannte Dateien; keine pauschale Lösch-Empfehlung.
 - Sortierung nach Speicherverbrauch und Mehrfachauswahl.
+- Doppeltipp auf einen Treffer öffnet bei Fotos eine Bildvorschau, bei Videos eine interne Wiedergabe und sonst die Dateidetails.
+- Byte-identische Dubletten werden in Gruppen geführt; die Referenzkopie, die erhalten bleibt, wird angezeigt.
+- Verschachtelte gleichnamige Entwicklungsordner werden als möglicher kompletter doppelter Projektstand erkannt und nur manuell zur Prüfung angeboten.
 - Zweite Sicherheitsabfrage vor jeder dauerhaften Löschung.
 - **Sicher automatisch bereinigen**: löscht ohne Einzelauswahl nur streng freigegebene Treffer direkt im Download-Ordner (alte Archive und byte-identische Dubletten).
 - Automatik-Schutz: WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents, Entwicklung, Orbit, Projekt-Unterordner sowie APK/AAB-Dateien werden nicht automatisch gelöscht.
