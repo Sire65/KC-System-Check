@@ -94,6 +94,7 @@ public class MainActivity extends Activity {
     private Button scanButton;
     private Button deleteButton;
     private Button reportButton;
+    private Button shareReportButton;
     private Button updateButton;
     private volatile boolean scanning = false;
 
@@ -197,6 +198,12 @@ public class MainActivity extends Activity {
         reportButton.setOnClickListener(v -> saveReport());
         row.addView(reportButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
         root.addView(row);
+
+        shareReportButton = new Button(this);
+        shareReportButton.setText("Bericht teilen");
+        shareReportButton.setEnabled(false);
+        shareReportButton.setOnClickListener(v -> shareReport());
+        root.addView(shareReportButton);
 
         status = new TextView(this);
         status.setText("Bereit");
@@ -368,6 +375,7 @@ public class MainActivity extends Activity {
         scanButton.setEnabled(false);
         deleteButton.setEnabled(false);
         reportButton.setEnabled(false);
+        shareReportButton.setEnabled(false);
 
         new Thread(() -> {
             ScanState state = new ScanState();
@@ -389,6 +397,7 @@ public class MainActivity extends Activity {
                 scanButton.setEnabled(true);
                 deleteButton.setEnabled(!candidates.isEmpty());
                 reportButton.setEnabled(!candidates.isEmpty());
+                shareReportButton.setEnabled(!candidates.isEmpty());
                 status.setText("Scan abgeschlossen: " + state.files + " Dateien, " + state.dirs + " Ordner geprüft.");
                 updateOverallSummary();
             });
@@ -624,6 +633,41 @@ public class MainActivity extends Activity {
         try { return f.delete(); } catch (SecurityException e) { return false; }
     }
 
+    private String buildReportText() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("KC SpeicherCheck v").append(BuildConfig.VERSION_NAME).append("\n");
+        sb.append("Erstellt: ").append(new Date()).append("\n");
+        sb.append("Gerät: ").append(Build.MANUFACTURER).append(" ").append(Build.MODEL).append("\n");
+        sb.append("Android: ").append(Build.VERSION.RELEASE).append("\n\n");
+        sb.append("Bewertung: GRUEN = meist erzeugbar/temporär; GELB = prüfen; ROT = nicht pauschal löschen\n\n");
+        int i = 1;
+        for (Candidate c : candidates) {
+            sb.append(i++).append(". ").append(c.risk)
+                    .append(" | ").append(c.size).append(" Bytes")
+                    .append(" | ").append(c.file.isDirectory() ? "ORDNER" : "DATEI")
+                    .append(" | ").append(c.reason).append("\n");
+            sb.append("Name: ").append(c.file.getName()).append("\n");
+            sb.append("Pfad: ").append(c.file.getAbsolutePath()).append("\n\n");
+        }
+        return sb.toString();
+    }
+
+    private void shareReport() {
+        if (candidates.isEmpty()) {
+            Toast.makeText(this, "Bitte zuerst den Speicher scannen.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/plain");
+        send.putExtra(Intent.EXTRA_SUBJECT, "KC SpeicherCheck Bericht");
+        send.putExtra(Intent.EXTRA_TEXT, buildReportText());
+        try {
+            startActivity(Intent.createChooser(send, "Bericht senden an …"));
+        } catch (Exception e) {
+            Toast.makeText(this, "Teilen konnte nicht geöffnet werden: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void saveReport() {
         File docs = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
         File dir = new File(docs, "KC_SpeicherCheck");
@@ -633,19 +677,8 @@ public class MainActivity extends Activity {
         }
         String ts = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.GERMANY).format(new Date());
         File out = new File(dir, "SpeicherCheck_" + ts + ".txt");
-        StringBuilder sb = new StringBuilder();
-        sb.append("KC SpeicherCheck\n");
-        sb.append("Erstellt: ").append(new Date()).append("\n");
-        sb.append("Gerät: ").append(Build.MANUFACTURER).append(" ").append(Build.MODEL).append("\n");
-        sb.append("Android: ").append(Build.VERSION.RELEASE).append("\n\n");
-        sb.append("Bewertung: GRUEN = meist erzeugbar/temporär; GELB = prüfen; ROT = nicht pauschal löschen\n\n");
-        int i = 1;
-        for (Candidate c : candidates) {
-            sb.append(i++).append(". ").append(c.risk).append(" | ").append(c.size).append(" Bytes | ").append(c.reason).append("\n");
-            sb.append(c.file.getAbsolutePath()).append("\n\n");
-        }
         try (FileOutputStream fos = new FileOutputStream(out)) {
-            fos.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+            fos.write(buildReportText().getBytes(StandardCharsets.UTF_8));
             Toast.makeText(this, "Bericht gespeichert:\n" + out.getAbsolutePath(), Toast.LENGTH_LONG).show();
         } catch (IOException e) {
             Toast.makeText(this, "Bericht konnte nicht gespeichert werden: " + e.getMessage(), Toast.LENGTH_LONG).show();
