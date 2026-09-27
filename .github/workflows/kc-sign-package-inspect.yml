@@ -1,0 +1,29 @@
+name: Inspect KC signing package v1.2.2
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kc-sign-package-inspect.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Historisches Signierpaket nur auf Dateinamen prüfen
+        run: |
+          set -euo pipefail
+          WF='.github/workflows/kc-speichercheck-publish-signed-v122.yml'
+          URL=$(grep -o "https://[^']*" "$WF" | head -1)
+          test -n "$URL"
+          curl -L --fail --retry 3 "$URL" -o /tmp/kc-signed.zip
+          echo '--- ZIP CONTENTS ---'
+          unzip -Z1 /tmp/kc-signed.zip
+          echo '--- EXTRACTED FILES ---'
+          rm -rf /tmp/kc-signed && mkdir -p /tmp/kc-signed
+          unzip -oq /tmp/kc-signed.zip -d /tmp/kc-signed
+          find /tmp/kc-signed -maxdepth 3 -type f -printf '%P | %s bytes\n' | sort
