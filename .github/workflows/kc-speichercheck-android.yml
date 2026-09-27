@@ -1,0 +1,45 @@
+name: KC SpeicherCheck Android
+
+on:
+  push:
+    paths:
+      - 'android/kc-speichercheck/**'
+      - '.github/workflows/kc-speichercheck-android.yml'
+  pull_request:
+    paths:
+      - 'android/kc-speichercheck/**'
+      - '.github/workflows/kc-speichercheck-android.yml'
+
+concurrency:
+  group: kc-speichercheck-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-debug:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Java 17 einrichten
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle 8.9 einrichten
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Debug-APK bauen
+        run: gradle -p android/kc-speichercheck clean assembleDebug
+
+      - name: Test-APK als Artefakt sichern
+        uses: actions/upload-artifact@v4
+        with:
+          name: KC-SpeicherCheck-debug
+          path: android/kc-speichercheck/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
