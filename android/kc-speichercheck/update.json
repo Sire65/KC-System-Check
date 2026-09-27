@@ -1,8 +1,8 @@
 {
-  "versionCode": 3,
-  "versionName": "1.1.1",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.1.1.apk",
-  "sha256": "156575b8b096f3aadb991622cf9a3aeec1bf1253873a090f033f36bb1766a1bd",
-  "notes": "Eigenes App-Icon und Funktion zum Anheften auf dem Android-Startbildschirm hinzugefügt.",
+  "versionCode": 4,
+  "versionName": "1.1.2",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.1.2.apk",
+  "sha256": "41f0dff0f6f0ddac5d1e2f8cc308bdede01d937870e45a9ce14616df65e7b488",
+  "notes": "Dateiname und vollständiger Pfad sind sichtbar. Zusätzlich gibt es 'Alle markieren' und 'Keine markieren'.",
   "published": "2026-09-27"
 }
