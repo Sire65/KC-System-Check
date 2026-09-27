@@ -458,21 +458,29 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             ScanState state = new ScanState();
             File root = Environment.getExternalStorageDirectory();
+
+            setScanPhase("1/6 Hauptscan des Gerätespeichers …");
             scanTree(root, state);
 
-            // Zweiter, unabhängiger Kontrolllauf speziell für Download:
-            // Er darf keine Unterordner wegen Projekt-/Buildlogik überspringen.
+            // Zweiter Kontrolllauf speziell für Download. In v1.3.9 ist dieser
+            // absichtlich schlank: keine erneute Projektanalyse pro Ordner.
+            setScanPhase("2/6 Download-Unterordner werden kontrolliert …");
             File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
             auditDownloadTree(downloads, state, 0);
 
-            // Androids Download-Index als zusätzlicher Fallback. Damit werden auch
-            // Einträge sichtbar, die ein Hersteller-Dateimanager zeigt, der klassische
-            // File-Baum aber ggf. nicht geliefert hat.
+            // Androids Download-Index als zusätzlicher Fallback.
+            setScanPhase("3/6 Android-Download-Index wird geprüft …");
             scanDownloadMediaStoreFallback(state);
 
+            setScanPhase("4/6 KC-/Projektstände werden ausgewertet …");
             analyzeProjectDirectories(state);
+
+            setScanPhase("5/6 WhatsApp-Dubletten werden geprüft …");
             findWhatsAppPhotoDuplicates(state);
+
+            setScanPhase("6/6 Dateidubletten werden geprüft …");
             findDuplicates(state);
+
             lastScanState = state;
 
             Collections.sort(candidates, Comparator.comparingLong((Candidate c) -> c.size).reversed());
@@ -537,6 +545,7 @@ public class MainActivity extends Activity {
         final Map<String, FolderStats> folderStatsCache = new HashMap<>();
         final Set<String> candidatePaths = new HashSet<>();
         final Set<String> seenFilePaths = new HashSet<>();
+        final Set<String> inspectedProjectDirPaths = new HashSet<>();
     }
 
     static class FolderStats {
@@ -650,7 +659,6 @@ public class MainActivity extends Activity {
 
         if (file.isDirectory()) {
             state.downloadAuditDirs++;
-            recordProjectDirCandidate(file, state);
             File[] children;
             try { children = file.listFiles(); }
             catch (SecurityException e) { state.unreadableDirs++; return; }
@@ -662,7 +670,19 @@ public class MainActivity extends Activity {
         state.downloadAuditFiles++;
         String ext = extension(file.getName().toLowerCase(Locale.ROOT));
         if (ARCHIVE_EXT.contains(ext)) state.downloadAuditArchives++;
-        registerScannedFile(file, state, false);
+
+        // Nur bislang unbekannte Dateien müssen erneut klassifiziert werden.
+        // Bereits im Hauptscan bekannte Dateien werden lediglich gezählt.
+        if (!state.seenFilePaths.contains(file.getAbsolutePath())) {
+            registerScannedFile(file, state, false);
+        }
+
+        if (state.downloadAuditFiles % 250 == 0) {
+            long n = state.downloadAuditFiles;
+            long a = state.downloadAuditArchives;
+            setScanPhase("2/6 Download-Kontrollscan … " + n +
+                    " Dateien, " + a + " Archive gesehen");
+        }
     }
 
     private void scanDownloadMediaStoreFallback(ScanState state) {
@@ -691,6 +711,12 @@ public class MainActivity extends Activity {
             int relCol = cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH);
             while (cursor.moveToNext()) {
                 state.mediaStoreDownloadRows++;
+                if (state.mediaStoreDownloadRows % 250 == 0) {
+                    long n = state.mediaStoreDownloadRows;
+                    long added = state.mediaStoreFilesAdded;
+                    setScanPhase("3/6 Android-Download-Index … " + n +
+                            " Einträge, " + added + " zusätzlich");
+                }
                 String name = nameCol >= 0 ? cursor.getString(nameCol) : null;
                 String rel = relCol >= 0 ? cursor.getString(relCol) : null;
                 if (name == null || name.trim().isEmpty()) continue;
@@ -729,6 +755,11 @@ public class MainActivity extends Activity {
 
     private void recordProjectDirCandidate(File dir, ScanState state) {
         if (dir == null || state == null || !dir.isDirectory()) return;
+
+        // Derselbe Ordner kann über Hauptscan, Download-Kontrollscan und MediaStore
+        // mehrfach auftauchen. Teure Marker-/listFiles-Prüfung nur einmal ausführen.
+        String inspectedPath = dir.getAbsolutePath();
+        if (!state.inspectedProjectDirPaths.add(inspectedPath)) return;
 
         int devDepth = developmentDepth(dir);
         if (devDepth >= 0) state.developmentDirsSeen++;
@@ -974,7 +1005,14 @@ public class MainActivity extends Activity {
         if (state == null || state.projectDirCandidates.isEmpty()) return;
 
         Map<String, List<ProjectDirEntry>> groups = new HashMap<>();
+        int analyzed = 0;
+        int total = state.projectDirCandidates.size();
         for (File dir : state.projectDirCandidates) {
+            analyzed++;
+            if (analyzed == 1 || analyzed % 5 == 0 || analyzed == total) {
+                final int done = analyzed;
+                setScanPhase("4/6 KC-/Projektstände … " + done + "/" + total);
+            }
             FolderStats stats = folderStats(dir, state, 0);
             String key = projectGroupKey(dir.getName());
             ProjectDirEntry entry = new ProjectDirEntry(dir, key, stats, developmentDepth(dir));
@@ -1188,7 +1226,14 @@ public class MainActivity extends Activity {
     }
 
     private void findWhatsAppPhotoDuplicates(ScanState state) {
+        int checkedGroups = 0;
+        int totalGroups = state.whatsappPhotoSameSize.size();
         for (Map.Entry<Long, List<File>> e : state.whatsappPhotoSameSize.entrySet()) {
+            checkedGroups++;
+            if (checkedGroups == 1 || checkedGroups % 100 == 0 || checkedGroups == totalGroups) {
+                final int done = checkedGroups;
+                setScanPhase("5/6 WhatsApp-Dubletten … " + done + "/" + totalGroups + " Größengruppen");
+            }
             List<File> same = e.getValue();
             if (same.size() < 2) continue;
 
@@ -1223,7 +1268,14 @@ public class MainActivity extends Activity {
 
     private void findDuplicates(ScanState state) {
         int groups = 0;
+        int scannedSizeGroups = 0;
+        int totalSizeGroups = state.sameSize.size();
         for (Map.Entry<Long, List<File>> e : state.sameSize.entrySet()) {
+            scannedSizeGroups++;
+            if (scannedSizeGroups == 1 || scannedSizeGroups % 50 == 0 || scannedSizeGroups == totalSizeGroups) {
+                final int done = scannedSizeGroups;
+                setScanPhase("6/6 Dateidubletten … " + done + "/" + totalSizeGroups + " Größengruppen");
+            }
             List<File> same = e.getValue();
             if (same.size() < 2 || e.getKey() < MB) continue;
             groups++;
@@ -1245,6 +1297,13 @@ public class MainActivity extends Activity {
                 }
             }
         }
+    }
+
+    private void setScanPhase(String text) {
+        if (text == null) return;
+        runOnUiThread(() -> {
+            if (scanning && status != null) status.setText(text);
+        });
     }
 
     private File chooseReferenceCopy(List<File> dupes) {
