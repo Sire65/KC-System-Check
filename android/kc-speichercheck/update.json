@@ -1,8 +1,8 @@
 {
-  "versionCode": 23,
-  "versionName": "1.4.5",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.5-STABIL.apk",
-  "sha256": "62e533f778bba3a639001e68208ee780ecf6b05f83db7a6d7f64760da027e8eb",
-  "notes": "Neu: sichere Leerordner-Bereinigung. Leere, nicht zum Android-/App-/Medien-System gehörende Ordner sowie reine Leerordner-Bäume können bereinigt werden. Android-, MIUI-/Xiaomi-, App-, Medien- und versteckte Bereiche bleiben geschützt. Vor dem Löschen wird erneut geprüft, ob der Ordner weiterhin leer und freigegeben ist.",
+  "versionCode": 24,
+  "versionName": "1.4.6",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.6-STABIL.apk",
+  "sha256": "f4ce19325840dca2a44a7ad49731c90b9bd937dd8e3b52a8ddc5c93054c25c76",
+  "notes": "Neu: Hauptverzeichnis-Diagnose für direkte Ordner unter „Interner Speicher“. Jeder direkte Ordner wird als geschützt, belegt, wirklich leer/löschbar oder nicht lesbar bewertet. Direkte Elementzahl und Pfad erscheinen im Bericht. Geschützte System-, App- und Medienordner werden nicht als neue Löschkandidaten aufgenommen; wirklich leere, unkritische Ordner bleiben vor der Löschung erneut sicherheitsgeprüft.",
   "published": "2026-09-27"
 }
