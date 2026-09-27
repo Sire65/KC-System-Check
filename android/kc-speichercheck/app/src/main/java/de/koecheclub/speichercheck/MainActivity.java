@@ -573,8 +573,13 @@ public class MainActivity extends Activity {
         if (isKcDevelopmentArchive(file)) {
             state.developmentArchivesSeen++;
             state.developmentArchiveBytes += size;
-            addCandidate(file, size, Risk.GREEN,
-                    "KC-Entwicklungsarchiv im Download-Baum; alter Entwicklungsstand – zum Löschen freigegeben", state);
+            if (isInDownloadTree(file)) {
+                addCandidate(file, size, Risk.GREEN,
+                        "KC-Entwicklungsarchiv im Download-Baum; alter Entwicklungsstand – zum Löschen freigegeben", state);
+            } else {
+                addCandidate(file, size, Risk.YELLOW,
+                        "KC-/Entwicklungsarchiv außerhalb des Download-Baums; alter Entwicklungsstand möglich – manuell prüfen", state);
+            }
             return;
         }
 
@@ -975,7 +980,7 @@ public class MainActivity extends Activity {
     }
 
     private boolean isKcDevelopmentArchive(File file) {
-        if (!isInDownloadTree(file)) return false;
+        if (file == null || !file.isFile()) return false;
         String name = file.getName().toLowerCase(Locale.ROOT);
         String ext = extension(name);
         if (!isAutoCleanupArchiveExtension(ext)) return false;
@@ -985,7 +990,8 @@ public class MainActivity extends Activity {
         String compactName = name.replace(" ", "");
         boolean developmentFolder = compactPath.contains("/entwicklung") || compactPath.contains("/projekte") ||
                 compactPath.contains("/projekt") || compactPath.contains("/development") ||
-                compactPath.contains("/projects") || compactPath.contains("/dev/");
+                compactPath.contains("/projects") || compactPath.contains("/dev/") ||
+                compactPath.contains("/orbit/") || compactPath.contains("/github/");
         boolean kcNamed = compactName.startsWith("kc_") || compactName.startsWith("kc-") ||
                 compactName.startsWith("kc.");
         boolean projectNamed = kcNamed || compactName.contains("marktkasse") || compactName.contains("kasse") ||
@@ -1009,8 +1015,8 @@ public class MainActivity extends Activity {
         if (c == null || c.risk == Risk.RED) return false;
 
         String reason = c.reason == null ? "" : c.reason;
-        if (reason.startsWith("KC-Entwicklungsarchiv")) {
-            return isKcDevelopmentArchive(c.file);
+        if (reason.startsWith("KC-Entwicklungsarchiv im Download-Baum")) {
+            return isInDownloadTree(c.file) && isKcDevelopmentArchive(c.file);
         }
 
         if (!isDirectDownloadFile(c.file)) return false;
