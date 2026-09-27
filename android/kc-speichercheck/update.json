@@ -1,8 +1,8 @@
 {
-  "versionCode": 7,
-  "versionName": "1.2.2",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.2.2-STABIL.apk",
-  "sha256": "2f9c9277d21295e09ef04feb77dde239be1b7ae4c4b3dfccb604edfaaf87e582",
-  "notes": "Neu: Bericht direkt teilen. Nach dem Scan kann der komplette Prüfbericht über die Android-Teilen-Funktion direkt an ChatGPT gesendet werden.",
+  "versionCode": 8,
+  "versionName": "1.3.0",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.3.0-STABIL.apk",
+  "sha256": "4ffa33dd1b78f2347eab765749476c5be7e23395ea6769eefed2817ba24d914f",
+  "notes": "Neu: sichere automatische Bereinigung. Mit einem Knopf werden nur streng freigegebene alte Archive und byte-identische Dubletten direkt im Download-Ordner gelöscht. WhatsApp, Kamera, Bilder, Documents, Entwicklung, Orbit, Projekt-Unterordner sowie APK/AAB bleiben für die Automatik geschützt.",
   "published": "2026-09-27"
 }
