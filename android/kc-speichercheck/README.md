@@ -10,13 +10,15 @@ Android-App zum Prüfen des gemeinsamen Gerätespeichers.
   - ROT: sehr große unbekannte Dateien; keine pauschale Lösch-Empfehlung.
 - Sortierung nach Speicherverbrauch und Mehrfachauswahl.
 - Zweite Sicherheitsabfrage vor jeder dauerhaften Löschung.
+- **Sicher automatisch bereinigen**: löscht ohne Einzelauswahl nur streng freigegebene Treffer direkt im Download-Ordner (alte Archive und byte-identische Dubletten).
+- Automatik-Schutz: WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents, Entwicklung, Orbit, Projekt-Unterordner sowie APK/AAB-Dateien werden nicht automatisch gelöscht.
 - Ausschluss von \`/Android/data\` und \`/Android/obb\`.
 - Scanbericht als TXT unter \`Dokumente/KC_SpeicherCheck/\`.
 - Update-Prüfung über GitHub: manuell per Button und höchstens einmal täglich beim App-Start.
 - APK-Updates werden nur nach Freigabe geladen und vor der Installation per SHA-256 geprüft.
 
 ## Datenschutz / Sicherheit
-Der Speicher-Scan bleibt vollständig lokal. Internetzugriff wird ausschließlich für die Update-Prüfung und den von dir freigegebenen Update-Download verwendet. Nichts wird automatisch gelöscht.
+Der Speicher-Scan bleibt vollständig lokal. Internetzugriff wird ausschließlich für die Update-Prüfung und den von dir freigegebenen Update-Download verwendet. Die automatische Bereinigung läuft ausschließlich nach einem bewussten Knopfdruck und einer zusammengefassten Sicherheitsabfrage; außerhalb der eng definierten Download-Regeln wird nichts automatisch gelöscht.
 
 ## Update-Kanal
 Die App liest:
