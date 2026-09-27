@@ -92,6 +92,7 @@ public class MainActivity extends Activity {
     private ListView list;
     private Button permissionButton;
     private Button scanButton;
+    private Button autoCleanButton;
     private Button deleteButton;
     private Button reportButton;
     private Button shareReportButton;
@@ -160,7 +161,7 @@ public class MainActivity extends Activity {
         root.addView(title);
 
         TextView info = new TextView(this);
-        info.setText("Lokaler Speicher-Scan. Dateidaten bleiben auf dem Gerät; Internet wird nur für die Update-Prüfung genutzt. Gelöscht wird nur nach deiner Freigabe.");
+        info.setText("Lokaler Speicher-Scan. Dateidaten bleiben auf dem Gerät; Internet wird nur für die Update-Prüfung genutzt. Die Automatik löscht nur streng freigegebene Treffer direkt im Download-Ordner.");
         info.setTextSize(14);
         root.addView(info);
 
@@ -173,6 +174,12 @@ public class MainActivity extends Activity {
         scanButton.setText("Speicher scannen");
         scanButton.setOnClickListener(v -> startScan());
         root.addView(scanButton);
+
+        autoCleanButton = new Button(this);
+        autoCleanButton.setText("Sicher automatisch bereinigen");
+        autoCleanButton.setEnabled(false);
+        autoCleanButton.setOnClickListener(v -> confirmAutoCleanup());
+        root.addView(autoCleanButton);
 
         updateButton = new Button(this);
         updateButton.setText("Update prüfen");
@@ -222,7 +229,7 @@ public class MainActivity extends Activity {
         root.addView(summary);
 
         TextView legend = new TextView(this);
-        legend.setText("🟢 meist erzeugbar/temporär   🟡 prüfen   🔴 nicht pauschal löschen\nTippe Einträge an, die du wirklich löschen willst.");
+        legend.setText("🟢 meist erzeugbar/temporär   🟡 prüfen   🔴 nicht pauschal löschen\nAutomatik: nur alte Archive und byte-identische Dubletten direkt in Download. WhatsApp, Kamera, Bilder und Entwicklungsordner bleiben geschützt.");
         legend.setTextSize(13);
         root.addView(legend);
 
@@ -374,6 +381,7 @@ public class MainActivity extends Activity {
         summary.setText("Dateien werden geprüft.");
         scanButton.setEnabled(false);
         deleteButton.setEnabled(false);
+        autoCleanButton.setEnabled(false);
         reportButton.setEnabled(false);
         shareReportButton.setEnabled(false);
 
@@ -396,6 +404,7 @@ public class MainActivity extends Activity {
                 scanning = false;
                 scanButton.setEnabled(true);
                 deleteButton.setEnabled(!candidates.isEmpty());
+                updateAutoCleanButton();
                 reportButton.setEnabled(!candidates.isEmpty());
                 shareReportButton.setEnabled(!candidates.isEmpty());
                 status.setText("Scan abgeschlossen: " + state.files + " Dateien, " + state.dirs + " Ordner geprüft.");
@@ -554,6 +563,77 @@ public class MainActivity extends Activity {
                 "🔴 " + rc + " · " + Formatter.formatFileSize(this, red));
     }
 
+    private boolean isDirectDownloadFile(File file) {
+        if (file == null || !file.isFile()) return false;
+        File parent = file.getParentFile();
+        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        if (parent == null || downloads == null) return false;
+        return parent.getAbsolutePath().equalsIgnoreCase(downloads.getAbsolutePath());
+    }
+
+    private boolean isAutoDeleteSafe(Candidate c) {
+        if (c == null || c.risk == Risk.RED || !isDirectDownloadFile(c.file)) return false;
+
+        String reason = c.reason == null ? "" : c.reason;
+        if (reason.startsWith("Byte-identische Dublette")) {
+            return true;
+        }
+
+        if (reason.startsWith("Altes Archiv/Installationspaket")) {
+            String ext = extension(c.file.getName().toLowerCase(Locale.ROOT));
+            return ext.equals("zip") || ext.equals("rar") || ext.equals("7z") ||
+                    ext.equals("tar") || ext.equals("gz") || ext.equals("tgz") ||
+                    ext.equals("bz2") || ext.equals("xz");
+        }
+
+        return false;
+    }
+
+    private List<Integer> autoSafePositions() {
+        List<Integer> out = new ArrayList<>();
+        for (int i = 0; i < candidates.size(); i++) {
+            if (isAutoDeleteSafe(candidates.get(i))) out.add(i);
+        }
+        return out;
+    }
+
+    private void updateAutoCleanButton() {
+        if (autoCleanButton == null) return;
+        List<Integer> safe = autoSafePositions();
+        long bytes = 0;
+        for (int p : safe) bytes += candidates.get(p).size;
+        autoCleanButton.setEnabled(!safe.isEmpty() && !scanning);
+        autoCleanButton.setText(safe.isEmpty()
+                ? "Sicher automatisch bereinigen"
+                : "Sicher automatisch bereinigen: " + safe.size() + " · " + Formatter.formatFileSize(this, bytes));
+    }
+
+    private void confirmAutoCleanup() {
+        List<Integer> safe = autoSafePositions();
+        if (safe.isEmpty()) {
+            Toast.makeText(this, "Keine automatisch freigegebenen Treffer vorhanden.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        long bytes = 0;
+        for (int p : safe) bytes += candidates.get(p).size;
+
+        String msg = safe.size() + " eindeutig freigegebene Treffer mit insgesamt " +
+                Formatter.formatFileSize(this, bytes) + " werden dauerhaft gelöscht.\n\n" +
+                "Automatisch gelöscht werden nur:\n" +
+                "• alte ZIP/RAR/7Z/TAR/GZ-Archive direkt im Download-Ordner\n" +
+                "• byte-identische Dubletten direkt im Download-Ordner, wenn eine andere Kopie erhalten bleibt\n\n" +
+                "Geschützt bleiben WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents, Entwicklung, Orbit, Projekt-Unterordner sowie APK/AAB-Dateien.\n\n" +
+                "Der Vorgang kann nicht rückgängig gemacht werden.";
+
+        new AlertDialog.Builder(this)
+                .setTitle("Sicher automatisch bereinigen?")
+                .setMessage(msg)
+                .setNegativeButton("Abbrechen", null)
+                .setPositiveButton("Jetzt bereinigen", (d, w) -> deleteSelected(safe))
+                .show();
+    }
+
     private void setAllChecked(boolean checked) {
         if (list == null) return;
         for (int i = 0; i < candidates.size(); i++) {
@@ -603,6 +683,7 @@ public class MainActivity extends Activity {
     private void deleteSelected(List<Integer> selected) {
         progress.setVisibility(View.VISIBLE);
         deleteButton.setEnabled(false);
+        autoCleanButton.setEnabled(false);
         scanButton.setEnabled(false);
         new Thread(() -> {
             int ok = 0, fail = 0;
@@ -644,6 +725,7 @@ public class MainActivity extends Activity {
         for (Candidate c : candidates) {
             sb.append(i++).append(". ").append(c.risk)
                     .append(" | ").append(c.size).append(" Bytes")
+                    .append(" | AUTO-SICHER=").append(isAutoDeleteSafe(c) ? "JA" : "NEIN")
                     .append(" | ").append(c.file.isDirectory() ? "ORDNER" : "DATEI")
                     .append(" | ").append(c.reason).append("\n");
             sb.append("Name: ").append(c.file.getName()).append("\n");
