@@ -1,8 +1,8 @@
 {
-  "versionCode": 15,
-  "versionName": "1.3.7",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.3.7-STABIL.apk",
-  "sha256": "6302f0cbb9ba1d483744a9ac46056c65d3ba7f0b66157d155ff0dd9468b5bf42",
-  "notes": "Neu: Flexible Projektordner-Diagnose für Unterverzeichnisse. Direkte Unterordner von Entwicklung/Projekte sowie tiefere Versions-, Kopie-, Backup-, Datums- und verschachtelte Projektstände werden rekursiv erkannt, nach Projektfamilien gruppiert und mit Dateizahl, Unterordnerzahl, Größe, jüngster Änderung und Referenzstand bewertet. Mögliche Alt-/Doppelstände bleiben GELB und werden nicht automatisch gelöscht.",
+  "versionCode": 16,
+  "versionName": "1.3.8",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.3.8-STABIL.apk",
+  "sha256": "a73eaf733620943cd0ee7eef54d2971ca7e8075d3e00fec95220166add644ac4",
+  "notes": "Neu: Unabhängiger rekursiver Kontrollscan des gesamten Download-Baums plus Android-Download-Index als Fallback. Zusätzliche Diagnose zeigt Download-Dateien, Ordner und Archive aus Hauptscan, Kontrollscan und MediaStore. Ausgepackte KC-Projekte werden anhand typischer Projektmerkmale besser erkannt. Framework-Studio-Versionen werden vor der Versionsnummer als gemeinsame Projektfamilie gruppiert. Automatische Löschregeln für Projektordner bleiben unverändert vorsichtig.",
   "published": "2026-09-27"
 }
