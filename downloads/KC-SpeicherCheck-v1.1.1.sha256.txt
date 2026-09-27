@@ -1,1 +1,1 @@
-156575b8b096f3aadb991622cf9a3aeec1bf1253873a090f033f36bb1766a1bd  downloads/KC-SpeicherCheck-v1.1.1.apk
+f66827b464a43e6b843986abc7240c3a4c339c209b1b9743e90f52429ba1593f  downloads/KC-SpeicherCheck-v1.1.1.apk
