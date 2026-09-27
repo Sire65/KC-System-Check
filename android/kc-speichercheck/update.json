@@ -1,8 +1,8 @@
 {
-  "versionCode": 21,
-  "versionName": "1.4.3",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.3-STABIL.apk",
-  "sha256": "d798a34b4f243112d3e8a7fb9796f0898bd126fcb360bd781f9e7dbbdbd1a96e",
-  "notes": "Neu: echter Fortschrittsbalken von 0 bis 100 Prozent über den kompletten Ablauf. Die vorhandene Statuszeile zeigt Prozent, Laufzeit und aktuelle Phase. Hauptscan, Download-Kontrolle, Android-Index, Projektvergleich, WhatsApp-/Dateidubletten sowie Sortieren und Auflisten sind enthalten. 100 Prozent wird erst angezeigt, wenn die Trefferliste vollständig aufgebaut und aktualisiert ist.",
+  "versionCode": 22,
+  "versionName": "1.4.4",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.4-STABIL.apk",
+  "sha256": "d9fe2de4467ddcbcc4e3f314d147a2f34faeb3a1c69350785e6944bb03f5d731",
+  "notes": "Fix: Archive werden jetzt zusätzlich über den globalen Android-Dateiindex erfasst. Dadurch sollen auch ZIPs erscheinen, die Xiaomi im Dateimanager zeigt, der bisherige Dateibaum aber nicht fand. Die Lupensuche nutzt ebenfalls diesen Index. Framework-, Dienstplan- und weitere Entwicklungsarchive werden besser erkannt. Frisch heruntergeladene Entwicklungs-ZIPs unter 3 Tagen bleiben vor Auto-Löschen geschützt. Der Fortschrittsbalken umfasst nun 8 Phasen.",
   "published": "2026-09-27"
 }
