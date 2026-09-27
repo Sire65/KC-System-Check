@@ -12,6 +12,8 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ShortcutInfo;
 import android.content.pm.ShortcutManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.drawable.Icon;
 import android.net.Uri;
@@ -21,15 +23,21 @@ import android.os.Environment;
 import android.provider.Settings;
 import android.database.Cursor;
 import android.text.format.Formatter;
+import android.view.GestureDetector;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.MediaController;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.VideoView;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -64,12 +72,20 @@ public class MainActivity extends Activity {
         final long size;
         final Risk risk;
         final String reason;
+        final File referenceCopy;
+        final int duplicateGroup;
 
         Candidate(File file, long size, Risk risk, String reason) {
+            this(file, size, risk, reason, null, 0);
+        }
+
+        Candidate(File file, long size, Risk risk, String reason, File referenceCopy, int duplicateGroup) {
             this.file = file;
             this.size = size;
             this.risk = risk;
             this.reason = reason;
+            this.referenceCopy = referenceCopy;
+            this.duplicateGroup = duplicateGroup;
         }
 
         String display(Activity a) {
@@ -77,8 +93,9 @@ public class MainActivity extends Activity {
             String type = file.isDirectory() ? "ORDNER" : "DATEI";
             String name = file.getName();
             if (name == null || name.trim().isEmpty()) name = file.getAbsolutePath();
+            String group = duplicateGroup > 0 ? " · Gruppe " + duplicateGroup : "";
             return mark + "  " + name + "\n"
-                    + type + " · " + Formatter.formatFileSize(a, size) + " · " + reason + "\n"
+                    + type + " · " + Formatter.formatFileSize(a, size) + group + " · " + reason + "\n"
                     + file.getAbsolutePath();
         }
     }
@@ -248,7 +265,7 @@ public class MainActivity extends Activity {
         root.addView(summary);
 
         TextView legend = new TextView(this);
-        legend.setText("🟢 löschbar/temporär   🟡 prüfen   🔴 geschützt\nWhatsApp-Fotodubletten werden bytegenau geprüft und bleiben manuell. Auto löscht nur streng sichere Download-Treffer.");
+        legend.setText("🟢 löschbar/temporär   🟡 prüfen   🔴 geschützt\nDoppeltipp auf Treffer = Foto/Video/Details. Dubletten bleiben manuell; Auto löscht nur streng sichere Download-Treffer.");
         legend.setTextSize(12);
         root.addView(legend);
 
@@ -258,12 +275,14 @@ public class MainActivity extends Activity {
         Button selectAllButton = new Button(this);
         selectAllButton.setText("Alle markieren");
         selectAllButton.setOnClickListener(v -> setAllChecked(true));
-        selectRow.addView(selectAllButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        styleCompactButton(selectAllButton);
+        selectRow.addView(selectAllButton, new LinearLayout.LayoutParams(0, dp(38), 1));
 
         Button selectNoneButton = new Button(this);
         selectNoneButton.setText("Keine markieren");
         selectNoneButton.setOnClickListener(v -> setAllChecked(false));
-        selectRow.addView(selectNoneButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        styleCompactButton(selectNoneButton);
+        selectRow.addView(selectNoneButton, new LinearLayout.LayoutParams(0, dp(38), 1));
 
         root.addView(selectRow);
 
@@ -289,6 +308,25 @@ public class MainActivity extends Activity {
         };
         list.setAdapter(adapter);
         list.setOnItemClickListener((parent, view, position, id) -> updateSelectedSummary());
+
+        GestureDetector previewGesture = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDown(MotionEvent e) {
+                return true;
+            }
+
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                int position = list.pointToPosition((int) e.getX(), (int) e.getY());
+                if (position != ListView.INVALID_POSITION) showCandidatePreview(position);
+                return true;
+            }
+        });
+        list.setOnTouchListener((v, event) -> {
+            previewGesture.onTouchEvent(event);
+            return false;
+        });
+
         root.addView(list, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
 
         setContentView(root);
@@ -458,8 +496,12 @@ public class MainActivity extends Activity {
         long whatsappPhotosSeen = 0;
         long whatsappPhotoDuplicates = 0;
         long whatsappPhotoDuplicateBytes = 0;
+        long nestedDuplicateFolders = 0;
+        long nestedDuplicateFolderBytes = 0;
+        int duplicateGroupSeq = 0;
         final Map<Long, List<File>> sameSize = new HashMap<>();
         final Map<Long, List<File>> whatsappPhotoSameSize = new HashMap<>();
+        final Map<String, Long> archiveCountByExt = new HashMap<>();
         final Set<String> candidatePaths = new HashSet<>();
     }
 
@@ -470,6 +512,16 @@ public class MainActivity extends Activity {
 
         if (file.isDirectory()) {
             state.dirs++;
+
+            if (isNestedDuplicateProjectDir(file)) {
+                long sz = folderSize(file, 0);
+                state.nestedDuplicateFolders++;
+                state.nestedDuplicateFolderBytes += sz;
+                addCandidate(file, sz, Risk.YELLOW,
+                        "Verschachtelter gleichnamiger Entwicklungsordner; wahrscheinlich kompletter doppelter Projektstand – vor Löschung prüfen", state);
+                return;
+            }
+
             String name = file.getName().toLowerCase(Locale.ROOT);
             if (GENERATED_DIRS.contains(name)) {
                 long sz = folderSize(file, 0);
@@ -515,6 +567,7 @@ public class MainActivity extends Activity {
         if (ARCHIVE_EXT.contains(ext)) {
             state.archivesSeen++;
             state.archiveBytesSeen += size;
+            state.archiveCountByExt.put(ext, state.archiveCountByExt.getOrDefault(ext, 0L) + 1L);
         }
 
         if (isKcDevelopmentArchive(file)) {
@@ -549,8 +602,40 @@ public class MainActivity extends Activity {
     }
 
     private void addCandidate(File file, long size, Risk risk, String reason, ScanState state) {
+        addCandidate(file, size, risk, reason, null, 0, state);
+    }
+
+    private void addCandidate(File file, long size, Risk risk, String reason,
+                              File referenceCopy, int duplicateGroup, ScanState state) {
         String path = file.getAbsolutePath();
-        if (state.candidatePaths.add(path)) candidates.add(new Candidate(file, size, risk, reason));
+        if (state.candidatePaths.add(path)) {
+            candidates.add(new Candidate(file, size, risk, reason, referenceCopy, duplicateGroup));
+        }
+    }
+
+    private boolean isNestedDuplicateProjectDir(File dir) {
+        if (dir == null || !dir.isDirectory()) return false;
+        String path = dir.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        boolean devContext = path.contains("/download/entwicklung") || path.contains("/development") ||
+                path.contains("/projekte") || path.contains("/projects") || path.contains("/project") ||
+                path.contains("/orbit");
+        if (!devContext) return false;
+
+        String current = normalizeDirName(dir.getName());
+        if (current.length() < 6) return false;
+
+        File parent = dir.getParentFile();
+        int hops = 0;
+        while (parent != null && hops++ < 4) {
+            if (current.equals(normalizeDirName(parent.getName()))) return true;
+            parent = parent.getParentFile();
+        }
+        return false;
+    }
+
+    private String normalizeDirName(String name) {
+        if (name == null) return "";
+        return name.toLowerCase(Locale.ROOT).trim().replaceAll("\\s+", " ");
     }
 
     private String extension(String name) {
@@ -603,12 +688,15 @@ public class MainActivity extends Activity {
                     return Long.compare(a.lastModified(), b.lastModified());
                 });
 
+                File keep = dupes.get(0);
+                int group = ++state.duplicateGroupSeq;
                 for (int i = 1; i < dupes.size(); i++) {
                     File f = dupes.get(i);
                     state.whatsappPhotoDuplicates++;
                     state.whatsappPhotoDuplicateBytes += f.length();
                     addCandidate(f, f.length(), Risk.YELLOW,
-                            "WhatsApp-Fotodublette; byte-identisch, eine andere Kopie bleibt erhalten", state);
+                            "WhatsApp-Fotodublette; byte-identisch, Referenzkopie bleibt erhalten",
+                            keep, group, state);
                 }
             }
         }
@@ -628,14 +716,45 @@ public class MainActivity extends Activity {
             }
             for (List<File> dupes : hashes.values()) {
                 if (dupes.size() < 2) continue;
-                dupes.sort(Comparator.comparingLong(File::lastModified));
-                // Keep oldest as the reference copy; flag the rest only.
-                for (int i = 1; i < dupes.size(); i++) {
-                    File f = dupes.get(i);
-                    addCandidate(f, f.length(), Risk.YELLOW, "Byte-identische Dublette; eine andere Kopie bleibt erhalten", state);
+                File keep = chooseReferenceCopy(dupes);
+                int group = ++state.duplicateGroupSeq;
+                for (File f : dupes) {
+                    if (sameFile(f, keep)) continue;
+                    addCandidate(f, f.length(), Risk.YELLOW,
+                            "Byte-identische Dublette; Referenzkopie bleibt erhalten",
+                            keep, group, state);
                 }
             }
         }
+    }
+
+    private File chooseReferenceCopy(List<File> dupes) {
+        File best = dupes.get(0);
+        int bestScore = referencePriority(best);
+        for (int i = 1; i < dupes.size(); i++) {
+            File f = dupes.get(i);
+            int score = referencePriority(f);
+            if (score < bestScore || (score == bestScore && f.lastModified() < best.lastModified())) {
+                best = f;
+                bestScore = score;
+            }
+        }
+        return best;
+    }
+
+    private int referencePriority(File file) {
+        String p = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        if (p.contains("/dcim/camera/")) return 0;
+        if (p.contains("/whatsapp images/") && !p.contains("/sent/")) return 1;
+        if (p.contains("/documents/")) return 2;
+        if (p.contains("/pictures/")) return 3;
+        if (p.contains("/download/")) return 5;
+        if (p.contains("/entwicklung") || p.contains("/development") || p.contains("/orbit/")) return 6;
+        return 4;
+    }
+
+    private boolean sameFile(File a, File b) {
+        return a != null && b != null && a.getAbsolutePath().equals(b.getAbsolutePath());
     }
 
     private String sha256(File file) {
@@ -655,6 +774,161 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean isImageFile(File file) {
+        if (file == null || !file.isFile()) return false;
+        String ext = extension(file.getName().toLowerCase(Locale.ROOT));
+        return ext.equals("jpg") || ext.equals("jpeg") || ext.equals("png") ||
+                ext.equals("webp") || ext.equals("heic") || ext.equals("heif") ||
+                ext.equals("gif") || ext.equals("bmp");
+    }
+
+    private boolean isVideoFile(File file) {
+        if (file == null || !file.isFile()) return false;
+        String ext = extension(file.getName().toLowerCase(Locale.ROOT));
+        return ext.equals("mp4") || ext.equals("m4v") || ext.equals("mov") ||
+                ext.equals("3gp") || ext.equals("mkv") || ext.equals("webm");
+    }
+
+    private void showCandidatePreview(int position) {
+        if (position < 0 || position >= candidates.size()) return;
+        Candidate c = candidates.get(position);
+        if (c.file.isDirectory()) {
+            showDetailsDialog(c, position, "Ordner-Details");
+        } else if (isImageFile(c.file)) {
+            showImagePreview(c, position);
+        } else if (isVideoFile(c.file)) {
+            showVideoPreview(c, position);
+        } else {
+            showDetailsDialog(c, position, "Datei-Details");
+        }
+    }
+
+    private String candidateDetails(Candidate c) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(c.file.getName()).append("\n")
+                .append(Formatter.formatFileSize(this, c.size)).append("\n")
+                .append(new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMANY)
+                        .format(new Date(c.file.lastModified()))).append("\n\n")
+                .append(c.reason).append("\n\n")
+                .append("Pfad:\n").append(c.file.getAbsolutePath());
+        if (c.duplicateGroup > 0) {
+            sb.append("\n\nDublettengruppe: ").append(c.duplicateGroup);
+        }
+        if (c.referenceCopy != null) {
+            sb.append("\n\nReferenzkopie, die erhalten bleibt:\n")
+                    .append(c.referenceCopy.getAbsolutePath());
+        }
+        return sb.toString();
+    }
+
+    private void showImagePreview(Candidate c, int position) {
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(10), dp(8), dp(10), dp(8));
+
+        Bitmap bitmap = loadPreviewBitmap(c.file, 1800);
+        if (bitmap != null) {
+            ImageView image = new ImageView(this);
+            image.setAdjustViewBounds(true);
+            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            image.setImageBitmap(bitmap);
+            body.addView(image, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        } else {
+            TextView noPreview = new TextView(this);
+            noPreview.setText("Bild konnte nicht als Vorschau geladen werden.");
+            noPreview.setPadding(0, dp(12), 0, dp(12));
+            body.addView(noPreview);
+        }
+
+        TextView details = new TextView(this);
+        details.setText(candidateDetails(c));
+        details.setTextSize(12);
+        details.setPadding(0, dp(10), 0, 0);
+        body.addView(details);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(body);
+
+        new AlertDialog.Builder(this)
+                .setTitle(c.duplicateGroup > 0 ? "Foto · Dublettengruppe " + c.duplicateGroup : "Foto-Vorschau")
+                .setView(scroll)
+                .setNegativeButton("Schließen", null)
+                .setPositiveButton(list.isItemChecked(position) ? "Markierung lösen" : "Zum Löschen markieren",
+                        (d, w) -> {
+                            list.setItemChecked(position, !list.isItemChecked(position));
+                            updateSelectedSummary();
+                        })
+                .show();
+    }
+
+    private Bitmap loadPreviewBitmap(File file, int maxDimension) {
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+
+            int sample = 1;
+            while (bounds.outWidth / sample > maxDimension || bounds.outHeight / sample > maxDimension) {
+                sample *= 2;
+            }
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = sample;
+            return BitmapFactory.decodeFile(file.getAbsolutePath(), opts);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void showVideoPreview(Candidate c, int position) {
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(8), dp(8), dp(8), dp(8));
+
+        VideoView video = new VideoView(this);
+        MediaController controls = new MediaController(this);
+        controls.setAnchorView(video);
+        video.setMediaController(controls);
+        video.setVideoPath(c.file.getAbsolutePath());
+        video.setOnPreparedListener(mp -> video.seekTo(1));
+        body.addView(video, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(260)));
+
+        TextView details = new TextView(this);
+        details.setText(candidateDetails(c));
+        details.setTextSize(12);
+        details.setPadding(0, dp(8), 0, 0);
+        body.addView(details);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(body);
+
+        new AlertDialog.Builder(this)
+                .setTitle(c.duplicateGroup > 0 ? "Video · Dublettengruppe " + c.duplicateGroup : "Video-Vorschau")
+                .setView(scroll)
+                .setNegativeButton("Schließen", null)
+                .setPositiveButton(list.isItemChecked(position) ? "Markierung lösen" : "Zum Löschen markieren",
+                        (d, w) -> {
+                            list.setItemChecked(position, !list.isItemChecked(position));
+                            updateSelectedSummary();
+                        })
+                .show();
+    }
+
+    private void showDetailsDialog(Candidate c, int position, String title) {
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(candidateDetails(c))
+                .setNegativeButton("Schließen", null)
+                .setPositiveButton(list.isItemChecked(position) ? "Markierung lösen" : "Zum Löschen markieren",
+                        (d, w) -> {
+                            list.setItemChecked(position, !list.isItemChecked(position));
+                            updateSelectedSummary();
+                        })
+                .show();
+    }
+
     private void updateOverallSummary() {
         long green = 0, yellow = 0, red = 0;
         int gc = 0, yc = 0, rc = 0;
@@ -667,7 +941,9 @@ public class MainActivity extends Activity {
         String archiveInfo = st == null ? "" : "\nArchive gesehen: " + st.archivesSeen +
                 " · davon Entwicklung: " + st.developmentArchivesSeen +
                 "\nWhatsApp-Fotos: " + st.whatsappPhotosSeen +
-                " · Dubletten: " + st.whatsappPhotoDuplicates;
+                " · Dubletten: " + st.whatsappPhotoDuplicates +
+                " · Gruppen: " + st.duplicateGroupSeq +
+                "\nDoppelte Projektordner: " + st.nestedDuplicateFolders;
         summary.setText("Gefunden (max. " + MAX_VISIBLE + " größte Treffer):\n" +
                 "🟢 " + gc + " · " + Formatter.formatFileSize(this, green) + "   " +
                 "🟡 " + yc + " · " + Formatter.formatFileSize(this, yellow) + "   " +
@@ -705,10 +981,20 @@ public class MainActivity extends Activity {
         if (!isAutoCleanupArchiveExtension(ext)) return false;
 
         String path = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
-        boolean developmentFolder = path.contains("/entwicklung") || path.contains("/projekte") ||
-                path.contains("/projekt") || path.contains("/development") || path.contains("/projects");
-        boolean kcNamed = name.startsWith("kc_") || name.startsWith("kc-") || name.startsWith("kc ");
-        return developmentFolder || kcNamed;
+        String compactPath = path.replace(" ", "");
+        String compactName = name.replace(" ", "");
+        boolean developmentFolder = compactPath.contains("/entwicklung") || compactPath.contains("/projekte") ||
+                compactPath.contains("/projekt") || compactPath.contains("/development") ||
+                compactPath.contains("/projects") || compactPath.contains("/dev/");
+        boolean kcNamed = compactName.startsWith("kc_") || compactName.startsWith("kc-") ||
+                compactName.startsWith("kc.");
+        boolean projectNamed = kcNamed || compactName.contains("marktkasse") || compactName.contains("kasse") ||
+                compactName.contains("dienstplan") || compactName.contains("dp2") ||
+                compactName.contains("futura") || compactName.contains("verwaltung") ||
+                compactName.contains("manager") || compactName.contains("communication") ||
+                compactName.contains("kommunikation");
+        boolean versionNamed = compactName.matches(".*(v[0-9]+([._-][0-9]+)*|20[0-9]{2}[-_.][0-9]{1,2}[-_.][0-9]{1,2}|backup|sicherung|alt|old|komplett|zusammengefuehrt).*");
+        return developmentFolder || kcNamed || (projectNamed && versionNamed);
     }
 
     private boolean isDirectDownloadFile(File file) {
@@ -882,10 +1168,14 @@ public class MainActivity extends Activity {
                     .append(" | ").append(st.archiveBytesSeen).append(" Bytes\n");
             sb.append("Entwicklungsarchive erkannt: ").append(st.developmentArchivesSeen)
                     .append(" | ").append(st.developmentArchiveBytes).append(" Bytes\n");
+            sb.append("Archive nach Typ: ").append(new java.util.TreeMap<>(st.archiveCountByExt)).append("\n");
             sb.append("Nicht lesbare Ordner: ").append(st.unreadableDirs).append("\n");
             sb.append("WhatsApp-Fotos gesehen: ").append(st.whatsappPhotosSeen).append("\n");
             sb.append("WhatsApp-Fotodubletten: ").append(st.whatsappPhotoDuplicates)
                     .append(" | ").append(st.whatsappPhotoDuplicateBytes).append(" Bytes\n");
+            sb.append("Dublettengruppen: ").append(st.duplicateGroupSeq).append("\n");
+            sb.append("Doppelte/verschachtelte Projektordner: ").append(st.nestedDuplicateFolders)
+                    .append(" | ").append(st.nestedDuplicateFolderBytes).append(" Bytes\n");
         }
         sb.append("\nBewertung: GRUEN = meist erzeugbar/temporär; GELB = prüfen; ROT = nicht pauschal löschen\n\n");
         int i = 1;
@@ -896,7 +1186,14 @@ public class MainActivity extends Activity {
                     .append(" | ").append(c.file.isDirectory() ? "ORDNER" : "DATEI")
                     .append(" | ").append(c.reason).append("\n");
             sb.append("Name: ").append(c.file.getName()).append("\n");
-            sb.append("Pfad: ").append(c.file.getAbsolutePath()).append("\n\n");
+            sb.append("Pfad: ").append(c.file.getAbsolutePath()).append("\n");
+            if (c.duplicateGroup > 0) {
+                sb.append("Dublettengruppe: ").append(c.duplicateGroup).append("\n");
+            }
+            if (c.referenceCopy != null) {
+                sb.append("Referenzkopie: ").append(c.referenceCopy.getAbsolutePath()).append("\n");
+            }
+            sb.append("\n");
         }
         return sb.toString();
     }
