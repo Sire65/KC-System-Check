@@ -791,6 +791,10 @@ public class MainActivity extends Activity {
         long projectRootsSeen = 0;
         long possibleOldProjectDirs = 0;
         long possibleOldProjectBytes = 0;
+        long verifiedContainedProjectDirs = 0;
+        long verifiedContainedProjectBytes = 0;
+        long projectDirsWithUniqueFiles = 0;
+        long projectDirsWithDifferentFiles = 0;
         long unpackedKcProgramDirs = 0;
         long unpackedKcProgramBytes = 0;
         long downloadFilesSeen = 0;
@@ -813,6 +817,7 @@ public class MainActivity extends Activity {
         final Set<String> projectDirPaths = new HashSet<>();
         final List<ProjectDirEntry> projectDirs = new ArrayList<>();
         final Map<String, FolderStats> folderStatsCache = new HashMap<>();
+        final Map<String, String> fileHashCache = new HashMap<>();
         final Set<String> candidatePaths = new HashSet<>();
         final Set<String> seenFilePaths = new HashSet<>();
         final Set<String> inspectedProjectDirPaths = new HashSet<>();
@@ -825,6 +830,22 @@ public class MainActivity extends Activity {
         long newestModified = 0;
     }
 
+    static class FolderCompareResult {
+        int matchedFiles = 0;
+        int missingInReference = 0;
+        int differentFiles = 0;
+        int unreadableFiles = 0;
+        long matchedBytes = 0;
+        long missingBytes = 0;
+        long differentBytes = 0;
+        final List<String> missingSamples = new ArrayList<>();
+        final List<String> differentSamples = new ArrayList<>();
+
+        boolean fullyContained() {
+            return missingInReference == 0 && differentFiles == 0 && unreadableFiles == 0;
+        }
+    }
+
     static class ProjectDirEntry {
         final File dir;
         final String key;
@@ -832,6 +853,7 @@ public class MainActivity extends Activity {
         final int developmentDepth;
         String assessment;
         File reference;
+        FolderCompareResult comparison;
 
         ProjectDirEntry(File dir, String key, FolderStats stats, int developmentDepth) {
             this.dir = dir;
@@ -1227,6 +1249,92 @@ public class MainActivity extends Activity {
                         b.getAbsolutePath().replace('\\', '/'));
     }
 
+    private String cachedSha256(File file, ScanState state) {
+        if (file == null || state == null || !file.isFile()) return null;
+        String key = file.getAbsolutePath() + "|" + file.length() + "|" + file.lastModified();
+        String cached = state.fileHashCache.get(key);
+        if (cached != null) return cached;
+        String hash = sha256(file);
+        if (hash != null) state.fileHashCache.put(key, hash);
+        return hash;
+    }
+
+    private FolderCompareResult compareProjectDirectory(File candidateRoot, File referenceRoot, ScanState state) {
+        FolderCompareResult out = new FolderCompareResult();
+        if (candidateRoot == null || referenceRoot == null ||
+                !candidateRoot.isDirectory() || !referenceRoot.isDirectory()) {
+            out.unreadableFiles++;
+            return out;
+        }
+        compareProjectTree(candidateRoot, candidateRoot, referenceRoot, state, out, 0);
+        return out;
+    }
+
+    private void compareProjectTree(File root, File current, File referenceRoot,
+                                    ScanState state, FolderCompareResult out, int depth) {
+        if (current == null || out == null || depth > 60) {
+            if (out != null) out.unreadableFiles++;
+            return;
+        }
+        if (isExcludedPath(current.getAbsolutePath())) {
+            out.unreadableFiles++;
+            return;
+        }
+        if (current.isDirectory()) {
+            File[] children;
+            try {
+                children = current.listFiles();
+            } catch (SecurityException e) {
+                out.unreadableFiles++;
+                return;
+            }
+            if (children == null) {
+                out.unreadableFiles++;
+                return;
+            }
+            for (File child : children) {
+                compareProjectTree(root, child, referenceRoot, state, out, depth + 1);
+            }
+            return;
+        }
+        if (!current.isFile()) return;
+
+        String rootPath = root.getAbsolutePath();
+        String currentPath = current.getAbsolutePath();
+        if (!currentPath.startsWith(rootPath + File.separator)) {
+            out.unreadableFiles++;
+            return;
+        }
+        String relative = currentPath.substring(rootPath.length() + 1);
+        File referenceFile = new File(referenceRoot, relative);
+
+        if (!referenceFile.exists()) {
+            out.missingInReference++;
+            out.missingBytes += current.length();
+            if (out.missingSamples.size() < 5) out.missingSamples.add(relative);
+            return;
+        }
+        if (!referenceFile.isFile() || referenceFile.length() != current.length()) {
+            out.differentFiles++;
+            out.differentBytes += current.length();
+            if (out.differentSamples.size() < 5) out.differentSamples.add(relative);
+            return;
+        }
+
+        String a = cachedSha256(current, state);
+        String b = cachedSha256(referenceFile, state);
+        if (a == null || b == null) {
+            out.unreadableFiles++;
+        } else if (a.equalsIgnoreCase(b)) {
+            out.matchedFiles++;
+            out.matchedBytes += current.length();
+        } else {
+            out.differentFiles++;
+            out.differentBytes += current.length();
+            if (out.differentSamples.size() < 5) out.differentSamples.add(relative);
+        }
+    }
+
     private boolean isVersionLikeProjectName(String raw) {
         if (raw == null) return false;
         String n = raw.toLowerCase(Locale.ROOT).trim();
@@ -1403,14 +1511,47 @@ public class MainActivity extends Activity {
             for (ProjectDirEntry e : group) {
                 if (e == keep) continue;
                 e.reference = keep.dir;
-                e.assessment = isDescendantOf(e.dir, keep.dir)
-                        ? "PRUEFEN – verschachtelter Projektstand innerhalb der Referenz"
-                        : "PRUEFEN – weiterer/älterer Parallelstand; Referenz bleibt erhalten";
                 state.possibleOldProjectDirs++;
                 state.possibleOldProjectBytes += e.stats.bytes;
-                addCandidate(e.dir, e.stats.bytes, Risk.YELLOW,
-                        "Möglicher alter/doppelter Projektstand; Vergleichsordner bleibt erhalten",
-                        keep.dir, 0, state);
+
+                if (isDescendantOf(keep.dir, e.dir)) {
+                    e.assessment = "SCHUETZEN – Referenz liegt innerhalb dieses Ordners; automatische Löschung gesperrt";
+                    addCandidate(e.dir, e.stats.bytes, Risk.RED,
+                            "Projektstand enthält den Referenzordner; automatische Löschung wäre unsicher",
+                            keep.dir, 0, state);
+                    state.projectDirsWithDifferentFiles++;
+                    continue;
+                }
+
+                setScanPhase("4/6 Projektvergleich per SHA-256 … " + e.dir.getName());
+                FolderCompareResult cmp = compareProjectDirectory(e.dir, keep.dir, state);
+                e.comparison = cmp;
+
+                if (cmp.fullyContained()) {
+                    e.assessment = "LOESCHBAR – vollständig bytegleich im Referenzstand enthalten";
+                    state.verifiedContainedProjectDirs++;
+                    state.verifiedContainedProjectBytes += e.stats.bytes;
+                    addCandidate(e.dir, e.stats.bytes, Risk.GREEN,
+                            "Alter Projektstand vollständig bytegleich im Referenzordner enthalten; " +
+                                    cmp.matchedFiles + " Dateien geprüft",
+                            keep.dir, 0, state);
+                } else if (cmp.differentFiles > 0 || cmp.unreadableFiles > 0) {
+                    e.assessment = "SCHUETZEN – echte Inhaltsabweichung oder nicht vollständig prüfbar";
+                    state.projectDirsWithDifferentFiles++;
+                    addCandidate(e.dir, e.stats.bytes, Risk.RED,
+                            "Projektstand weicht vom Referenzordner ab: " +
+                                    cmp.differentFiles + " unterschiedliche, " +
+                                    cmp.missingInReference + " nur hier vorhandene, " +
+                                    cmp.unreadableFiles + " nicht prüfbare Dateien",
+                            keep.dir, 0, state);
+                } else {
+                    e.assessment = "PRUEFEN – zusätzliche Dateien fehlen im Referenzstand";
+                    state.projectDirsWithUniqueFiles++;
+                    addCandidate(e.dir, e.stats.bytes, Risk.YELLOW,
+                            "Projektstand enthält " + cmp.missingInReference +
+                                    " Datei(en), die im Referenzordner fehlen; nicht automatisch löschen",
+                            keep.dir, 0, state);
+                }
             }
         }
 
@@ -1888,6 +2029,8 @@ public class MainActivity extends Activity {
                 "\nEntwicklungs-Unterordner: " + st.developmentDirsSeen +
                 " · Projektwurzeln: " + st.projectRootsSeen +
                 " · mögliche Altstände: " + st.possibleOldProjectDirs +
+                "\nHash-geprüft löschbar: " + st.verifiedContainedProjectDirs +
+                " · " + Formatter.formatFileSize(this, st.verifiedContainedProjectBytes) +
                 "\nEntpackte KC-Programmordner: " + st.unpackedKcProgramDirs +
                 " · " + Formatter.formatFileSize(this, st.unpackedKcProgramBytes) +
                 "\nDoppelte Projektordner: " + st.nestedDuplicateFolders;
@@ -1963,6 +2106,12 @@ public class MainActivity extends Activity {
             return c.risk == Risk.GREEN && top != null && samePath(c.file, top);
         }
 
+        if (c.file.isDirectory() &&
+                reason.startsWith("Alter Projektstand vollständig bytegleich im Referenzordner enthalten")) {
+            return c.risk == Risk.GREEN && c.referenceCopy != null && c.referenceCopy.isDirectory() &&
+                    !isDescendantOf(c.referenceCopy, c.file) && !samePath(c.file, c.referenceCopy);
+        }
+
         if (reason.startsWith("KC-Entwicklungsarchiv im Download-Baum")) {
             return isInDownloadTree(c.file) && isKcDevelopmentArchive(c.file);
         }
@@ -2016,10 +2165,11 @@ public class MainActivity extends Activity {
                 Formatter.formatFileSize(this, bytes) + " werden dauerhaft gelöscht.\n\n" +
                 "Automatisch gelöscht werden nur:\n" +
                 "• entpackte Hauptordner von KC Verwaltung, Money Butler, Kasse/MarktKasse und PC Manager im Download-Baum; verschachtelte Unterordner werden nicht doppelt gezählt\n" +
+                "• ältere Projektstände, deren sämtliche Dateien per SHA-256 am gleichen relativen Pfad bytegleich im Referenzstand vorhanden sind\n" +
                 "• KC-/Entwicklungsarchive (ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ) im Download-Baum, unabhängig vom Alter\n" +
                 "• alte ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ-Archive direkt im Download-Ordner – auch kleine Dateien unter 1 MB\n" +
                 "• byte-identische Dubletten direkt im Download-Ordner, wenn eine andere Kopie erhalten bleibt\n\n" +
-                "Andere entpackte Projektordner, WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents, Orbit sowie APK/AAB-Dateien bleiben geschützt.\n\n" +
+                "Projektstände mit fehlenden, abweichenden oder nicht lesbaren Dateien sowie WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents und APK/AAB-Dateien bleiben geschützt.\n\n" +
                 "Der Vorgang kann nicht rückgängig gemacht werden.";
 
         new AlertDialog.Builder(this)
@@ -2135,6 +2285,10 @@ public class MainActivity extends Activity {
             sb.append("Erkannte Projektwurzeln: ").append(st.projectRootsSeen).append("\n");
             sb.append("Mögliche alte/doppelte Projektstände: ").append(st.possibleOldProjectDirs)
                     .append(" | ").append(st.possibleOldProjectBytes).append(" Bytes\n");
+            sb.append("Davon per SHA-256 vollständig enthalten/löschbar: ").append(st.verifiedContainedProjectDirs)
+                    .append(" | ").append(st.verifiedContainedProjectBytes).append(" Bytes\n");
+            sb.append("Projektstände mit nur hier vorhandenen Dateien: ").append(st.projectDirsWithUniqueFiles).append("\n");
+            sb.append("Projektstände mit Abweichungen/nicht prüfbaren Dateien: ").append(st.projectDirsWithDifferentFiles).append("\n");
             sb.append("Entpackte KC-Programmordner löschbar: ").append(st.unpackedKcProgramDirs)
                     .append(" | ").append(st.unpackedKcProgramBytes).append(" Bytes\n");
             sb.append("Download im Hauptscan: ").append(st.downloadFilesSeen).append(" Dateien, ")
@@ -2169,6 +2323,19 @@ public class MainActivity extends Activity {
                     }
                     if (p.reference != null) {
                         sb.append("Referenzordner: ").append(p.reference.getAbsolutePath()).append("\n");
+                    }
+                    if (p.comparison != null) {
+                        sb.append("SHA-256-Vergleich: ")
+                                .append(p.comparison.matchedFiles).append(" bytegleich, ")
+                                .append(p.comparison.missingInReference).append(" nur hier vorhanden, ")
+                                .append(p.comparison.differentFiles).append(" abweichend, ")
+                                .append(p.comparison.unreadableFiles).append(" nicht prüfbar\n");
+                        if (!p.comparison.missingSamples.isEmpty()) {
+                            sb.append("Nur-hier-Beispiele: ").append(p.comparison.missingSamples).append("\n");
+                        }
+                        if (!p.comparison.differentSamples.isEmpty()) {
+                            sb.append("Abweichungs-Beispiele: ").append(p.comparison.differentSamples).append("\n");
+                        }
                     }
                     sb.append("\n");
                 }

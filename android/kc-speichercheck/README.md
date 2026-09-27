@@ -11,7 +11,7 @@ Android-App zum Prüfen des gemeinsamen Gerätespeichers.
 - Sortierung nach Speicherverbrauch und Mehrfachauswahl.
 - Doppeltipp auf einen Treffer öffnet bei Fotos eine Bildvorschau, bei Videos eine interne Wiedergabe und sonst die Dateidetails.
 - Byte-identische Dubletten werden in Gruppen geführt; die Referenzkopie, die erhalten bleibt, wird angezeigt.
-- Verschachtelte gleichnamige Entwicklungsordner werden als möglicher kompletter doppelter Projektstand erkannt und nur manuell zur Prüfung angeboten.
+- Projektstände derselben Versionsgruppe werden dateiweise per SHA-256 gegen den bevorzugten Referenzstand geprüft. Nur vollständig enthaltene, byte-identische Altstände werden GRÜN und für die automatische Bereinigung freigegeben; fehlende oder abweichende Dateien bleiben geschützt.
 - Zweite Sicherheitsabfrage vor jeder dauerhaften Löschung.
 - Kleine alte Archive direkt im Download-Ordner werden ab 14 Tagen unabhängig von ihrer Dateigröße erfasst und können automatisch bereinigt werden.
 - **Sicher automatisch bereinigen**: löscht ohne Einzelauswahl nur streng freigegebene Treffer direkt im Download-Ordner (alte Archive und byte-identische Dubletten).
