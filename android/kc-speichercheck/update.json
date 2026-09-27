@@ -1,8 +1,8 @@
 {
-  "versionCode": 14,
-  "versionName": "1.3.6",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.3.6-STABIL.apk",
-  "sha256": "1c59cdccfc405c45b3905d7a5678661dd7fb3ea75d1bf69e560a767d1e77224c",
-  "notes": "Neu: Vollständige Archivdiagnose im Bericht. Alle erreichbaren ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ/APK/AAB werden mit Pfad, Größe und Bewertung aufgeführt. Archive in ansonsten übersprungenen Build-/Projektordnern werden diagnostisch mit erfasst. Automatische Löschregeln bleiben unverändert vorsichtig.",
+  "versionCode": 15,
+  "versionName": "1.3.7",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.3.7-STABIL.apk",
+  "sha256": "6302f0cbb9ba1d483744a9ac46056c65d3ba7f0b66157d155ff0dd9468b5bf42",
+  "notes": "Neu: Flexible Projektordner-Diagnose für Unterverzeichnisse. Direkte Unterordner von Entwicklung/Projekte sowie tiefere Versions-, Kopie-, Backup-, Datums- und verschachtelte Projektstände werden rekursiv erkannt, nach Projektfamilien gruppiert und mit Dateizahl, Unterordnerzahl, Größe, jüngster Änderung und Referenzstand bewertet. Mögliche Alt-/Doppelstände bleiben GELB und werden nicht automatisch gelöscht.",
   "published": "2026-09-27"
 }
