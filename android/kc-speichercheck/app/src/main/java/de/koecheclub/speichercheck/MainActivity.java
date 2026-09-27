@@ -217,6 +217,7 @@ public class MainActivity extends Activity {
                 tv.setPadding(dp(8), dp(8), dp(8), dp(8));
                 Candidate c = candidates.get(position);
                 if (c.risk == Risk.GREEN) tv.setTextColor(Color.rgb(27, 94, 32));
+                else if (c.risk == Risk.YELLOW) tv.setTextColor(Color.rgb(120, 90, 0));
                 else tv.setTextColor(Color.rgb(183, 28, 28));
                 return v;
             }
