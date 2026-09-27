@@ -5,6 +5,8 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -30,6 +32,8 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -115,7 +119,9 @@ public class MainActivity extends Activity {
     private Button reportButton;
     private Button shareReportButton;
     private Button updateButton;
+    private ImageButton searchButton;
     private volatile boolean scanning = false;
+    private volatile boolean fileSearchRunning = false;
     private volatile ScanState lastScanState;
 
     private static final String UPDATE_MANIFEST_URL =
@@ -247,6 +253,13 @@ public class MainActivity extends Activity {
         shortcutButton.setOnClickListener(v -> requestHomeScreenShortcut(false));
         styleCompactButton(shortcutButton);
         row3.addView(shortcutButton, compactButtonParams());
+
+        searchButton = new ImageButton(this);
+        searchButton.setImageResource(android.R.drawable.ic_menu_search);
+        searchButton.setContentDescription("Datei suchen");
+        searchButton.setPadding(dp(8), dp(8), dp(8), dp(8));
+        searchButton.setOnClickListener(v -> showFileSearchDialog());
+        row3.addView(searchButton, new LinearLayout.LayoutParams(dp(42), dp(42)));
         root.addView(row3);
 
         status = new TextView(this);
@@ -343,6 +356,261 @@ public class MainActivity extends Activity {
 
     private LinearLayout.LayoutParams compactButtonParams() {
         return new LinearLayout.LayoutParams(0, dp(42), 1);
+    }
+
+
+    private void showFileSearchDialog() {
+        if (!hasStorageAccess()) {
+            requestStorageAccess();
+            return;
+        }
+        if (scanning) {
+            Toast.makeText(this, "Während des Speicher-Scans bitte kurz warten.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(18), dp(4), dp(18), 0);
+
+        TextView hint = new TextView(this);
+        hint.setText("Dateiname oder Teil davon eingeben. Für ZIP-Dateien geht auch *.zip oder zip.");
+        hint.setTextSize(12);
+        hint.setPadding(0, 0, 0, dp(6));
+        body.addView(hint);
+
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("z. B. projektname.zip oder *.zip");
+        body.addView(input, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Datei suchen")
+                .setView(body)
+                .setNegativeButton("Abbrechen", null)
+                .setNeutralButton("Neueste ZIPs", (d, w) -> startFileSearch("*.zip"))
+                .setPositiveButton("Suchen", (d, w) -> startFileSearch(input.getText().toString()))
+                .create();
+        dialog.setOnShowListener(d -> {
+            input.requestFocus();
+            dialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        });
+        dialog.show();
+    }
+
+    private void startFileSearch(String rawQuery) {
+        if (!hasStorageAccess()) {
+            requestStorageAccess();
+            return;
+        }
+
+        String query = rawQuery == null ? "" : rawQuery.trim();
+        if (query.isEmpty()) {
+            Toast.makeText(this, "Bitte einen Dateinamen oder *.zip eingeben.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (scanning) {
+            Toast.makeText(this, "Während des Speicher-Scans bitte kurz warten.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (fileSearchRunning) {
+            Toast.makeText(this, "Die Dateisuche läuft bereits.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        fileSearchRunning = true;
+        if (searchButton != null) searchButton.setEnabled(false);
+        status.setText("Dateisuche: " + query + " …");
+
+        new Thread(() -> {
+            try {
+                List<File> found = new ArrayList<>();
+                long[] checked = new long[] {0L, 0L};
+                searchFiles(Environment.getExternalStorageDirectory(), query, found, 0, checked);
+
+                found.sort((a, b) -> {
+                    int byDate = Long.compare(b.lastModified(), a.lastModified());
+                    if (byDate != 0) return byDate;
+                    return a.getAbsolutePath().compareToIgnoreCase(b.getAbsolutePath());
+                });
+
+                int total = found.size();
+                int visibleCount = Math.min(250, total);
+                List<File> visible = new ArrayList<>(found.subList(0, visibleCount));
+                runOnUiThread(() -> {
+                    fileSearchRunning = false;
+                    if (searchButton != null) searchButton.setEnabled(true);
+                    status.setText("Dateisuche: " + total + " Treffer · neueste zuerst");
+                    showFileSearchResults(query, visible, total, checked[0], checked[1]);
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    fileSearchRunning = false;
+                    if (searchButton != null) searchButton.setEnabled(true);
+                    status.setText("Dateisuche fehlgeschlagen.");
+                    Toast.makeText(this, "Dateisuche fehlgeschlagen: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
+        }).start();
+    }
+
+    private void searchFiles(File node, String query, List<File> found, int depth, long[] checked) {
+        if (node == null || !node.exists() || depth > 80) return;
+        if (isExcludedPath(node.getAbsolutePath())) return;
+
+        if (node.isDirectory()) {
+            checked[1]++;
+            File[] children;
+            try {
+                children = node.listFiles();
+            } catch (SecurityException e) {
+                return;
+            }
+            if (children == null) return;
+            for (File child : children) {
+                searchFiles(child, query, found, depth + 1, checked);
+            }
+            return;
+        }
+
+        checked[0]++;
+        if (matchesFileSearch(node, query)) found.add(node);
+
+        if (checked[0] % 1000L == 0L) {
+            long n = checked[0];
+            runOnUiThread(() -> {
+                if (fileSearchRunning && status != null) {
+                    status.setText("Dateisuche … " + n + " Dateien geprüft");
+                }
+            });
+        }
+    }
+
+    private boolean matchesFileSearch(File file, String rawQuery) {
+        if (file == null || !file.isFile()) return false;
+        String q = rawQuery == null ? "" : rawQuery.trim().toLowerCase(Locale.ROOT);
+        if (q.isEmpty()) return false;
+
+        String name = file.getName() == null ? "" : file.getName().toLowerCase(Locale.ROOT);
+        String path = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+
+        if (q.equals("zip") || q.equals(".zip") || q.equals("*.zip")) {
+            return name.endsWith(".zip");
+        }
+        if (q.startsWith("*.") && q.indexOf('*', 1) < 0) {
+            return name.endsWith(q.substring(1));
+        }
+        if (q.indexOf('*') >= 0) {
+            return wildcardMatch(name, q) || wildcardMatch(path, q);
+        }
+        return name.contains(q) || path.contains(q);
+    }
+
+    private boolean wildcardMatch(String text, String pattern) {
+        if (text == null || pattern == null) return false;
+        String[] parts = pattern.split("\\*", -1);
+        int pos = 0;
+        boolean anchoredStart = !pattern.startsWith("*");
+        boolean anchoredEnd = !pattern.endsWith("*");
+        boolean firstPart = true;
+        String lastNonEmpty = "";
+
+        for (String part : parts) {
+            if (part.isEmpty()) continue;
+            int at = text.indexOf(part, pos);
+            if (at < 0) return false;
+            if (firstPart && anchoredStart && at != 0) return false;
+            pos = at + part.length();
+            firstPart = false;
+            lastNonEmpty = part;
+        }
+        if (anchoredEnd && !lastNonEmpty.isEmpty() && !text.endsWith(lastNonEmpty)) return false;
+        return true;
+    }
+
+    private void showFileSearchResults(String query, List<File> files, int total, long checkedFiles, long checkedDirs) {
+        if (files.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Keine Datei gefunden")
+                    .setMessage("Für „" + query + "“ wurde kein Treffer gefunden.\n\nGeprüft: " +
+                            checkedFiles + " Dateien in " + checkedDirs + " Ordnern.")
+                    .setNegativeButton("Schließen", null)
+                    .setPositiveButton("Neue Suche", (d, w) -> showFileSearchDialog())
+                    .show();
+            return;
+        }
+
+        List<String> rows = new ArrayList<>();
+        SimpleDateFormat df = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMANY);
+        for (File f : files) {
+            rows.add(f.getName() + "\n" +
+                    Formatter.formatFileSize(this, f.length()) + " · " +
+                    df.format(new Date(f.lastModified())) + "\n" +
+                    f.getAbsolutePath());
+        }
+
+        ListView resultList = new ListView(this);
+        ArrayAdapter<String> resultAdapter = new ArrayAdapter<String>(
+                this, android.R.layout.simple_list_item_1, rows) {
+            @Override
+            public View getView(int position, View convertView, android.view.ViewGroup parent) {
+                View v = super.getView(position, convertView, parent);
+                TextView tv = (TextView) v;
+                tv.setTextSize(12.5f);
+                tv.setSingleLine(false);
+                tv.setMaxLines(4);
+                tv.setPadding(dp(10), dp(8), dp(10), dp(8));
+                return v;
+            }
+        };
+        resultList.setAdapter(resultAdapter);
+
+        String title = total > files.size()
+                ? "Dateisuche · " + total + " Treffer (erste " + files.size() + ")"
+                : "Dateisuche · " + total + " Treffer";
+
+        AlertDialog resultsDialog = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(resultList)
+                .setNegativeButton("Schließen", null)
+                .setPositiveButton("Neue Suche", (d, w) -> showFileSearchDialog())
+                .create();
+
+        resultList.setOnItemClickListener((parent, view, position, id) -> {
+            File file = files.get(position);
+            showFoundFileDetails(file);
+        });
+
+        resultsDialog.show();
+    }
+
+    private void showFoundFileDetails(File file) {
+        if (file == null) return;
+        String parent = file.getParentFile() == null ? "" : file.getParentFile().getAbsolutePath();
+        String details = file.getName() + "\n" +
+                Formatter.formatFileSize(this, file.length()) + "\n" +
+                new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMANY)
+                        .format(new Date(file.lastModified())) +
+                "\n\nOrdner:\n" + parent +
+                "\n\nVollständiger Pfad:\n" + file.getAbsolutePath();
+
+        new AlertDialog.Builder(this)
+                .setTitle("Gefundene Datei")
+                .setMessage(details)
+                .setNegativeButton("Schließen", null)
+                .setPositiveButton("Pfad kopieren", (d, w) -> copyPathToClipboard(file))
+                .show();
+    }
+
+    private void copyPathToClipboard(File file) {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard == null || file == null) {
+            Toast.makeText(this, "Pfad konnte nicht kopiert werden.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        clipboard.setPrimaryClip(ClipData.newPlainText("Dateipfad", file.getAbsolutePath()));
+        Toast.makeText(this, "Dateipfad kopiert.", Toast.LENGTH_SHORT).show();
     }
 
     private void requestHomeScreenShortcut(boolean automaticFirstRun) {
