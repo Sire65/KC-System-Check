@@ -502,7 +502,23 @@ public class MainActivity extends Activity {
         final Map<Long, List<File>> sameSize = new HashMap<>();
         final Map<Long, List<File>> whatsappPhotoSameSize = new HashMap<>();
         final Map<String, Long> archiveCountByExt = new HashMap<>();
+        final List<ArchiveEntry> archives = new ArrayList<>();
+        final Set<String> archivePaths = new HashSet<>();
         final Set<String> candidatePaths = new HashSet<>();
+    }
+
+    static class ArchiveEntry {
+        final File file;
+        final long size;
+        final String ext;
+        final String assessment;
+
+        ArchiveEntry(File file, long size, String ext, String assessment) {
+            this.file = file;
+            this.size = size;
+            this.ext = ext;
+            this.assessment = assessment;
+        }
     }
 
     private void scanTree(File file, ScanState state) {
@@ -515,6 +531,7 @@ public class MainActivity extends Activity {
 
             if (isNestedDuplicateProjectDir(file)) {
                 long sz = folderSize(file, 0);
+                scanArchivesOnly(file, state, 0);
                 state.nestedDuplicateFolders++;
                 state.nestedDuplicateFolderBytes += sz;
                 addCandidate(file, sz, Risk.YELLOW,
@@ -525,8 +542,9 @@ public class MainActivity extends Activity {
             String name = file.getName().toLowerCase(Locale.ROOT);
             if (GENERATED_DIRS.contains(name)) {
                 long sz = folderSize(file, 0);
+                scanArchivesOnly(file, state, 0);
                 if (sz >= MB) addCandidate(file, sz, Risk.GREEN, "Erzeugter Entwicklungsordner; normalerweise wiederherstellbar", state);
-                return; // avoid double counting inside generated folders
+                return; // normale Dateien nicht doppelt zählen; Archive werden diagnostisch erfasst
             }
             File[] children;
             try { children = file.listFiles(); } catch (SecurityException e) { state.unreadableDirs++; return; }
@@ -556,6 +574,55 @@ public class MainActivity extends Activity {
         return p.contains("/Android/data") || p.contains("/Android/obb") || p.contains("/Android/.Trash");
     }
 
+    private void scanArchivesOnly(File file, ScanState state, int depth) {
+        if (file == null || !file.exists() || depth > 40) return;
+        if (isExcludedPath(file.getAbsolutePath())) return;
+
+        if (file.isDirectory()) {
+            File[] children;
+            try { children = file.listFiles(); } catch (SecurityException e) { state.unreadableDirs++; return; }
+            if (children == null) { state.unreadableDirs++; return; }
+            for (File child : children) scanArchivesOnly(child, state, depth + 1);
+            return;
+        }
+
+        String ext = extension(file.getName().toLowerCase(Locale.ROOT));
+        if (ARCHIVE_EXT.contains(ext)) recordArchive(file, file.length(), state);
+    }
+
+    private void recordArchive(File file, long size, ScanState state) {
+        if (file == null || state == null) return;
+        String path = file.getAbsolutePath();
+        if (!state.archivePaths.add(path)) return;
+
+        String ext = extension(file.getName().toLowerCase(Locale.ROOT));
+        state.archivesSeen++;
+        state.archiveBytesSeen += size;
+        state.archiveCountByExt.put(ext, state.archiveCountByExt.getOrDefault(ext, 0L) + 1L);
+        state.archives.add(new ArchiveEntry(file, size, ext, archiveAssessment(file, size)));
+    }
+
+    private String archiveAssessment(File file, long size) {
+        String ext = extension(file.getName().toLowerCase(Locale.ROOT));
+        long age = System.currentTimeMillis() - file.lastModified();
+
+        if (ext.equals("apk") || ext.equals("aab")) {
+            return "GESCHUETZT – APK/AAB wird nicht automatisch gelöscht";
+        }
+        if (isKcDevelopmentArchive(file)) {
+            return isInDownloadTree(file)
+                    ? "LOESCHBAR – KC-Entwicklungsarchiv im Download-Baum"
+                    : "PRUEFEN – KC-/Entwicklungsarchiv außerhalb des Download-Baums";
+        }
+        if (isAutoCleanupArchiveExtension(ext) && age > 14 * DAY && isDirectDownloadFile(file)) {
+            return "LOESCHBAR – altes Archiv direkt im Download-Ordner (>14 Tage)";
+        }
+        if (isAutoCleanupArchiveExtension(ext) && age > 14 * DAY && size >= MB) {
+            return "PRUEFEN – altes Archiv außerhalb des direkten Download-Ordners (>14 Tage)";
+        }
+        return "BEHALTEN – keine sichere automatische Löschregel erfüllt";
+    }
+
     private void classifyFile(File file, long size, ScanState state) {
         String name = file.getName().toLowerCase(Locale.ROOT);
         String ext = extension(name);
@@ -565,9 +632,7 @@ public class MainActivity extends Activity {
                 path.contains("entwicklung") || path.contains("development") || path.contains("source") || path.contains("src") || path.contains("build");
 
         if (ARCHIVE_EXT.contains(ext)) {
-            state.archivesSeen++;
-            state.archiveBytesSeen += size;
-            state.archiveCountByExt.put(ext, state.archiveCountByExt.getOrDefault(ext, 0L) + 1L);
+            recordArchive(file, size, state);
         }
 
         if (isKcDevelopmentArchive(file)) {
@@ -1186,6 +1251,24 @@ public class MainActivity extends Activity {
             sb.append("Dublettengruppen: ").append(st.duplicateGroupSeq).append("\n");
             sb.append("Doppelte/verschachtelte Projektordner: ").append(st.nestedDuplicateFolders)
                     .append(" | ").append(st.nestedDuplicateFolderBytes).append(" Bytes\n");
+
+            sb.append("\nARCHIVDIAGNOSE – alle im Scan erreichbaren Archive\n");
+            sb.append("Ausgenommen bleiben Android/data, Android/obb und Android/.Trash.\n");
+            if (st.archives.isEmpty()) {
+                sb.append("Keine Archive gefunden.\n");
+            } else {
+                List<ArchiveEntry> archiveReport = new ArrayList<>(st.archives);
+                archiveReport.sort((a, b) -> a.file.getAbsolutePath().compareToIgnoreCase(b.file.getAbsolutePath()));
+                int ai = 1;
+                for (ArchiveEntry a : archiveReport) {
+                    sb.append(ai++).append(". ")
+                            .append(a.ext.toUpperCase(Locale.ROOT))
+                            .append(" | ").append(a.size).append(" Bytes")
+                            .append(" | ").append(a.assessment).append("\n");
+                    sb.append("Name: ").append(a.file.getName()).append("\n");
+                    sb.append("Pfad: ").append(a.file.getAbsolutePath()).append("\n\n");
+                }
+            }
         }
         sb.append("\nBewertung: GRUEN = meist erzeugbar/temporär; GELB = prüfen; ROT = nicht pauschal löschen\n\n");
         int i = 1;
