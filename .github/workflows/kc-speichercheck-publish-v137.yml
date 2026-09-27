@@ -1,0 +1,63 @@
+name: KC SpeicherCheck v1.3.7 veröffentlichen
+
+on:
+  push:
+    paths:
+      - '.github/workflows/kc-speichercheck-publish-v137.yml'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Signiertes Paket laden und prüfen
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 'https://sdmntprdenmarkeast.oaiusercontent.com/files/00000000-90b0-8210-8aab-6d5aa37884a9/raw?se=2026-09-27T13%3A03%3A23Z&sp=r&sv=2026-02-06&sr=b&scid=48b4353e-c59f-5951-a118-915f1c246b29&skoid=c30e7ce7-1f51-4051-a377-288cdba21c02&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-27T08%3A12%3A49Z&ske=2026-09-28T08%3A12%3A49Z&sks=b&skv=2026-02-06&sig=xvnCaoybKsIHYxs/feO3%2Bm4e8lqkqyOsI1nYjGZ5slg%3D' -o /tmp/kc-v137-signed.zip
+          rm -rf /tmp/kc-v137
+          mkdir -p /tmp/kc-v137
+          unzip -o /tmp/kc-v137-signed.zip -d /tmp/kc-v137
+          test -f /tmp/kc-v137/KC-SpeicherCheck-v1.3.7.apk
+          echo '6302f0cbb9ba1d483744a9ac46056c65d3ba7f0b66157d155ff0dd9468b5bf42  /tmp/kc-v137/KC-SpeicherCheck-v1.3.7.apk' | sha256sum -c -
+
+      - name: Signatur mit stabiler v1.3.6 vergleichen
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          NEW_INFO="$("$APKSIGNER" verify --print-certs /tmp/kc-v137/KC-SpeicherCheck-v1.3.7.apk)"
+          OLD_INFO="$("$APKSIGNER" verify --print-certs downloads/KC-SpeicherCheck-v1.3.6-STABIL.apk)"
+          NEW_CERT="$(printf '%s\n' "$NEW_INFO" | sed -n 's/.*certificate SHA-256 digest:[[:space:]]*//p' | head -1)"
+          OLD_CERT="$(printf '%s\n' "$OLD_INFO" | sed -n 's/.*certificate SHA-256 digest:[[:space:]]*//p' | head -1)"
+          test -n "$NEW_CERT"
+          test -n "$OLD_CERT"
+          test "$NEW_CERT" = "$OLD_CERT"
+          echo "Signatur kompatibel: $NEW_CERT"
+
+      - name: Stabiles Update veröffentlichen
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/kc-v137/KC-SpeicherCheck-v1.3.7.apk downloads/KC-SpeicherCheck-v1.3.7-STABIL.apk
+          echo '6302f0cbb9ba1d483744a9ac46056c65d3ba7f0b66157d155ff0dd9468b5bf42  downloads/KC-SpeicherCheck-v1.3.7-STABIL.apk' > downloads/KC-SpeicherCheck-v1.3.7-STABIL.sha256.txt
+          cat > android/kc-speichercheck/update.json <<'JSON'
+          {
+            "versionCode": 15,
+            "versionName": "1.3.7",
+            "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.3.7-STABIL.apk",
+            "sha256": "6302f0cbb9ba1d483744a9ac46056c65d3ba7f0b66157d155ff0dd9468b5bf42",
+            "notes": "Neu: Flexible Projektordner-Diagnose für Unterverzeichnisse. Direkte Unterordner von Entwicklung/Projekte sowie tiefere Versions-, Kopie-, Backup-, Datums- und verschachtelte Projektstände werden rekursiv erkannt, nach Projektfamilien gruppiert und mit Dateizahl, Unterordnerzahl, Größe, jüngster Änderung und Referenzstand bewertet. Mögliche Alt-/Doppelstände bleiben GELB und werden nicht automatisch gelöscht.",
+            "published": "2026-09-27"
+          }
+          JSON
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add downloads/KC-SpeicherCheck-v1.3.7-STABIL.apk downloads/KC-SpeicherCheck-v1.3.7-STABIL.sha256.txt android/kc-speichercheck/update.json
+          git commit -m "KC SpeicherCheck v1.3.7 signiert veröffentlichen [skip ci]"
+          git push
