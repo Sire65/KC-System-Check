@@ -1,8 +1,8 @@
 {
-  "versionCode": 22,
-  "versionName": "1.4.4",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.4-STABIL.apk",
-  "sha256": "d9fe2de4467ddcbcc4e3f314d147a2f34faeb3a1c69350785e6944bb03f5d731",
-  "notes": "Fix: Archive werden jetzt zusätzlich über den globalen Android-Dateiindex erfasst. Dadurch sollen auch ZIPs erscheinen, die Xiaomi im Dateimanager zeigt, der bisherige Dateibaum aber nicht fand. Die Lupensuche nutzt ebenfalls diesen Index. Framework-, Dienstplan- und weitere Entwicklungsarchive werden besser erkannt. Frisch heruntergeladene Entwicklungs-ZIPs unter 3 Tagen bleiben vor Auto-Löschen geschützt. Der Fortschrittsbalken umfasst nun 8 Phasen.",
+  "versionCode": 23,
+  "versionName": "1.4.5",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.5-STABIL.apk",
+  "sha256": "62e533f778bba3a639001e68208ee780ecf6b05f83db7a6d7f64760da027e8eb",
+  "notes": "Neu: sichere Leerordner-Bereinigung. Leere, nicht zum Android-/App-/Medien-System gehörende Ordner sowie reine Leerordner-Bäume können bereinigt werden. Android-, MIUI-/Xiaomi-, App-, Medien- und versteckte Bereiche bleiben geschützt. Vor dem Löschen wird erneut geprüft, ob der Ordner weiterhin leer und freigegeben ist.",
   "published": "2026-09-27"
 }
