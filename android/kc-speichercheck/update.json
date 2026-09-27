@@ -1,0 +1,8 @@
+{
+  "versionCode": 2,
+  "versionName": "1.1.0",
+  "apkUrl": "",
+  "sha256": "",
+  "notes": "Update-Funktion hinzugefügt: GitHub-Versionsprüfung, Freigabe vor Download und SHA-256-Prüfung vor der Installation.",
+  "published": "2026-09-27"
+}
