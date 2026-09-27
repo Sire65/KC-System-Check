@@ -10,7 +10,10 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.pm.ShortcutInfo;
+import android.content.pm.ShortcutManager;
 import android.graphics.Color;
+import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -134,6 +137,7 @@ public class MainActivity extends Activity {
         refreshPermissionUi();
         registerUpdateReceiver();
         maybeCheckForUpdates();
+        getWindow().getDecorView().postDelayed(() -> requestHomeScreenShortcut(true), 800);
     }
 
     private void buildUi() {
@@ -168,6 +172,11 @@ public class MainActivity extends Activity {
         updateButton.setText("Update prüfen");
         updateButton.setOnClickListener(v -> checkForUpdates(true));
         root.addView(updateButton);
+
+        Button shortcutButton = new Button(this);
+        shortcutButton.setText("Icon auf Startbildschirm");
+        shortcutButton.setOnClickListener(v -> requestHomeScreenShortcut(false));
+        root.addView(shortcutButton);
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -227,6 +236,44 @@ public class MainActivity extends Activity {
         root.addView(list, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
 
         setContentView(root);
+    }
+
+    private void requestHomeScreenShortcut(boolean automaticFirstRun) {
+        SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
+        if (automaticFirstRun && p.getBoolean("shortcut_prompted", false)) return;
+
+        ShortcutManager shortcutManager = getSystemService(ShortcutManager.class);
+        if (shortcutManager == null || !shortcutManager.isRequestPinShortcutSupported()) {
+            if (!automaticFirstRun) {
+                Toast.makeText(this,
+                        "Dein Android-Launcher unterstützt das automatische Anheften nicht. Bitte KC SpeicherCheck in der App-Liste gedrückt halten und auf den Startbildschirm ziehen.",
+                        Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+
+        Intent launchIntent = new Intent(this, MainActivity.class);
+        launchIntent.setAction(Intent.ACTION_MAIN);
+        launchIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+
+        ShortcutInfo shortcut = new ShortcutInfo.Builder(this, "kc_speichercheck_home")
+                .setShortLabel("KC SpeicherCheck")
+                .setLongLabel("KC SpeicherCheck")
+                .setIcon(Icon.createWithResource(this, R.drawable.ic_kc_speichercheck))
+                .setIntent(launchIntent)
+                .build();
+
+        boolean requested = shortcutManager.requestPinShortcut(shortcut, null);
+        if (requested) {
+            p.edit().putBoolean("shortcut_prompted", true).apply();
+            if (!automaticFirstRun) {
+                Toast.makeText(this, "Bitte das Anheften des KC-SpeicherCheck-Icons bestätigen.", Toast.LENGTH_LONG).show();
+            }
+        } else if (!automaticFirstRun) {
+            Toast.makeText(this,
+                    "Das Icon konnte nicht automatisch angeheftet werden. Bitte die App in der App-Liste gedrückt halten und auf den Startbildschirm ziehen.",
+                    Toast.LENGTH_LONG).show();
+        }
     }
 
     private int dp(int n) {
