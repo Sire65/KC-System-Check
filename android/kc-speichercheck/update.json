@@ -1,8 +1,8 @@
 {
-  "versionCode": 17,
-  "versionName": "1.3.9",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.3.9-STABIL.apk",
-  "sha256": "aea2520fdc52f130db9df0e6c57603b3ff2f7b0dfac5d6da559acdc265a45717",
-  "notes": "Fix: Der Scan bleibt nach dem Hauptscan nicht mehr scheinbar bei ca. 27.000 Dateien stehen. Alle sechs Scanphasen werden sichtbar angezeigt. Der Download-Kontrollscan ist deutlich schlanker, Projektordner werden nur einmal aufwendig untersucht und Android-Download-Index sowie Dublettenprüfung zeigen Fortschritt. Die tiefe ZIP-/Projekt-Erkennung aus v1.3.8 bleibt erhalten.",
+  "versionCode": 18,
+  "versionName": "1.4.0",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.0-STABIL.apk",
+  "sha256": "5eebb8ed51e2365a97863ff28b5ad830bc134cc2be0bb3dd32beb0aabbb63e4b",
+  "notes": "Neu: Entpackte KC-Programmordner werden im gesamten Download-Baum gezielt erkannt. KC Verwaltung, Money Butler, Kasse/MarktKasse und PC Manager können als komplette Download-/Entwicklungsstände sicher bereinigt werden. Verschachtelte Bestandteile wie kasse-git und pc-manager werden nicht mehr zusätzlich als eigener Speichergewinn gezählt. Andere Projekte, Orbit, Bilder, Dokumente und APK/AAB bleiben geschützt.",
   "published": "2026-09-27"
 }
