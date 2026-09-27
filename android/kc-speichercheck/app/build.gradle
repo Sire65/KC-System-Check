@@ -6,6 +6,10 @@ android {
     namespace 'de.koecheclub.speichercheck'
     compileSdk 35
 
+    buildFeatures {
+        buildConfig true
+    }
+
     defaultConfig {
         applicationId 'de.koecheclub.speichercheck'
         minSdk 26
