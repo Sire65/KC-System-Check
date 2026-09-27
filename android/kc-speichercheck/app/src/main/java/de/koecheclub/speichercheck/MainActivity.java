@@ -68,6 +68,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 import org.json.JSONObject;
 
@@ -869,7 +871,9 @@ public class MainActivity extends Activity {
             // Xiaomi/Android im Dateimanager kennt, aber der File-Baum nicht sah.
             setScanProgress(46, "4/8 Globaler Android-Dateiindex · Archive");
             scanGlobalArchiveMediaStoreFallback(state);
-            setScanProgress(58, "4/8 Globaler Archivindex abgeschlossen");
+            setScanProgress(55, "4/8 Zusätzliche Speicherbereiche werden tief geprüft");
+            scanAdditionalStorageRoots(state);
+            setScanProgress(58, "4/8 Globaler Archivindex und Zusatzspeicher abgeschlossen");
 
             setScanProgress(59, "5/8 KC-/Projektstände werden ausgewertet");
             analyzeProjectDirectories(state);
@@ -964,6 +968,13 @@ public class MainActivity extends Activity {
         long mediaStoreGlobalArchivesAdded = 0;
         long mediaStoreGlobalPathMisses = 0;
         long mediaStoreGlobalQueryErrors = 0;
+        long additionalStorageRootsFound = 0;
+        long additionalStorageRootsScanned = 0;
+        long additionalStorageRootsUnreadable = 0;
+        long zipArchivesInspected = 0;
+        long zipArchivesInvalid = 0;
+        long zipArchivesEmpty = 0;
+        boolean additionalStorageScanActive = false;
         int duplicateGroupSeq = 0;
         final Map<Long, List<File>> sameSize = new HashMap<>();
         final Map<Long, List<File>> whatsappPhotoSameSize = new HashMap<>();
@@ -976,6 +987,8 @@ public class MainActivity extends Activity {
         final List<RootDirectoryEntry> rootDirectories = new ArrayList<>();
         final Map<String, FolderStats> folderStatsCache = new HashMap<>();
         final Map<String, String> fileHashCache = new HashMap<>();
+        final Map<String, ArchiveInspection> archiveInspectionByPath = new HashMap<>();
+        final Set<String> additionalStorageRootPaths = new HashSet<>();
         final Set<String> candidatePaths = new HashSet<>();
         final Set<String> seenFilePaths = new HashSet<>();
         final Set<String> inspectedProjectDirPaths = new HashSet<>();
@@ -1034,17 +1047,27 @@ public class MainActivity extends Activity {
         }
     }
 
+    static class ArchiveInspection {
+        boolean valid = true;
+        int entries = 0;
+        int files = 0;
+        long uncompressedBytes = 0;
+        String error = null;
+    }
+
     static class ArchiveEntry {
         final File file;
         final long size;
         final String ext;
         final String assessment;
+        final ArchiveInspection inspection;
 
-        ArchiveEntry(File file, long size, String ext, String assessment) {
+        ArchiveEntry(File file, long size, String ext, String assessment, ArchiveInspection inspection) {
             this.file = file;
             this.size = size;
             this.ext = ext;
             this.assessment = assessment;
+            this.inspection = inspection;
         }
     }
 
@@ -1109,7 +1132,7 @@ public class MainActivity extends Activity {
             }
         }
         classifyFile(file, size, state);
-        if (state.files % 500 == 0) {
+        if (!state.additionalStorageScanActive && state.files % 500 == 0) {
             long f = state.files;
             int pct = 2 + Math.min(24, (int) (f / 1200L));
             setScanProgress(pct, "1/8 Hauptscan · " + f + " Dateien geprüft");
@@ -1243,11 +1266,15 @@ public class MainActivity extends Activity {
                 String name = nameCol >= 0 ? cursor.getString(nameCol) : null;
                 if (name == null || name.trim().isEmpty()) continue;
 
+                String data = dataCol >= 0 ? cursor.getString(dataCol) : null;
+                String rel = relCol >= 0 ? cursor.getString(relCol) : null;
+                rememberAdditionalStorageRoot(data, state);
+
                 String ext = extension(name.toLowerCase(Locale.ROOT));
                 if (!ARCHIVE_EXT.contains(ext)) {
                     if (state.mediaStoreGlobalRows % 1000 == 0) {
-                        int pct = 46 + (int) Math.min(12L,
-                                (12L * state.mediaStoreGlobalRows) / total);
+                        int pct = 46 + (int) Math.min(9L,
+                                (9L * state.mediaStoreGlobalRows) / total);
                         setScanProgress(pct, "4/8 Globaler Dateiindex · " +
                                 state.mediaStoreGlobalRows + "/" + total +
                                 " Einträge · " + state.mediaStoreGlobalArchivesSeen + " Archive");
@@ -1256,8 +1283,6 @@ public class MainActivity extends Activity {
                 }
 
                 state.mediaStoreGlobalArchivesSeen++;
-                String data = dataCol >= 0 ? cursor.getString(dataCol) : null;
-                String rel = relCol >= 0 ? cursor.getString(relCol) : null;
                 File candidate = resolveIndexedFile(data, rel, name);
                 if (candidate == null || !candidate.exists() || !candidate.isFile()) {
                     state.mediaStoreGlobalPathMisses++;
@@ -1272,8 +1297,8 @@ public class MainActivity extends Activity {
                 }
 
                 if (state.mediaStoreGlobalRows % 250 == 0) {
-                    int pct = 46 + (int) Math.min(12L,
-                            (12L * state.mediaStoreGlobalRows) / total);
+                    int pct = 46 + (int) Math.min(9L,
+                            (9L * state.mediaStoreGlobalRows) / total);
                     setScanProgress(pct, "4/8 Globaler Dateiindex · " +
                             state.mediaStoreGlobalRows + "/" + total +
                             " Einträge · " + state.mediaStoreGlobalArchivesSeen +
@@ -1283,6 +1308,67 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             state.mediaStoreGlobalQueryErrors++;
         }
+    }
+
+    private void rememberAdditionalStorageRoot(String absolutePath, ScanState state) {
+        if (absolutePath == null || state == null) return;
+        String p = absolutePath.replace('\\', '/');
+        String prefix = "/storage/emulated/";
+        if (!p.startsWith(prefix)) return;
+        int slash = p.indexOf('/', prefix.length());
+        if (slash < 0) return;
+
+        String rootPath = p.substring(0, slash);
+        File primary = Environment.getExternalStorageDirectory();
+        if (primary != null && rootPath.equalsIgnoreCase(primary.getAbsolutePath().replace('\\', '/'))) return;
+
+        if (state.additionalStorageRootPaths.add(rootPath)) {
+            state.additionalStorageRootsFound++;
+        }
+    }
+
+    private void scanAdditionalStorageRoots(ScanState state) {
+        if (state == null || state.additionalStorageRootPaths.isEmpty()) return;
+        List<String> roots = new ArrayList<>(state.additionalStorageRootPaths);
+        Collections.sort(roots);
+
+        state.additionalStorageScanActive = true;
+        try {
+            int doneCount = 0;
+            for (String rootPath : roots) {
+                doneCount++;
+                setScanProgress(55 + Math.min(2, doneCount - 1),
+                        "4/8 Zusatzspeicher " + doneCount + "/" + roots.size() + " · " + rootPath);
+                File root = new File(rootPath);
+                File[] direct;
+                try {
+                    direct = root.exists() && root.isDirectory() ? root.listFiles() : null;
+                } catch (SecurityException e) {
+                    direct = null;
+                }
+                if (direct == null) {
+                    state.additionalStorageRootsUnreadable++;
+                    continue;
+                }
+
+                state.additionalStorageRootsScanned++;
+                scanTree(root, state);
+                auditStorageRoot(root, state);
+                findSafeEmptyDirectoryTrees(root, state);
+            }
+        } finally {
+            state.additionalStorageScanActive = false;
+        }
+    }
+
+    private File emulatedStorageRootFor(File file) {
+        if (file == null) return null;
+        String p = file.getAbsolutePath().replace('\\', '/');
+        String prefix = "/storage/emulated/";
+        if (!p.startsWith(prefix)) return null;
+        int slash = p.indexOf('/', prefix.length());
+        String rootPath = slash < 0 ? p : p.substring(0, slash);
+        return new File(rootPath);
     }
 
     private boolean isExcludedPath(String path) {
@@ -1425,23 +1511,26 @@ public class MainActivity extends Activity {
 
     private boolean isProtectedEmptyDirectoryPath(File dir) {
         if (dir == null) return true;
-        File root = Environment.getExternalStorageDirectory();
+        File root = emulatedStorageRootFor(dir);
         if (root == null) return true;
         if (samePath(dir, root)) return true;
         if (isEmptyCleanupTraversalBlocked(dir)) return true;
 
-        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        if (downloads != null && samePath(dir, downloads)) return true;
+        String rootPath = root.getAbsolutePath().replace('\\', '/');
+        String path = dir.getAbsolutePath().replace('\\', '/');
+        if (!path.startsWith(rootPath + "/")) return true;
+        String rel = path.substring(rootPath.length() + 1).toLowerCase(Locale.ROOT);
 
-        String name = dir.getName() == null ? "" : dir.getName().trim();
-        return name.equalsIgnoreCase("Download") || name.equalsIgnoreCase("Downloads")
-                ? dir.getParentFile() != null && samePath(dir.getParentFile(), root)
-                : false;
+        if (rel.equals("download") || rel.equals("downloads")) return true;
+
+        // Xiaomi-Systemcontainer bleibt geschützt. Wirklich leere Unterordner
+        // darin dürfen separat geprüft und entfernt werden.
+        return rel.equals("download/downloaded_rom") || rel.equals("downloads/downloaded_rom");
     }
 
     private boolean isEmptyCleanupTraversalBlocked(File dir) {
         if (dir == null) return true;
-        File root = Environment.getExternalStorageDirectory();
+        File root = emulatedStorageRootFor(dir);
         if (root == null) return true;
 
         String rootPath = root.getAbsolutePath().replace('\\', '/');
@@ -1477,10 +1566,9 @@ public class MainActivity extends Activity {
             return true;
         }
 
-        // Xiaomi nutzt Download/downloaded_rom für System-/ROM-Downloads.
-        if (top.equals("download") || top.equals("downloads")) {
-            if (parts.length >= 2 && parts[1].equalsIgnoreCase("downloaded_rom")) return true;
-        }
+        // downloaded_rom selbst wird in isProtectedEmptyDirectoryPath geschützt.
+        // Die Traversierung darf weiterlaufen, damit ausschließlich wirklich
+        // leere Unterordner separat erkannt werden.
 
         // Paketnamenartige Hauptordner werden als App-Struktur behandelt.
         return top.matches("[a-z0-9_]+(\\.[a-z0-9_]+){2,}");
@@ -1558,25 +1646,21 @@ public class MainActivity extends Activity {
     private boolean isDirectoryInDownloadTree(File dir) {
         if (dir == null || !dir.isDirectory()) return false;
         String p = dir.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
-        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        if (downloads != null) {
-            String d = downloads.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
-            if (p.equals(d) || p.startsWith(d + "/")) return true;
-        }
-        return p.contains("/download/") || p.endsWith("/download") ||
-                p.contains("/downloads/") || p.endsWith("/downloads");
+        return p.matches("^/storage/emulated/[^/]+/downloads?(?:/.*)?$");
     }
 
     private int downloadDepth(File dir) {
         if (dir == null) return -1;
-        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        if (downloads == null) return -1;
-        String target = downloads.getAbsolutePath().replace('\\', '/');
         File current = dir;
         int depth = 0;
         while (current != null && depth <= 30) {
-            String p = current.getAbsolutePath().replace('\\', '/');
-            if (p.equalsIgnoreCase(target)) return depth;
+            String name = current.getName() == null ? "" : current.getName();
+            File root = emulatedStorageRootFor(current);
+            if ((name.equalsIgnoreCase("Download") || name.equalsIgnoreCase("Downloads")) &&
+                    current.getParentFile() != null && root != null &&
+                    samePath(current.getParentFile(), root)) {
+                return depth;
+            }
             current = current.getParentFile();
             depth++;
         }
@@ -1811,6 +1895,8 @@ public class MainActivity extends Activity {
                 n.matches(".*[-_ ]kopie([0-9]*)?$") ||
                 n.contains("backup") || n.contains("sicherung") || n.contains("_old") ||
                 n.contains("-old") || n.contains(" alt") || n.contains("_alt") ||
+                n.contains("_fixed") || n.contains("-fixed") || n.contains(" fixed") ||
+                n.contains("_final") || n.contains("-final") || n.contains(" final") ||
                 n.contains("komplett") || n.contains("zusammengefuehrt") ||
                 n.contains("zusammengeführt") || n.contains("stand ");
     }
@@ -1841,7 +1927,7 @@ public class MainActivity extends Activity {
         n = n.replaceAll("\\b20[0-9]{2}[ ]+[0-9]{1,2}[ ]+[0-9]{1,2}\\b", " ");
         n = n.replaceAll("\\b[0-9]{1,2}[ ]+[0-9]{1,2}[ ]+20[0-9]{2}\\b", " ");
         n = n.replaceAll("\\bv[0-9]+(?:[ ]+[0-9]+)*\\b", " ");
-        n = n.replaceAll("\\b(copy|kopie|backup|sicherung|old|alt|komplett|zusammengefuehrt|zusammengefuhrt)\\b", " ");
+        n = n.replaceAll("\\b(copy|kopie|backup|sicherung|old|alt|fixed|final|komplett|zusammengefuehrt|zusammengefuhrt)\\b", " ");
         n = n.replaceAll("\\bstand[ ]*[0-9]*\\b", " ");
         if (raw != null && raw.toLowerCase(Locale.ROOT).matches(".*(\\([0-9]+\\)|[-_ ][0-9]+)$")) {
             n = n.replaceAll("\\b[0-9]+\\b$", " ");
@@ -1943,6 +2029,16 @@ public class MainActivity extends Activity {
             ProjectDirEntry entry = new ProjectDirEntry(dir, key, stats, developmentDepth(dir));
             state.projectDirs.add(entry);
             state.projectRootsSeen++;
+
+            if (stats.files == 0 && stats.bytes == 0 && isDirectoryTreeStillEmptyAndSafe(dir, 0)) {
+                entry.assessment = "LOESCHBAR – leerer Projekt-/Versionsordner; keine Dateien enthalten";
+                boolean alreadyKnown = state.candidatePaths.contains(dir.getAbsolutePath());
+                addCandidate(dir, 0L, Risk.GREEN,
+                        "Leerer Ordnerbaum außerhalb geschützter System-/App-Bereiche; sicher automatisch löschbar",
+                        state);
+                if (!alreadyKnown) state.safeEmptyDirectoryTrees++;
+                continue;
+            }
 
             if (cleanupKind != null) {
                 entry.assessment = "LOESCHBAR – entpackter " + cleanupKind +
@@ -2053,13 +2149,49 @@ public class MainActivity extends Activity {
         state.archivesSeen++;
         state.archiveBytesSeen += size;
         state.archiveCountByExt.put(ext, state.archiveCountByExt.getOrDefault(ext, 0L) + 1L);
-        state.archives.add(new ArchiveEntry(file, size, ext, archiveAssessment(file, size)));
+
+        ArchiveInspection inspection = null;
+        if (ext.equals("zip")) {
+            inspection = inspectZipArchive(file, state);
+            state.archiveInspectionByPath.put(path, inspection);
+        }
+        state.archives.add(new ArchiveEntry(file, size, ext,
+                archiveAssessment(file, size, inspection), inspection));
     }
 
-    private String archiveAssessment(File file, long size) {
+    private ArchiveInspection inspectZipArchive(File file, ScanState state) {
+        ArchiveInspection out = new ArchiveInspection();
+        if (state != null) state.zipArchivesInspected++;
+        try (ZipFile zip = new ZipFile(file)) {
+            java.util.Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                out.entries++;
+                if (!entry.isDirectory()) {
+                    out.files++;
+                    long s = entry.getSize();
+                    if (s > 0) out.uncompressedBytes += s;
+                }
+            }
+            if (out.files == 0 && state != null) state.zipArchivesEmpty++;
+        } catch (Exception e) {
+            out.valid = false;
+            out.error = e.getClass().getSimpleName();
+            if (state != null) state.zipArchivesInvalid++;
+        }
+        return out;
+    }
+
+    private String archiveAssessment(File file, long size, ArchiveInspection inspection) {
         String ext = extension(file.getName().toLowerCase(Locale.ROOT));
         long age = System.currentTimeMillis() - file.lastModified();
 
+        if (inspection != null && !inspection.valid) {
+            return "PRUEFEN – ZIP nicht lesbar oder beschädigt; nicht automatisch löschen";
+        }
+        if (inspection != null && inspection.files == 0) {
+            return "PRUEFEN – ZIP gültig, enthält aber keine Dateien";
+        }
         if (ext.equals("apk") || ext.equals("aab")) {
             return "GESCHUETZT – APK/AAB wird nicht automatisch gelöscht";
         }
@@ -2090,6 +2222,18 @@ public class MainActivity extends Activity {
 
         if (ARCHIVE_EXT.contains(ext)) {
             recordArchive(file, size, state);
+        }
+
+        if (ext.equals("zip")) {
+            ArchiveInspection inspection = state.archiveInspectionByPath.get(file.getAbsolutePath());
+            if (inspection != null && (!inspection.valid || inspection.files == 0)) {
+                addCandidate(file, size, Risk.YELLOW,
+                        inspection.valid
+                                ? "ZIP enthält keine Dateien; sehr kleines/leeres Archiv – manuell prüfen"
+                                : "ZIP ist nicht lesbar oder beschädigt; vor dem Löschen manuell prüfen",
+                        state);
+                return;
+            }
         }
 
         if (isKcDevelopmentArchive(file)) {
@@ -2517,6 +2661,11 @@ public class MainActivity extends Activity {
                 " · leer löschbar " + st.rootDirectoriesSafeEmpty +
                 " · nicht lesbar " + st.rootDirectoriesUnreadable +
                 "\nDoppelte Projektordner: " + st.nestedDuplicateFolders +
+                "\nZIP-Prüfung: " + st.zipArchivesInspected + " geprüft · " +
+                st.zipArchivesInvalid + " defekt · " + st.zipArchivesEmpty + " leer" +
+                "\nZusatzspeicher: " + st.additionalStorageRootsFound + " erkannt · " +
+                st.additionalStorageRootsScanned + " tief gescannt · " +
+                st.additionalStorageRootsUnreadable + " nicht lesbar" +
                 "\nGlobaler Android-Dateiindex: " + st.mediaStoreGlobalRows +
                 " Einträge · " + st.mediaStoreGlobalArchivesSeen + " Archive · " +
                 st.mediaStoreGlobalArchivesAdded + " zusätzlich gefunden";
@@ -2529,19 +2678,7 @@ public class MainActivity extends Activity {
     private boolean isInDownloadTree(File file) {
         if (file == null || !file.isFile()) return false;
         String filePath = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
-
-        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        if (downloads != null) {
-            String downloadPath = downloads.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
-            if (filePath.startsWith(downloadPath + "/")) return true;
-        }
-
-        File storageRoot = Environment.getExternalStorageDirectory();
-        if (storageRoot != null) {
-            String rootPath = storageRoot.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
-            if (filePath.startsWith(rootPath + "/download/") || filePath.startsWith(rootPath + "/downloads/")) return true;
-        }
-        return false;
+        return filePath.matches("^/storage/emulated/[^/]+/downloads?/.+");
     }
 
     private boolean isAutoCleanupArchiveExtension(String ext) {
@@ -2581,9 +2718,9 @@ public class MainActivity extends Activity {
     private boolean isDirectDownloadFile(File file) {
         if (file == null || !file.isFile()) return false;
         File parent = file.getParentFile();
-        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        if (parent == null || downloads == null) return false;
-        return parent.getAbsolutePath().equalsIgnoreCase(downloads.getAbsolutePath());
+        if (parent == null) return false;
+        String p = parent.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        return p.matches("^/storage/emulated/[^/]+/downloads?$");
     }
 
     private boolean isAutoDeleteSafe(Candidate c) {
@@ -2817,6 +2954,13 @@ public class MainActivity extends Activity {
                     .append(" zusätzliche Archive erfasst; ").append(st.mediaStoreGlobalPathMisses)
                     .append(" Indexeinträge ohne erreichbaren Dateipfad; Fehler ")
                     .append(st.mediaStoreGlobalQueryErrors).append("\n");
+            sb.append("Zusätzliche Speicherwurzeln: ").append(st.additionalStorageRootsFound)
+                    .append(" erkannt; ").append(st.additionalStorageRootsScanned)
+                    .append(" tief gescannt; ").append(st.additionalStorageRootsUnreadable)
+                    .append(" nicht lesbar\n");
+            sb.append("ZIP-Prüfung: ").append(st.zipArchivesInspected).append(" geprüft; ")
+                    .append(st.zipArchivesInvalid).append(" ungültig/beschädigt; ")
+                    .append(st.zipArchivesEmpty).append(" ohne Dateien\n");
 
             sb.append("\nHAUPTVERZEICHNIS – DIREKTE ORDNER\n");
             if (st.rootDirectories.isEmpty()) {
@@ -2886,6 +3030,17 @@ public class MainActivity extends Activity {
                             .append(" | ").append(a.size).append(" Bytes")
                             .append(" | ").append(a.assessment).append("\n");
                     sb.append("Name: ").append(a.file.getName()).append("\n");
+                    if (a.inspection != null) {
+                        sb.append("ZIP-Prüfung: ")
+                                .append(a.inspection.valid ? "gültig" : "ungültig/beschädigt")
+                                .append("; Einträge ").append(a.inspection.entries)
+                                .append("; Dateien ").append(a.inspection.files)
+                                .append("; unkomprimierte Größe ").append(a.inspection.uncompressedBytes).append(" Bytes");
+                        if (a.inspection.error != null) {
+                            sb.append("; Fehlerklasse ").append(a.inspection.error);
+                        }
+                        sb.append("\n");
+                    }
                     sb.append("Pfad: ").append(a.file.getAbsolutePath()).append("\n\n");
                 }
             }
