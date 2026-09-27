@@ -98,6 +98,7 @@ public class MainActivity extends Activity {
     private Button shareReportButton;
     private Button updateButton;
     private volatile boolean scanning = false;
+    private volatile ScanState lastScanState;
 
     private static final String UPDATE_MANIFEST_URL =
             "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/android/kc-speichercheck/update.json";
@@ -420,6 +421,7 @@ public class MainActivity extends Activity {
             File root = Environment.getExternalStorageDirectory();
             scanTree(root, state);
             findDuplicates(state);
+            lastScanState = state;
 
             Collections.sort(candidates, Comparator.comparingLong((Candidate c) -> c.size).reversed());
             if (candidates.size() > MAX_VISIBLE) {
@@ -447,6 +449,11 @@ public class MainActivity extends Activity {
         long files = 0;
         long dirs = 0;
         long totalBytes = 0;
+        long archivesSeen = 0;
+        long archiveBytesSeen = 0;
+        long developmentArchivesSeen = 0;
+        long developmentArchiveBytes = 0;
+        long unreadableDirs = 0;
         final Map<Long, List<File>> sameSize = new HashMap<>();
         final Set<String> candidatePaths = new HashSet<>();
     }
@@ -465,8 +472,8 @@ public class MainActivity extends Activity {
                 return; // avoid double counting inside generated folders
             }
             File[] children;
-            try { children = file.listFiles(); } catch (SecurityException e) { return; }
-            if (children == null) return;
+            try { children = file.listFiles(); } catch (SecurityException e) { state.unreadableDirs++; return; }
+            if (children == null) { state.unreadableDirs++; return; }
             for (File child : children) scanTree(child, state);
         } else {
             state.files++;
@@ -492,11 +499,18 @@ public class MainActivity extends Activity {
         long age = System.currentTimeMillis() - file.lastModified();
         String path = file.getAbsolutePath().toLowerCase(Locale.ROOT);
         boolean devPath = path.contains("github") || path.contains("gitlab") || path.contains("project") || path.contains("projekte") ||
-                path.contains("entwicklung") || path.contains("dev") || path.contains("source") || path.contains("src") || path.contains("build");
+                path.contains("entwicklung") || path.contains("development") || path.contains("source") || path.contains("src") || path.contains("build");
+
+        if (ARCHIVE_EXT.contains(ext)) {
+            state.archivesSeen++;
+            state.archiveBytesSeen += size;
+        }
 
         if (isKcDevelopmentArchive(file)) {
+            state.developmentArchivesSeen++;
+            state.developmentArchiveBytes += size;
             addCandidate(file, size, Risk.GREEN,
-                    "KC-Entwicklungs-ZIP; alter Entwicklungsstand – zum Löschen freigegeben", state);
+                    "KC-Entwicklungsarchiv im Download-Baum; alter Entwicklungsstand – zum Löschen freigegeben", state);
             return;
         }
 
@@ -593,28 +607,48 @@ public class MainActivity extends Activity {
             else if (c.risk == Risk.YELLOW) { yellow += c.size; yc++; }
             else { red += c.size; rc++; }
         }
+        ScanState st = lastScanState;
+        String archiveInfo = st == null ? "" : "\nArchive gesehen: " + st.archivesSeen +
+                " · davon Entwicklung: " + st.developmentArchivesSeen;
         summary.setText("Gefunden (max. " + MAX_VISIBLE + " größte Treffer):\n" +
                 "🟢 " + gc + " · " + Formatter.formatFileSize(this, green) + "   " +
                 "🟡 " + yc + " · " + Formatter.formatFileSize(this, yellow) + "   " +
-                "🔴 " + rc + " · " + Formatter.formatFileSize(this, red));
+                "🔴 " + rc + " · " + Formatter.formatFileSize(this, red) + archiveInfo);
     }
 
     private boolean isInDownloadTree(File file) {
         if (file == null || !file.isFile()) return false;
-        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        if (downloads == null) return false;
         String filePath = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
-        String downloadPath = downloads.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
-        return filePath.startsWith(downloadPath + "/");
+
+        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        if (downloads != null) {
+            String downloadPath = downloads.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+            if (filePath.startsWith(downloadPath + "/")) return true;
+        }
+
+        File storageRoot = Environment.getExternalStorageDirectory();
+        if (storageRoot != null) {
+            String rootPath = storageRoot.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+            if (filePath.startsWith(rootPath + "/download/") || filePath.startsWith(rootPath + "/downloads/")) return true;
+        }
+        return false;
+    }
+
+    private boolean isAutoCleanupArchiveExtension(String ext) {
+        return ext.equals("zip") || ext.equals("rar") || ext.equals("7z") ||
+                ext.equals("tar") || ext.equals("gz") || ext.equals("tgz") ||
+                ext.equals("bz2") || ext.equals("xz");
     }
 
     private boolean isKcDevelopmentArchive(File file) {
         if (!isInDownloadTree(file)) return false;
         String name = file.getName().toLowerCase(Locale.ROOT);
-        if (!extension(name).equals("zip")) return false;
+        String ext = extension(name);
+        if (!isAutoCleanupArchiveExtension(ext)) return false;
 
         String path = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
-        boolean developmentFolder = path.contains("/entwicklung");
+        boolean developmentFolder = path.contains("/entwicklung") || path.contains("/projekte") ||
+                path.contains("/projekt") || path.contains("/development") || path.contains("/projects");
         boolean kcNamed = name.startsWith("kc_") || name.startsWith("kc-") || name.startsWith("kc ");
         return developmentFolder || kcNamed;
     }
@@ -631,7 +665,7 @@ public class MainActivity extends Activity {
         if (c == null || c.risk == Risk.RED) return false;
 
         String reason = c.reason == null ? "" : c.reason;
-        if (reason.startsWith("KC-Entwicklungs-ZIP")) {
+        if (reason.startsWith("KC-Entwicklungsarchiv")) {
             return isKcDevelopmentArchive(c.file);
         }
 
@@ -666,8 +700,8 @@ public class MainActivity extends Activity {
         for (int p : safe) bytes += candidates.get(p).size;
         autoCleanButton.setEnabled(!safe.isEmpty() && !scanning);
         autoCleanButton.setText(safe.isEmpty()
-                ? "Sicher automatisch bereinigen"
-                : "Sicher automatisch bereinigen: " + safe.size() + " · " + Formatter.formatFileSize(this, bytes));
+                ? "Auto löschen"
+                : "Auto löschen (" + safe.size() + ")");
     }
 
     private void confirmAutoCleanup() {
@@ -683,7 +717,7 @@ public class MainActivity extends Activity {
         String msg = safe.size() + " eindeutig freigegebene Treffer mit insgesamt " +
                 Formatter.formatFileSize(this, bytes) + " werden dauerhaft gelöscht.\n\n" +
                 "Automatisch gelöscht werden nur:\n" +
-                "• KC-Entwicklungs-ZIPs im Download-Baum (auch in Entwicklung-Unterordnern), unabhängig vom Alter\n" +
+                "• KC-/Entwicklungsarchive (ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ) im Download-Baum, unabhängig vom Alter\n" +
                 "• alte ZIP/RAR/7Z/TAR/GZ-Archive direkt im Download-Ordner\n" +
                 "• byte-identische Dubletten direkt im Download-Ordner, wenn eine andere Kopie erhalten bleibt\n\n" +
                 "Entpackte KC-Projektordner, WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents, Orbit sowie APK/AAB-Dateien bleiben geschützt.\n\n" +
@@ -782,8 +816,17 @@ public class MainActivity extends Activity {
         sb.append("KC SpeicherCheck v").append(BuildConfig.VERSION_NAME).append("\n");
         sb.append("Erstellt: ").append(new Date()).append("\n");
         sb.append("Gerät: ").append(Build.MANUFACTURER).append(" ").append(Build.MODEL).append("\n");
-        sb.append("Android: ").append(Build.VERSION.RELEASE).append("\n\n");
-        sb.append("Bewertung: GRUEN = meist erzeugbar/temporär; GELB = prüfen; ROT = nicht pauschal löschen\n\n");
+        sb.append("Android: ").append(Build.VERSION.RELEASE).append("\n");
+        ScanState st = lastScanState;
+        if (st != null) {
+            sb.append("Scan: ").append(st.files).append(" Dateien, ").append(st.dirs).append(" Ordner geprüft\n");
+            sb.append("Archive gesehen: ").append(st.archivesSeen)
+                    .append(" | ").append(st.archiveBytesSeen).append(" Bytes\n");
+            sb.append("Entwicklungsarchive erkannt: ").append(st.developmentArchivesSeen)
+                    .append(" | ").append(st.developmentArchiveBytes).append(" Bytes\n");
+            sb.append("Nicht lesbare Ordner: ").append(st.unreadableDirs).append("\n");
+        }
+        sb.append("\nBewertung: GRUEN = meist erzeugbar/temporär; GELB = prüfen; ROT = nicht pauschal löschen\n\n");
         int i = 1;
         for (Candidate c : candidates) {
             sb.append(i++).append(". ").append(c.risk)
