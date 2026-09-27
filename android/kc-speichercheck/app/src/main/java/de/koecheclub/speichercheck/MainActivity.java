@@ -155,62 +155,80 @@ public class MainActivity extends Activity {
 
         TextView title = new TextView(this);
         title.setText("KC SpeicherCheck · v" + BuildConfig.VERSION_NAME);
-        title.setTextSize(24);
+        title.setTextSize(20);
         title.setTextColor(Color.BLACK);
-        title.setPadding(0, 0, 0, dp(4));
+        title.setPadding(0, 0, 0, dp(2));
         root.addView(title);
 
         TextView info = new TextView(this);
-        info.setText("Lokaler Speicher-Scan. Dateidaten bleiben auf dem Gerät; Internet wird nur für die Update-Prüfung genutzt. Die Automatik löscht nur streng freigegebene Treffer direkt im Download-Ordner.");
-        info.setTextSize(14);
+        info.setText("Scannt den gemeinsamen Gerätespeicher. Internet wird nur für Updates genutzt.");
+        info.setTextSize(12);
+        info.setPadding(0, 0, 0, dp(3));
         root.addView(info);
 
+        LinearLayout row1 = new LinearLayout(this);
+        row1.setOrientation(LinearLayout.HORIZONTAL);
+
         permissionButton = new Button(this);
-        permissionButton.setText("Speicherzugriff freigeben");
+        permissionButton.setText("Zugriff");
         permissionButton.setOnClickListener(v -> requestStorageAccess());
-        root.addView(permissionButton);
+        styleCompactButton(permissionButton);
+        row1.addView(permissionButton, compactButtonParams());
 
         scanButton = new Button(this);
-        scanButton.setText("Speicher scannen");
+        scanButton.setText("Scannen");
         scanButton.setOnClickListener(v -> startScan());
-        root.addView(scanButton);
+        styleCompactButton(scanButton);
+        row1.addView(scanButton, compactButtonParams());
 
         autoCleanButton = new Button(this);
-        autoCleanButton.setText("Sicher automatisch bereinigen");
+        autoCleanButton.setText("Auto löschen");
         autoCleanButton.setEnabled(false);
         autoCleanButton.setOnClickListener(v -> confirmAutoCleanup());
-        root.addView(autoCleanButton);
+        styleCompactButton(autoCleanButton);
+        row1.addView(autoCleanButton, compactButtonParams());
+        root.addView(row1);
 
-        updateButton = new Button(this);
-        updateButton.setText("Update prüfen");
-        updateButton.setOnClickListener(v -> checkForUpdates(true));
-        root.addView(updateButton);
+        LinearLayout row2 = new LinearLayout(this);
+        row2.setOrientation(LinearLayout.HORIZONTAL);
 
-        Button shortcutButton = new Button(this);
-        shortcutButton.setText("Icon auf Startbildschirm");
-        shortcutButton.setOnClickListener(v -> requestHomeScreenShortcut(false));
-        root.addView(shortcutButton);
-
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
         deleteButton = new Button(this);
         deleteButton.setText("Auswahl löschen");
         deleteButton.setEnabled(false);
         deleteButton.setOnClickListener(v -> confirmDelete());
-        row.addView(deleteButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        styleCompactButton(deleteButton);
+        row2.addView(deleteButton, compactButtonParams());
 
         reportButton = new Button(this);
-        reportButton.setText("Bericht speichern");
+        reportButton.setText("Bericht");
         reportButton.setEnabled(false);
         reportButton.setOnClickListener(v -> saveReport());
-        row.addView(reportButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        root.addView(row);
+        styleCompactButton(reportButton);
+        row2.addView(reportButton, compactButtonParams());
 
         shareReportButton = new Button(this);
-        shareReportButton.setText("Bericht teilen");
+        shareReportButton.setText("Teilen");
         shareReportButton.setEnabled(false);
         shareReportButton.setOnClickListener(v -> shareReport());
-        root.addView(shareReportButton);
+        styleCompactButton(shareReportButton);
+        row2.addView(shareReportButton, compactButtonParams());
+        root.addView(row2);
+
+        LinearLayout row3 = new LinearLayout(this);
+        row3.setOrientation(LinearLayout.HORIZONTAL);
+
+        updateButton = new Button(this);
+        updateButton.setText("Update");
+        updateButton.setOnClickListener(v -> checkForUpdates(true));
+        styleCompactButton(updateButton);
+        row3.addView(updateButton, compactButtonParams());
+
+        Button shortcutButton = new Button(this);
+        shortcutButton.setText("Start-Icon");
+        shortcutButton.setOnClickListener(v -> requestHomeScreenShortcut(false));
+        styleCompactButton(shortcutButton);
+        row3.addView(shortcutButton, compactButtonParams());
+        root.addView(row3);
 
         status = new TextView(this);
         status.setText("Bereit");
@@ -229,8 +247,8 @@ public class MainActivity extends Activity {
         root.addView(summary);
 
         TextView legend = new TextView(this);
-        legend.setText("🟢 meist erzeugbar/temporär   🟡 prüfen   🔴 nicht pauschal löschen\nAutomatik: nur alte Archive und byte-identische Dubletten direkt in Download. WhatsApp, Kamera, Bilder und Entwicklungsordner bleiben geschützt.");
-        legend.setTextSize(13);
+        legend.setText("🟢 löschbar/temporär   🟡 prüfen   🔴 geschützt\nAuto: KC-Entwicklungs-ZIPs unter Download sowie streng sichere Download-Treffer.");
+        legend.setTextSize(12);
         root.addView(legend);
 
         LinearLayout selectRow = new LinearLayout(this);
@@ -273,6 +291,18 @@ public class MainActivity extends Activity {
         root.addView(list, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
 
         setContentView(root);
+    }
+
+    private void styleCompactButton(Button button) {
+        button.setTextSize(10.5f);
+        button.setAllCaps(false);
+        button.setMinHeight(0);
+        button.setMinimumHeight(0);
+        button.setPadding(dp(3), 0, dp(3), 0);
+    }
+
+    private LinearLayout.LayoutParams compactButtonParams() {
+        return new LinearLayout.LayoutParams(0, dp(42), 1);
     }
 
     private void requestHomeScreenShortcut(boolean automaticFirstRun) {
@@ -326,7 +356,7 @@ public class MainActivity extends Activity {
 
     private void refreshPermissionUi() {
         boolean ok = hasStorageAccess();
-        permissionButton.setText(ok ? "Speicherzugriff: freigegeben" : "Speicherzugriff freigeben");
+        permissionButton.setText(ok ? "Zugriff ✓" : "Zugriff");
         scanButton.setEnabled(ok && !scanning);
         if (!ok) status.setText("Für den vollständigen gemeinsamen Gerätespeicher ist eine einmalige Freigabe nötig.");
     }
@@ -464,6 +494,12 @@ public class MainActivity extends Activity {
         boolean devPath = path.contains("github") || path.contains("gitlab") || path.contains("project") || path.contains("projekte") ||
                 path.contains("entwicklung") || path.contains("dev") || path.contains("source") || path.contains("src") || path.contains("build");
 
+        if (isKcDevelopmentArchive(file)) {
+            addCandidate(file, size, Risk.GREEN,
+                    "KC-Entwicklungs-ZIP; alter Entwicklungsstand – zum Löschen freigegeben", state);
+            return;
+        }
+
         if (TEMP_EXT.contains(ext) && age > 14 * DAY && size > 256 * 1024) {
             addCandidate(file, size, Risk.GREEN, "Alte temporäre/Protokolldatei (>14 Tage)", state);
             return;
@@ -563,6 +599,26 @@ public class MainActivity extends Activity {
                 "🔴 " + rc + " · " + Formatter.formatFileSize(this, red));
     }
 
+    private boolean isInDownloadTree(File file) {
+        if (file == null || !file.isFile()) return false;
+        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        if (downloads == null) return false;
+        String filePath = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        String downloadPath = downloads.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        return filePath.startsWith(downloadPath + "/");
+    }
+
+    private boolean isKcDevelopmentArchive(File file) {
+        if (!isInDownloadTree(file)) return false;
+        String name = file.getName().toLowerCase(Locale.ROOT);
+        if (!extension(name).equals("zip")) return false;
+
+        String path = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        boolean developmentFolder = path.contains("/entwicklung");
+        boolean kcNamed = name.startsWith("kc_") || name.startsWith("kc-") || name.startsWith("kc ");
+        return developmentFolder || kcNamed;
+    }
+
     private boolean isDirectDownloadFile(File file) {
         if (file == null || !file.isFile()) return false;
         File parent = file.getParentFile();
@@ -572,9 +628,15 @@ public class MainActivity extends Activity {
     }
 
     private boolean isAutoDeleteSafe(Candidate c) {
-        if (c == null || c.risk == Risk.RED || !isDirectDownloadFile(c.file)) return false;
+        if (c == null || c.risk == Risk.RED) return false;
 
         String reason = c.reason == null ? "" : c.reason;
+        if (reason.startsWith("KC-Entwicklungs-ZIP")) {
+            return isKcDevelopmentArchive(c.file);
+        }
+
+        if (!isDirectDownloadFile(c.file)) return false;
+
         if (reason.startsWith("Byte-identische Dublette")) {
             return true;
         }
@@ -621,9 +683,10 @@ public class MainActivity extends Activity {
         String msg = safe.size() + " eindeutig freigegebene Treffer mit insgesamt " +
                 Formatter.formatFileSize(this, bytes) + " werden dauerhaft gelöscht.\n\n" +
                 "Automatisch gelöscht werden nur:\n" +
+                "• KC-Entwicklungs-ZIPs im Download-Baum (auch in Entwicklung-Unterordnern), unabhängig vom Alter\n" +
                 "• alte ZIP/RAR/7Z/TAR/GZ-Archive direkt im Download-Ordner\n" +
                 "• byte-identische Dubletten direkt im Download-Ordner, wenn eine andere Kopie erhalten bleibt\n\n" +
-                "Geschützt bleiben WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents, Entwicklung, Orbit, Projekt-Unterordner sowie APK/AAB-Dateien.\n\n" +
+                "Entpackte KC-Projektordner, WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents, Orbit sowie APK/AAB-Dateien bleiben geschützt.\n\n" +
                 "Der Vorgang kann nicht rückgängig gemacht werden.";
 
         new AlertDialog.Builder(this)
