@@ -1,8 +1,8 @@
 {
-  "versionCode": 3,
-  "versionName": "1.1.1",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.1.1.apk",
-  "sha256": "f66827b464a43e6b843986abc7240c3a4c339c209b1b9743e90f52429ba1593f",
-  "notes": "Update-Kanal wird auf eine dauerhaft signierte Release-Version umgestellt.",
+  "versionCode": 6,
+  "versionName": "1.2.1",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.2.1-STABIL.apk",
+  "sha256": "5e2fb52be16a462d23f1033a31793d75902ee3c21396368bf8faf98f77c445d4",
+  "notes": "Stabile Version mit neuem Paketnamen, festem KC-Signierschlüssel, sichtbaren Dateinamen und Alle/Keine-Auswahl.",
   "published": "2026-09-27"
 }
