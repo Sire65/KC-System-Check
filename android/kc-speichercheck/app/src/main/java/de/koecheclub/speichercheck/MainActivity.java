@@ -591,8 +591,12 @@ public class MainActivity extends Activity {
             addCandidate(file, size, Risk.GREEN, "Alte Sicherungs-/Altdatei; Inhalt vor Löschung prüfen", state);
             return;
         }
-        if (ARCHIVE_EXT.contains(ext) && age > 14 * DAY && size >= MB) {
-            addCandidate(file, size, Risk.YELLOW, "Altes Archiv/Installationspaket (>14 Tage)", state);
+        if (ARCHIVE_EXT.contains(ext) && age > 14 * DAY &&
+                (size >= MB || isDirectDownloadFile(file))) {
+            addCandidate(file, size, Risk.YELLOW,
+                    isDirectDownloadFile(file)
+                            ? "Altes Archiv/Installationspaket (>14 Tage; im Download auch unter 1 MB)"
+                            : "Altes Archiv/Installationspaket (>14 Tage)", state);
             return;
         }
         if ((name.contains("backup") || name.contains("sicherung") || name.contains("kopie") || name.contains("copy") || name.contains("_old"))
@@ -1068,7 +1072,7 @@ public class MainActivity extends Activity {
                 Formatter.formatFileSize(this, bytes) + " werden dauerhaft gelöscht.\n\n" +
                 "Automatisch gelöscht werden nur:\n" +
                 "• KC-/Entwicklungsarchive (ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ) im Download-Baum, unabhängig vom Alter\n" +
-                "• alte ZIP/RAR/7Z/TAR/GZ-Archive direkt im Download-Ordner\n" +
+                "• alte ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ-Archive direkt im Download-Ordner – auch kleine Dateien unter 1 MB\n" +
                 "• byte-identische Dubletten direkt im Download-Ordner, wenn eine andere Kopie erhalten bleibt\n\n" +
                 "Entpackte KC-Projektordner, WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents, Orbit sowie APK/AAB-Dateien bleiben geschützt.\n\n" +
                 "Der Vorgang kann nicht rückgängig gemacht werden.";
