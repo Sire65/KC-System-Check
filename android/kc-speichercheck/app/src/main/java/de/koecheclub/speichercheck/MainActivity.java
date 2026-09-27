@@ -2267,7 +2267,10 @@ public class MainActivity extends Activity {
                 " · " + Formatter.formatFileSize(this, st.verifiedContainedProjectBytes) +
                 "\nEntpackte KC-Programmordner: " + st.unpackedKcProgramDirs +
                 " · " + Formatter.formatFileSize(this, st.unpackedKcProgramBytes) +
-                "\nDoppelte Projektordner: " + st.nestedDuplicateFolders;
+                "\nDoppelte Projektordner: " + st.nestedDuplicateFolders +
+                "\nGlobaler Android-Dateiindex: " + st.mediaStoreGlobalRows +
+                " Einträge · " + st.mediaStoreGlobalArchivesSeen + " Archive · " +
+                st.mediaStoreGlobalArchivesAdded + " zusätzlich gefunden";
         summary.setText("Gefunden (max. " + MAX_VISIBLE + " größte Treffer):\n" +
                 "🟢 " + gc + " · " + Formatter.formatFileSize(this, green) + "   " +
                 "🟡 " + yc + " · " + Formatter.formatFileSize(this, yellow) + "   " +
@@ -2541,6 +2544,12 @@ public class MainActivity extends Activity {
                     .append(st.mediaStoreFilesAdded).append(" zusätzlich erfasste Dateien; ")
                     .append(st.mediaStoreArchivesAdded).append(" zusätzliche Archive; Fehler ")
                     .append(st.mediaStoreQueryErrors).append("\n");
+            sb.append("Globaler Android-Dateiindex: ").append(st.mediaStoreGlobalRows)
+                    .append(" Einträge; ").append(st.mediaStoreGlobalArchivesSeen)
+                    .append(" Archive gesehen; ").append(st.mediaStoreGlobalArchivesAdded)
+                    .append(" zusätzliche Archive erfasst; ").append(st.mediaStoreGlobalPathMisses)
+                    .append(" Indexeinträge ohne erreichbaren Dateipfad; Fehler ")
+                    .append(st.mediaStoreGlobalQueryErrors).append("\n");
 
             sb.append("\nPROJEKTORDNER-DIAGNOSE – Unterverzeichnisse und Versionsstände\n");
             if (st.projectDirs.isEmpty()) {
