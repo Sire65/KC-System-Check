@@ -10,6 +10,10 @@ on:
       - 'android/kc-speichercheck/**'
       - '.github/workflows/kc-speichercheck-android.yml'
 
+concurrency:
+  group: kc-speichercheck-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-debug:
     runs-on: ubuntu-latest
