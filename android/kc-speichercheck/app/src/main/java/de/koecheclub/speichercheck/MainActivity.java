@@ -848,6 +848,8 @@ public class MainActivity extends Activity {
 
             setScanProgress(1, "1/8 Hauptscan des Gerätespeichers");
             scanTree(root, state);
+            setScanProgress(24, "1/8 Hauptverzeichnis wird bewertet");
+            auditStorageRoot(root, state);
             setScanProgress(26, "1/8 Leere Ordner werden sicher geprüft");
             findSafeEmptyDirectoryTrees(root, state);
             setScanProgress(27, "1/8 Hauptscan abgeschlossen");
@@ -942,6 +944,11 @@ public class MainActivity extends Activity {
         long unpackedKcProgramDirs = 0;
         long unpackedKcProgramBytes = 0;
         long safeEmptyDirectoryTrees = 0;
+        long rootDirectoriesSeen = 0;
+        long rootDirectoriesProtected = 0;
+        long rootDirectoriesOccupied = 0;
+        long rootDirectoriesSafeEmpty = 0;
+        long rootDirectoriesUnreadable = 0;
         long downloadFilesSeen = 0;
         long downloadDirsSeen = 0;
         long downloadArchivesSeen = 0;
@@ -966,6 +973,7 @@ public class MainActivity extends Activity {
         final List<File> projectDirCandidates = new ArrayList<>();
         final Set<String> projectDirPaths = new HashSet<>();
         final List<ProjectDirEntry> projectDirs = new ArrayList<>();
+        final List<RootDirectoryEntry> rootDirectories = new ArrayList<>();
         final Map<String, FolderStats> folderStatsCache = new HashMap<>();
         final Map<String, String> fileHashCache = new HashMap<>();
         final Set<String> candidatePaths = new HashSet<>();
@@ -993,6 +1001,18 @@ public class MainActivity extends Activity {
 
         boolean fullyContained() {
             return missingInReference == 0 && differentFiles == 0 && unreadableFiles == 0;
+        }
+    }
+
+    static class RootDirectoryEntry {
+        final File dir;
+        final String assessment;
+        final int directItems;
+
+        RootDirectoryEntry(File dir, String assessment, int directItems) {
+            this.dir = dir;
+            this.assessment = assessment;
+            this.directItems = directItems;
         }
     }
 
@@ -1268,6 +1288,75 @@ public class MainActivity extends Activity {
     private boolean isExcludedPath(String path) {
         String p = path.replace('\\', '/');
         return p.contains("/Android/data") || p.contains("/Android/obb") || p.contains("/Android/.Trash");
+    }
+
+    private void auditStorageRoot(File root, ScanState state) {
+        if (root == null || state == null || !root.exists() || !root.isDirectory()) return;
+
+        File[] children;
+        try {
+            children = root.listFiles();
+        } catch (SecurityException e) {
+            state.rootDirectoriesUnreadable++;
+            return;
+        }
+        if (children == null) {
+            state.rootDirectoriesUnreadable++;
+            return;
+        }
+
+        List<File> dirs = new ArrayList<>();
+        for (File child : children) {
+            if (child != null && child.isDirectory()) dirs.add(child);
+        }
+        dirs.sort(Comparator.comparing(a -> {
+            String name = a.getName();
+            return name == null ? "" : name.toLowerCase(Locale.ROOT);
+        }));
+
+        for (File dir : dirs) {
+            state.rootDirectoriesSeen++;
+
+            boolean protectedDir = isProtectedEmptyDirectoryPath(dir) || isEmptyCleanupTraversalBlocked(dir);
+            File[] direct;
+            try {
+                direct = dir.listFiles();
+            } catch (SecurityException e) {
+                direct = null;
+            }
+
+            if (protectedDir) {
+                state.rootDirectoriesProtected++;
+                state.rootDirectories.add(new RootDirectoryEntry(
+                        dir,
+                        "GESCHÜTZT – System-/App-/Medienbereich; nicht automatisch löschen",
+                        direct == null ? -1 : direct.length));
+                continue;
+            }
+
+            if (direct == null) {
+                state.rootDirectoriesUnreadable++;
+                state.rootDirectories.add(new RootDirectoryEntry(
+                        dir,
+                        "NICHT LESBAR – vorsichtshalber geschützt behandeln",
+                        -1));
+                continue;
+            }
+
+            if (direct.length == 0) {
+                state.rootDirectoriesSafeEmpty++;
+                state.rootDirectories.add(new RootDirectoryEntry(
+                        dir,
+                        "LEER – sicher löschbar; wird vor dem Löschen erneut geprüft",
+                        0));
+            } else {
+                state.rootDirectoriesOccupied++;
+                state.rootDirectories.add(new RootDirectoryEntry(
+                        dir,
+                        "BELEGT – enthält Daten; nicht automatisch löschen",
+                        direct.length));
+            }
+        }
     }
 
     private void findSafeEmptyDirectoryTrees(File root, ScanState state) {
@@ -2422,6 +2511,11 @@ public class MainActivity extends Activity {
                 "\nEntpackte KC-Programmordner: " + st.unpackedKcProgramDirs +
                 " · " + Formatter.formatFileSize(this, st.unpackedKcProgramBytes) +
                 "\nLeere Ordnerbäume sicher löschbar: " + st.safeEmptyDirectoryTrees +
+                "\nHauptordner: " + st.rootDirectoriesSeen +
+                " · geschützt " + st.rootDirectoriesProtected +
+                " · belegt " + st.rootDirectoriesOccupied +
+                " · leer löschbar " + st.rootDirectoriesSafeEmpty +
+                " · nicht lesbar " + st.rootDirectoriesUnreadable +
                 "\nDoppelte Projektordner: " + st.nestedDuplicateFolders +
                 "\nGlobaler Android-Dateiindex: " + st.mediaStoreGlobalRows +
                 " Einträge · " + st.mediaStoreGlobalArchivesSeen + " Archive · " +
@@ -2702,6 +2796,11 @@ public class MainActivity extends Activity {
             sb.append("Entpackte KC-Programmordner löschbar: ").append(st.unpackedKcProgramDirs)
                     .append(" | ").append(st.unpackedKcProgramBytes).append(" Bytes\n");
             sb.append("Leere Ordnerbäume sicher löschbar: ").append(st.safeEmptyDirectoryTrees).append("\n");
+            sb.append("Hauptordner geprüft: ").append(st.rootDirectoriesSeen)
+                    .append("; geschützt ").append(st.rootDirectoriesProtected)
+                    .append("; belegt ").append(st.rootDirectoriesOccupied)
+                    .append("; leer/löschbar ").append(st.rootDirectoriesSafeEmpty)
+                    .append("; nicht lesbar ").append(st.rootDirectoriesUnreadable).append("\n");
             sb.append("Download im Hauptscan: ").append(st.downloadFilesSeen).append(" Dateien, ")
                     .append(st.downloadDirsSeen).append(" Ordner, ")
                     .append(st.downloadArchivesSeen).append(" Archive\n");
@@ -2718,6 +2817,21 @@ public class MainActivity extends Activity {
                     .append(" zusätzliche Archive erfasst; ").append(st.mediaStoreGlobalPathMisses)
                     .append(" Indexeinträge ohne erreichbaren Dateipfad; Fehler ")
                     .append(st.mediaStoreGlobalQueryErrors).append("\n");
+
+            sb.append("\nHAUPTVERZEICHNIS – DIREKTE ORDNER\n");
+            if (st.rootDirectories.isEmpty()) {
+                sb.append("Keine direkten Hauptordner erkannt oder Hauptverzeichnis nicht lesbar.\n");
+            } else {
+                int ri = 1;
+                for (RootDirectoryEntry entry : st.rootDirectories) {
+                    sb.append(ri++).append(". ").append(entry.assessment).append("\n");
+                    sb.append("Name: ").append(entry.dir.getName()).append("\n");
+                    sb.append("Direkte Elemente: ")
+                            .append(entry.directItems < 0 ? "nicht lesbar" : String.valueOf(entry.directItems))
+                            .append("\n");
+                    sb.append("Pfad: ").append(entry.dir.getAbsolutePath()).append("\n\n");
+                }
+            }
 
             sb.append("\nPROJEKTORDNER-DIAGNOSE – Unterverzeichnisse und Versionsstände\n");
             if (st.projectDirs.isEmpty()) {
