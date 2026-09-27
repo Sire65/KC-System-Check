@@ -1,0 +1,50 @@
+name: KC SpeicherCheck APK bereitstellen
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'android/kc-speichercheck/**'
+      - '.github/workflows/kc-speichercheck-publish-apk.yml'
+
+jobs:
+  publish-apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Java 17 einrichten
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle 8.9 einrichten
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: APK bauen
+        run: gradle -p android/kc-speichercheck clean assembleDebug
+
+      - name: APK in Download-Ordner kopieren
+        run: |
+          mkdir -p downloads
+          cp android/kc-speichercheck/app/build/outputs/apk/debug/app-debug.apk downloads/KC-SpeicherCheck-v1.1.1.apk
+          sha256sum downloads/KC-SpeicherCheck-v1.1.1.apk > downloads/KC-SpeicherCheck-v1.1.1.sha256.txt
+
+      - name: APK in Repository veröffentlichen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add downloads/KC-SpeicherCheck-v1.1.1.apk downloads/KC-SpeicherCheck-v1.1.1.sha256.txt
+          if git diff --cached --quiet; then
+            echo "Keine Änderung."
+          else
+            git commit -m "KC SpeicherCheck v1.1.1 APK bereitstellen [skip ci]"
+            git push
+          fi
