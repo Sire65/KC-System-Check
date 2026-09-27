@@ -1,0 +1,35 @@
+name: KC SpeicherCheck signierte v1.2.2 veröffentlichen
+
+on:
+  push:
+    paths:
+      - '.github/workflows/kc-speichercheck-publish-signed-v122.yml'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Signiertes Release laden und prüfen
+        run: |
+          curl -L --fail --retry 3 'https://sdmntprnortheu.oaiusercontent.com/files/00000000-43f8-81f4-9dc3-ad3d15175b76/raw?se=2026-09-27T07%3A34%3A44Z&sp=r&sv=2026-02-06&sr=b&scid=eb89277a-7263-5269-8a43-b0e2206260db&skoid=c30e7ce7-1f51-4051-a377-288cdba21c02&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-27T07%3A00%3A10Z&ske=2026-09-28T07%3A00%3A10Z&sks=b&skv=2026-02-06&sig=6AibM1eGw2hxmzs3UqrbdvU0kMPvY7K79sfCSk3OCd8%3D' -o /tmp/kc-signed.zip
+          rm -rf /tmp/kc-signed
+          mkdir -p /tmp/kc-signed
+          unzip -o /tmp/kc-signed.zip -d /tmp/kc-signed
+          test -f /tmp/kc-signed/KC-SpeicherCheck-v1.2.2.apk
+          echo '2f9c9277d21295e09ef04feb77dde239be1b7ae4c4b3dfccb604edfaaf87e582  /tmp/kc-signed/KC-SpeicherCheck-v1.2.2.apk' | sha256sum -c -
+
+      - name: APK veröffentlichen
+        run: |
+          mkdir -p downloads
+          cp /tmp/kc-signed/KC-SpeicherCheck-v1.2.2.apk downloads/KC-SpeicherCheck-v1.2.2-STABIL.apk
+          echo '2f9c9277d21295e09ef04feb77dde239be1b7ae4c4b3dfccb604edfaaf87e582  downloads/KC-SpeicherCheck-v1.2.2-STABIL.apk' > downloads/KC-SpeicherCheck-v1.2.2-STABIL.sha256.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add downloads/KC-SpeicherCheck-v1.2.2-STABIL.apk downloads/KC-SpeicherCheck-v1.2.2-STABIL.sha256.txt
+          git commit -m "KC SpeicherCheck v1.2.2 stabil signiert veröffentlichen [skip ci]"
+          git push
