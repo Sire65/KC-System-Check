@@ -1,0 +1,15 @@
+KC SpeicherCheck 1.1.0
+
+1. Projekt in Android Studio öffnen.
+2. Android SDK 35 installieren, falls Android Studio danach fragt.
+3. Zum Testen: Build > Build APK(s).
+4. Für dauerhaft updatefähige Installationen eine Release-APK mit einem eigenen, dauerhaft aufbewahrten Signierschlüssel bauen.
+5. Auf dem Handy die APK öffnen und installieren.
+6. Beim ersten Start „Speicherzugriff freigeben“ wählen.
+7. „Speicher scannen“ startet die Analyse.
+8. „Update prüfen“ fragt den GitHub-Updatekanal ab.
+
+WICHTIG:
+- Nie automatisch löschen: Treffer immer prüfen und ausdrücklich auswählen.
+- Der Signierschlüssel darf nicht verloren gehen und darf nicht in GitHub veröffentlicht werden.
+- Für ein Update muss die neue APK mit exakt demselben Signierschlüssel signiert sein.
