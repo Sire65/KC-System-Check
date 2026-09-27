@@ -14,15 +14,15 @@ Android-App zum Prüfen des gemeinsamen Gerätespeichers.
 - Projektstände derselben Versionsgruppe werden dateiweise per SHA-256 gegen den bevorzugten Referenzstand geprüft. Nur vollständig enthaltene, byte-identische Altstände werden GRÜN und für die automatische Bereinigung freigegeben; fehlende oder abweichende Dateien bleiben geschützt.
 - Zweite Sicherheitsabfrage vor jeder dauerhaften Löschung.
 - Kleine alte Archive direkt im Download-Ordner werden ab 14 Tagen unabhängig von ihrer Dateigröße erfasst und können automatisch bereinigt werden.
-- **Sicher automatisch bereinigen**: löscht ohne Einzelauswahl nur streng freigegebene Treffer direkt im Download-Ordner (alte Archive und byte-identische Dubletten).
-- Automatik-Schutz: WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents, Entwicklung, Orbit, Projekt-Unterordner sowie APK/AAB-Dateien werden nicht automatisch gelöscht.
+- **Sicher automatisch bereinigen**: löscht ohne Einzelauswahl nur streng freigegebene Treffer. Dazu gehören sichere Altstände/Archive sowie leere Ordner bzw. reine Leerordner-Bäume außerhalb geschützter Android-, System-, App- und Medienbereiche.
+- Automatik-Schutz: Android-/App-Strukturen, versteckte Ordner, MIUI/Xiaomi, downloaded_rom, WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents sowie APK/AAB-Dateien werden nicht automatisch gelöscht. Leere Ordner werden unmittelbar vor dem Löschen erneut geprüft.
 - Ausschluss von \`/Android/data\` und \`/Android/obb\`.
 - Scanbericht als TXT unter \`Dokumente/KC_SpeicherCheck/\`.
 - Update-Prüfung über GitHub: manuell per Button und höchstens einmal täglich beim App-Start.
 - APK-Updates werden nur nach Freigabe geladen und vor der Installation per SHA-256 geprüft.
 
 ## Datenschutz / Sicherheit
-Der Speicher-Scan bleibt vollständig lokal. Internetzugriff wird ausschließlich für die Update-Prüfung und den von dir freigegebenen Update-Download verwendet. Die automatische Bereinigung läuft ausschließlich nach einem bewussten Knopfdruck und einer zusammengefassten Sicherheitsabfrage; außerhalb der eng definierten Download-Regeln wird nichts automatisch gelöscht.
+Der Speicher-Scan bleibt vollständig lokal. Internetzugriff wird ausschließlich für die Update-Prüfung und den von dir freigegebenen Update-Download verwendet. Die automatische Bereinigung läuft ausschließlich nach einem bewussten Knopfdruck und einer zusammengefassten Sicherheitsabfrage. Leere Ordner werden nur außerhalb geschützter Bereiche berücksichtigt und direkt vor dem Löschen erneut auf Leerstand geprüft.
 
 ## Update-Kanal
 Die App liest:

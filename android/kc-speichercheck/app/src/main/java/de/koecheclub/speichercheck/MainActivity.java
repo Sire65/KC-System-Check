@@ -848,6 +848,8 @@ public class MainActivity extends Activity {
 
             setScanProgress(1, "1/8 Hauptscan des Gerätespeichers");
             scanTree(root, state);
+            setScanProgress(26, "1/8 Leere Ordner werden sicher geprüft");
+            findSafeEmptyDirectoryTrees(root, state);
             setScanProgress(27, "1/8 Hauptscan abgeschlossen");
 
             // Kontrolllauf speziell für Download.
@@ -939,6 +941,7 @@ public class MainActivity extends Activity {
         long projectDirsWithDifferentFiles = 0;
         long unpackedKcProgramDirs = 0;
         long unpackedKcProgramBytes = 0;
+        long safeEmptyDirectoryTrees = 0;
         long downloadFilesSeen = 0;
         long downloadDirsSeen = 0;
         long downloadArchivesSeen = 0;
@@ -1265,6 +1268,157 @@ public class MainActivity extends Activity {
     private boolean isExcludedPath(String path) {
         String p = path.replace('\\', '/');
         return p.contains("/Android/data") || p.contains("/Android/obb") || p.contains("/Android/.Trash");
+    }
+
+    private void findSafeEmptyDirectoryTrees(File root, ScanState state) {
+        if (root == null || state == null || !root.exists() || !root.isDirectory()) return;
+
+        List<File> allSafeEmpty = new ArrayList<>();
+        collectSafeEmptyDirectoryTrees(root, allSafeEmpty, 0);
+        allSafeEmpty.sort(Comparator.comparingInt(a -> a.getAbsolutePath().length()));
+
+        List<File> selectedRoots = new ArrayList<>();
+        for (File dir : allSafeEmpty) {
+            boolean covered = false;
+            for (File parent : selectedRoots) {
+                if (samePath(dir, parent) || isDescendantOf(dir, parent)) {
+                    covered = true;
+                    break;
+                }
+            }
+            if (covered) continue;
+
+            selectedRoots.add(dir);
+            String p = dir.getAbsolutePath();
+            if (!state.candidatePaths.contains(p)) {
+                addCandidate(dir, 0L, Risk.GREEN,
+                        "Leerer Ordnerbaum außerhalb geschützter System-/App-Bereiche; sicher automatisch löschbar", state);
+                state.safeEmptyDirectoryTrees++;
+            }
+        }
+    }
+
+    private boolean collectSafeEmptyDirectoryTrees(File dir, List<File> safeEmpty, int depth) {
+        if (dir == null || safeEmpty == null || !dir.exists() || !dir.isDirectory() || depth > 80) return false;
+        if (isExcludedPath(dir.getAbsolutePath())) return false;
+        if (isEmptyCleanupTraversalBlocked(dir)) return false;
+
+        File[] children;
+        try {
+            children = dir.listFiles();
+        } catch (SecurityException e) {
+            return false;
+        }
+        if (children == null) return false;
+
+        boolean treeHasNoFiles = true;
+        for (File child : children) {
+            if (child == null) {
+                treeHasNoFiles = false;
+                continue;
+            }
+            if (child.isFile()) {
+                treeHasNoFiles = false;
+            } else if (child.isDirectory()) {
+                if (!collectSafeEmptyDirectoryTrees(child, safeEmpty, depth + 1)) {
+                    treeHasNoFiles = false;
+                }
+            } else {
+                treeHasNoFiles = false;
+            }
+        }
+
+        if (treeHasNoFiles && !isProtectedEmptyDirectoryPath(dir)) {
+            safeEmpty.add(dir);
+        }
+        return treeHasNoFiles;
+    }
+
+    private boolean isProtectedEmptyDirectoryPath(File dir) {
+        if (dir == null) return true;
+        File root = Environment.getExternalStorageDirectory();
+        if (root == null) return true;
+        if (samePath(dir, root)) return true;
+        if (isEmptyCleanupTraversalBlocked(dir)) return true;
+
+        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        if (downloads != null && samePath(dir, downloads)) return true;
+
+        String name = dir.getName() == null ? "" : dir.getName().trim();
+        return name.equalsIgnoreCase("Download") || name.equalsIgnoreCase("Downloads")
+                ? dir.getParentFile() != null && samePath(dir.getParentFile(), root)
+                : false;
+    }
+
+    private boolean isEmptyCleanupTraversalBlocked(File dir) {
+        if (dir == null) return true;
+        File root = Environment.getExternalStorageDirectory();
+        if (root == null) return true;
+
+        String rootPath = root.getAbsolutePath().replace('\\', '/');
+        String path = dir.getAbsolutePath().replace('\\', '/');
+        if (!path.equals(rootPath) && !path.startsWith(rootPath + "/")) return true;
+        if (path.equals(rootPath)) return false;
+
+        String rel = path.substring(rootPath.length() + 1);
+        String[] parts = rel.split("/");
+        for (String part : parts) {
+            if (part == null || part.isEmpty()) continue;
+            if (part.startsWith(".")) return true;
+        }
+
+        String top = parts.length == 0 ? "" : parts[0].toLowerCase(Locale.ROOT);
+        if (top.equals("android") ||
+                top.equals("dcim") ||
+                top.equals("pictures") ||
+                top.equals("movies") ||
+                top.equals("music") ||
+                top.equals("documents") ||
+                top.equals("ringtones") ||
+                top.equals("notifications") ||
+                top.equals("podcasts") ||
+                top.equals("alarms") ||
+                top.equals("recordings") ||
+                top.equals("whatsapp") ||
+                top.equals("miui") ||
+                top.equals("xiaomi") ||
+                top.equals("bluetooth") ||
+                top.equals("lost.dir") ||
+                top.equals("system volume information")) {
+            return true;
+        }
+
+        // Xiaomi nutzt Download/downloaded_rom für System-/ROM-Downloads.
+        if (top.equals("download") || top.equals("downloads")) {
+            if (parts.length >= 2 && parts[1].equalsIgnoreCase("downloaded_rom")) return true;
+        }
+
+        // Paketnamenartige Hauptordner werden als App-Struktur behandelt.
+        return top.matches("[a-z0-9_]+(\\.[a-z0-9_]+){2,}");
+    }
+
+    private boolean isDirectoryTreeStillEmptyAndSafe(File dir, int depth) {
+        if (dir == null || !dir.exists() || !dir.isDirectory() || depth > 80) return false;
+        if (isProtectedEmptyDirectoryPath(dir) || isEmptyCleanupTraversalBlocked(dir)) return false;
+
+        File[] children;
+        try {
+            children = dir.listFiles();
+        } catch (SecurityException e) {
+            return false;
+        }
+        if (children == null) return false;
+        for (File child : children) {
+            if (child == null) return false;
+            if (child.isFile()) return false;
+            if (!child.isDirectory() || !isDirectoryTreeStillEmptyAndSafe(child, depth + 1)) return false;
+        }
+        return true;
+    }
+
+    private boolean isEmptyDirectoryCleanupCandidate(Candidate c) {
+        return c != null && c.file != null && c.file.isDirectory() &&
+                c.reason != null && c.reason.startsWith("Leerer Ordnerbaum außerhalb geschützter System-/App-Bereiche");
     }
 
     private void recordProjectDirCandidate(File dir, ScanState state) {
@@ -2267,6 +2421,7 @@ public class MainActivity extends Activity {
                 " · " + Formatter.formatFileSize(this, st.verifiedContainedProjectBytes) +
                 "\nEntpackte KC-Programmordner: " + st.unpackedKcProgramDirs +
                 " · " + Formatter.formatFileSize(this, st.unpackedKcProgramBytes) +
+                "\nLeere Ordnerbäume sicher löschbar: " + st.safeEmptyDirectoryTrees +
                 "\nDoppelte Projektordner: " + st.nestedDuplicateFolders +
                 "\nGlobaler Android-Dateiindex: " + st.mediaStoreGlobalRows +
                 " Einträge · " + st.mediaStoreGlobalArchivesSeen + " Archive · " +
@@ -2342,6 +2497,10 @@ public class MainActivity extends Activity {
 
         String reason = c.reason == null ? "" : c.reason;
 
+        if (isEmptyDirectoryCleanupCandidate(c)) {
+            return c.risk == Risk.GREEN && isDirectoryTreeStillEmptyAndSafe(c.file, 0);
+        }
+
         if (c.file.isDirectory() && reason.startsWith("Entpackter KC-Programmordner im Download-Baum")) {
             File top = findTopUnpackedKcCleanupRoot(c.file);
             return c.risk == Risk.GREEN && top != null && samePath(c.file, top);
@@ -2407,12 +2566,13 @@ public class MainActivity extends Activity {
         String msg = safe.size() + " eindeutig freigegebene Treffer mit insgesamt " +
                 Formatter.formatFileSize(this, bytes) + " werden dauerhaft gelöscht.\n\n" +
                 "Automatisch gelöscht werden nur:\n" +
+                "• leere Ordner bzw. reine Leerordner-Bäume außerhalb geschützter Android-, System-, App- und Medienbereiche; direkt vor dem Löschen wird erneut auf Leerstand geprüft\n" +
                 "• entpackte Hauptordner von KC Verwaltung, Money Butler, Kasse/MarktKasse und PC Manager im Download-Baum; verschachtelte Unterordner werden nicht doppelt gezählt\n" +
                 "• ältere Projektstände, deren sämtliche Dateien per SHA-256 am gleichen relativen Pfad bytegleich im Referenzstand vorhanden sind\n" +
-                "• KC-/Entwicklungsarchive (ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ) im Download-Baum, unabhängig vom Alter\n" +
+                "• KC-/Entwicklungsarchive (ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ) im Download-Baum erst ab 3 Tagen Alter\n" +
                 "• alte ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ-Archive direkt im Download-Ordner – auch kleine Dateien unter 1 MB\n" +
                 "• byte-identische Dubletten direkt im Download-Ordner, wenn eine andere Kopie erhalten bleibt\n\n" +
-                "Projektstände mit fehlenden, abweichenden oder nicht lesbaren Dateien sowie WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents und APK/AAB-Dateien bleiben geschützt.\n\n" +
+                "Geschützt bleiben insbesondere Android, versteckte Ordner, App-Strukturen, MIUI/Xiaomi, downloaded_rom, WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents und APK/AAB-Dateien.\n\n" +
                 "Der Vorgang kann nicht rückgängig gemacht werden.";
 
         new AlertDialog.Builder(this)
@@ -2475,19 +2635,26 @@ public class MainActivity extends Activity {
         autoCleanButton.setEnabled(false);
         scanButton.setEnabled(false);
         new Thread(() -> {
-            int ok = 0, fail = 0;
+            int ok = 0, fail = 0, skipped = 0;
             long freed = 0;
             for (int p : selected) {
                 if (p < 0 || p >= candidates.size()) continue;
                 Candidate c = candidates.get(p);
+                if (isEmptyDirectoryCleanupCandidate(c) && !isDirectoryTreeStillEmptyAndSafe(c.file, 0)) {
+                    skipped++;
+                    continue;
+                }
                 if (deleteRecursive(c.file)) { ok++; freed += c.size; }
                 else fail++;
             }
-            int okF = ok, failF = fail;
+            int okF = ok, failF = fail, skippedF = skipped;
             long freedF = freed;
             runOnUiThread(() -> {
                 progress.setVisibility(View.GONE);
-                Toast.makeText(this, "Gelöscht: " + okF + " · freigegeben ca. " + Formatter.formatFileSize(this, freedF) + (failF > 0 ? " · Fehler: " + failF : ""), Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Gelöscht: " + okF +
+                        " · freigegeben ca. " + Formatter.formatFileSize(this, freedF) +
+                        (skippedF > 0 ? " · übersprungen (nicht mehr leer/geschützt): " + skippedF : "") +
+                        (failF > 0 ? " · Fehler: " + failF : ""), Toast.LENGTH_LONG).show();
                 startScan();
             });
         }).start();
@@ -2534,6 +2701,7 @@ public class MainActivity extends Activity {
             sb.append("Projektstände mit Abweichungen/nicht prüfbaren Dateien: ").append(st.projectDirsWithDifferentFiles).append("\n");
             sb.append("Entpackte KC-Programmordner löschbar: ").append(st.unpackedKcProgramDirs)
                     .append(" | ").append(st.unpackedKcProgramBytes).append(" Bytes\n");
+            sb.append("Leere Ordnerbäume sicher löschbar: ").append(st.safeEmptyDirectoryTrees).append("\n");
             sb.append("Download im Hauptscan: ").append(st.downloadFilesSeen).append(" Dateien, ")
                     .append(st.downloadDirsSeen).append(" Ordner, ")
                     .append(st.downloadArchivesSeen).append(" Archive\n");
