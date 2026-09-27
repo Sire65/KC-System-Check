@@ -248,7 +248,7 @@ public class MainActivity extends Activity {
         root.addView(summary);
 
         TextView legend = new TextView(this);
-        legend.setText("🟢 löschbar/temporär   🟡 prüfen   🔴 geschützt\nAuto: KC-Entwicklungs-ZIPs unter Download sowie streng sichere Download-Treffer.");
+        legend.setText("🟢 löschbar/temporär   🟡 prüfen   🔴 geschützt\nWhatsApp-Fotodubletten werden bytegenau geprüft und bleiben manuell. Auto löscht nur streng sichere Download-Treffer.");
         legend.setTextSize(12);
         root.addView(legend);
 
@@ -420,6 +420,7 @@ public class MainActivity extends Activity {
             ScanState state = new ScanState();
             File root = Environment.getExternalStorageDirectory();
             scanTree(root, state);
+            findWhatsAppPhotoDuplicates(state);
             findDuplicates(state);
             lastScanState = state;
 
@@ -454,7 +455,11 @@ public class MainActivity extends Activity {
         long developmentArchivesSeen = 0;
         long developmentArchiveBytes = 0;
         long unreadableDirs = 0;
+        long whatsappPhotosSeen = 0;
+        long whatsappPhotoDuplicates = 0;
+        long whatsappPhotoDuplicateBytes = 0;
         final Map<Long, List<File>> sameSize = new HashMap<>();
+        final Map<Long, List<File>> whatsappPhotoSameSize = new HashMap<>();
         final Set<String> candidatePaths = new HashSet<>();
     }
 
@@ -480,6 +485,12 @@ public class MainActivity extends Activity {
             long size = file.length();
             state.totalBytes += size;
             if (size >= MB) state.sameSize.computeIfAbsent(size, k -> new ArrayList<>()).add(file);
+            if (isWhatsAppPhoto(file)) {
+                state.whatsappPhotosSeen++;
+                if (size >= 64L * 1024L) {
+                    state.whatsappPhotoSameSize.computeIfAbsent(size, k -> new ArrayList<>()).add(file);
+                }
+            }
             classifyFile(file, size, state);
             if (state.files % 500 == 0) {
                 long f = state.files;
@@ -558,6 +569,51 @@ public class MainActivity extends Activity {
         return total;
     }
 
+    private boolean isWhatsAppPhoto(File file) {
+        if (file == null || !file.isFile()) return false;
+        String path = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        if (!path.contains("/android/media/com.whatsapp/whatsapp/media/whatsapp images/")) return false;
+        String ext = extension(file.getName().toLowerCase(Locale.ROOT));
+        return ext.equals("jpg") || ext.equals("jpeg") || ext.equals("png") ||
+                ext.equals("webp") || ext.equals("heic") || ext.equals("heif");
+    }
+
+    private boolean isWhatsAppSentPhoto(File file) {
+        String path = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        return path.contains("/whatsapp images/sent/");
+    }
+
+    private void findWhatsAppPhotoDuplicates(ScanState state) {
+        for (Map.Entry<Long, List<File>> e : state.whatsappPhotoSameSize.entrySet()) {
+            List<File> same = e.getValue();
+            if (same.size() < 2) continue;
+
+            Map<String, List<File>> hashes = new HashMap<>();
+            for (File f : same) {
+                String hash = sha256(f);
+                if (hash != null) hashes.computeIfAbsent(hash, k -> new ArrayList<>()).add(f);
+            }
+
+            for (List<File> dupes : hashes.values()) {
+                if (dupes.size() < 2) continue;
+                dupes.sort((a, b) -> {
+                    boolean aSent = isWhatsAppSentPhoto(a);
+                    boolean bSent = isWhatsAppSentPhoto(b);
+                    if (aSent != bSent) return aSent ? 1 : -1; // prefer keeping non-Sent copy
+                    return Long.compare(a.lastModified(), b.lastModified());
+                });
+
+                for (int i = 1; i < dupes.size(); i++) {
+                    File f = dupes.get(i);
+                    state.whatsappPhotoDuplicates++;
+                    state.whatsappPhotoDuplicateBytes += f.length();
+                    addCandidate(f, f.length(), Risk.YELLOW,
+                            "WhatsApp-Fotodublette; byte-identisch, eine andere Kopie bleibt erhalten", state);
+                }
+            }
+        }
+    }
+
     private void findDuplicates(ScanState state) {
         int groups = 0;
         for (Map.Entry<Long, List<File>> e : state.sameSize.entrySet()) {
@@ -609,7 +665,9 @@ public class MainActivity extends Activity {
         }
         ScanState st = lastScanState;
         String archiveInfo = st == null ? "" : "\nArchive gesehen: " + st.archivesSeen +
-                " · davon Entwicklung: " + st.developmentArchivesSeen;
+                " · davon Entwicklung: " + st.developmentArchivesSeen +
+                "\nWhatsApp-Fotos: " + st.whatsappPhotosSeen +
+                " · Dubletten: " + st.whatsappPhotoDuplicates;
         summary.setText("Gefunden (max. " + MAX_VISIBLE + " größte Treffer):\n" +
                 "🟢 " + gc + " · " + Formatter.formatFileSize(this, green) + "   " +
                 "🟡 " + yc + " · " + Formatter.formatFileSize(this, yellow) + "   " +
@@ -825,6 +883,9 @@ public class MainActivity extends Activity {
             sb.append("Entwicklungsarchive erkannt: ").append(st.developmentArchivesSeen)
                     .append(" | ").append(st.developmentArchiveBytes).append(" Bytes\n");
             sb.append("Nicht lesbare Ordner: ").append(st.unreadableDirs).append("\n");
+            sb.append("WhatsApp-Fotos gesehen: ").append(st.whatsappPhotosSeen).append("\n");
+            sb.append("WhatsApp-Fotodubletten: ").append(st.whatsappPhotoDuplicates)
+                    .append(" | ").append(st.whatsappPhotoDuplicateBytes).append(" Bytes\n");
         }
         sb.append("\nBewertung: GRUEN = meist erzeugbar/temporär; GELB = prüfen; ROT = nicht pauschal löschen\n\n");
         int i = 1;
