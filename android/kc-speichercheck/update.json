@@ -1,8 +1,8 @@
 {
-  "versionCode": 25,
-  "versionName": "1.4.7",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.7-STABIL.apk",
-  "sha256": "db172a57518308535dda45fe2163c93511564374522841f1c9234224fd886fb8",
-  "notes": "Neu: Tiefenscan zusätzlicher Android-Speicherwurzeln (z. B. /storage/emulated/999), sichere Erkennung wirklich leerer Unterordner unter downloaded_rom bei weiterhin geschütztem Systemcontainer, ZIP-Inhaltsprüfung auf Gültigkeit/Dateien/unkomprimierte Größe sowie verbesserte Gruppierung von fixed/final/Kopie-/Backup-/Alt-Projektständen. Automatische Löschung bleibt auf streng geprüfte Fälle beschränkt.",
-  "published": "2026-09-27"
+  "versionCode": 26,
+  "versionName": "1.4.8",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.8-STABIL.apk",
+  "sha256": "df251a27bc858726f436d3119bcde9add1071c7a66fa36086fa28de68a05c9b3",
+  "notes": "Neu: zusätzliche Android-Speicherprofile unter /storage/emulated werden direkt erkannt, soweit lesbar tief gescannt und auch von der Lupe durchsucht. Leere Ordner und andere Treffer in Zusatzprofilen werden diagnostiziert, aber nicht automatisch gelöscht; Auto-Löschen bleibt auf den primären gemeinsamen Speicher beschränkt. ZIP-/SHA-256-Sicherheitsregeln aus v1.4.7 bleiben erhalten.",
+  "published": "2026-09-28"
 }
