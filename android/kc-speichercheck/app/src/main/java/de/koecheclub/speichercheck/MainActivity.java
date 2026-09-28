@@ -577,6 +577,8 @@ public class MainActivity extends Activity {
 
         fileSearchRunning = true;
         if (searchButton != null) searchButton.setEnabled(false);
+        if (explorerButton != null) explorerButton.setEnabled(false);
+        if (scanButton != null) scanButton.setEnabled(false);
         status.setText("Dateisuche: " + query + " …");
 
         new Thread(() -> {
@@ -600,6 +602,8 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     fileSearchRunning = false;
                     if (searchButton != null) searchButton.setEnabled(true);
+                    if (scanButton != null) scanButton.setEnabled(hasStorageAccess() && !scanning);
+                    if (explorerButton != null) explorerButton.setEnabled(hasStorageAccess() && !scanning);
                     status.setText("Dateisuche: " + total + " Treffer · neueste zuerst");
                     showFileSearchResults(query, visible, total, checked[0], checked[1]);
                 });
@@ -607,6 +611,8 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     fileSearchRunning = false;
                     if (searchButton != null) searchButton.setEnabled(true);
+                    if (scanButton != null) scanButton.setEnabled(hasStorageAccess() && !scanning);
+                    if (explorerButton != null) explorerButton.setEnabled(hasStorageAccess() && !scanning);
                     status.setText("Dateisuche fehlgeschlagen.");
                     Toast.makeText(this, "Dateisuche fehlgeschlagen: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
@@ -970,6 +976,10 @@ public class MainActivity extends Activity {
             return;
         }
         if (scanning) return;
+        if (fileSearchRunning) {
+            Toast.makeText(this, "Während der Dateisuche bitte kurz warten.", Toast.LENGTH_SHORT).show();
+            return;
+        }
         scanning = true;
         candidates.clear();
         displayRows.clear();
