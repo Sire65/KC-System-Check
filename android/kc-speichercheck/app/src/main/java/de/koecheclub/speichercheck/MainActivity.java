@@ -25,6 +25,8 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.os.storage.StorageManager;
+import android.os.storage.StorageVolume;
 import android.provider.Settings;
 import android.provider.MediaStore;
 import android.database.Cursor;
@@ -416,7 +418,7 @@ public class MainActivity extends Activity {
             return;
         }
 
-        List<File> roots = listEmulatedStorageRoots();
+        List<File> roots = listAllStorageRoots();
         if (roots.isEmpty()) {
             Toast.makeText(this, "Kein lesbarer Speicherbereich gefunden.", Toast.LENGTH_LONG).show();
             return;
@@ -585,7 +587,7 @@ public class MainActivity extends Activity {
             try {
                 List<File> found = new ArrayList<>();
                 long[] checked = new long[] {0L, 0L};
-                for (File storageRoot : listEmulatedStorageRoots()) {
+                for (File storageRoot : listAllStorageRoots()) {
                     searchFiles(storageRoot, query, found, 0, checked);
                 }
                 augmentFileSearchFromMediaStore(query, found, checked);
@@ -1023,34 +1025,38 @@ public class MainActivity extends Activity {
 
             // Globaler Android-Dateiindex: findet insbesondere Archive, die
             // Xiaomi/Android im Dateimanager kennt, aber der File-Baum nicht sah.
-            setScanProgress(46, "4/8 Globaler Android-Dateiindex · Archive");
+            setScanProgress(46, "4/9 Globaler Android-Dateiindex · Archive");
             scanGlobalArchiveMediaStoreFallback(state);
-            setScanProgress(55, "4/8 Zusätzliche Speicherbereiche werden gesucht");
+            setScanProgress(53, "4/9 Zusatzspeicher und SD-Karte werden gesucht");
             discoverAdditionalStorageRoots(state);
             scanAdditionalStorageRoots(state);
-            setScanProgress(58, "4/8 Globaler Archivindex und Zusatzspeicher abgeschlossen");
+            setScanProgress(58, "4/9 Alle erreichbaren Speicherbereiche gescannt");
 
-            setScanProgress(59, "5/8 KC-/Projektstände werden ausgewertet");
+            setScanProgress(59, "5/9 Vollständige Speicherinventur wird erstellt");
+            buildStorageInventory(state);
+            setScanProgress(66, "5/9 Speicherinventur abgeschlossen");
+
+            setScanProgress(67, "6/9 KC-/Reise-/Kreuzfahrt-Projekte werden ausgewertet");
             analyzeProjectDirectories(state);
-            setScanProgress(75, "5/8 KC-/Projektstände ausgewertet");
+            setScanProgress(78, "6/9 Projektstände ausgewertet");
 
-            setScanProgress(76, "6/8 WhatsApp-Dubletten werden geprüft");
+            setScanProgress(79, "7/9 WhatsApp-Dubletten werden geprüft");
             findWhatsAppPhotoDuplicates(state);
-            setScanProgress(84, "6/8 WhatsApp-Dubletten geprüft");
+            setScanProgress(86, "7/9 WhatsApp-Dubletten geprüft");
 
-            setScanProgress(85, "7/8 Dateidubletten werden geprüft");
+            setScanProgress(87, "8/9 Dateidubletten werden geprüft");
             findDuplicates(state);
-            setScanProgress(94, "7/8 Dateidubletten geprüft");
+            setScanProgress(94, "8/9 Dateidubletten geprüft");
 
             lastScanState = state;
 
-            setScanProgress(95, "8/8 Treffer werden sortiert");
+            setScanProgress(95, "9/9 Treffer werden sortiert");
             Collections.sort(candidates, Comparator.comparingLong((Candidate c) -> c.size).reversed());
-            setScanProgress(96, "8/8 Treffer werden vorbereitet");
+            setScanProgress(96, "9/9 Treffer werden vorbereitet");
             if (candidates.size() > MAX_VISIBLE) {
                 candidates.subList(MAX_VISIBLE, candidates.size()).clear();
             }
-            setScanProgress(97, "8/8 Treffer werden aufgelistet");
+            setScanProgress(97, "9/9 Treffer werden aufgelistet");
 
             runOnUiThread(() -> {
                 displayRows.clear();
@@ -1061,7 +1067,7 @@ public class MainActivity extends Activity {
                     row++;
                     if (totalRows > 0 && (row % 50 == 0 || row == totalRows)) {
                         scanProgressPercent = row == totalRows ? 99 : 98;
-                        scanProgressPhase = "8/8 Treffer werden aufgelistet · " + row + "/" + totalRows;
+                        scanProgressPhase = "9/9 Treffer werden aufgelistet · " + row + "/" + totalRows;
                         renderScanProgress();
                     }
                 }
@@ -1071,8 +1077,8 @@ public class MainActivity extends Activity {
                 if (explorerButton != null) explorerButton.setEnabled(true);
                 deleteButton.setEnabled(!candidates.isEmpty());
                 updateAutoCleanButton();
-                reportButton.setEnabled(!candidates.isEmpty());
-                shareReportButton.setEnabled(!candidates.isEmpty());
+                reportButton.setEnabled(true);
+                shareReportButton.setEnabled(true);
                 updateOverallSummary();
                 finishScanProgress(state);
             });
@@ -1205,6 +1211,9 @@ public class MainActivity extends Activity {
         long additionalStorageRootsEnumerated = 0;
         long additionalStorageRootsScanned = 0;
         long additionalStorageRootsUnreadable = 0;
+        long storageRootsInventoryCount = 0;
+        long removableStorageRoots = 0;
+        long inventoryTopFoldersCount = 0;
         long zipArchivesInspected = 0;
         long zipArchivesInvalid = 0;
         long zipArchivesEmpty = 0;
@@ -1219,6 +1228,8 @@ public class MainActivity extends Activity {
         final Set<String> projectDirPaths = new HashSet<>();
         final List<ProjectDirEntry> projectDirs = new ArrayList<>();
         final List<RootDirectoryEntry> rootDirectories = new ArrayList<>();
+        final List<StorageRootEntry> storageRootsInventory = new ArrayList<>();
+        final List<InventoryFolderEntry> inventoryTopFolders = new ArrayList<>();
         final Map<String, FolderStats> folderStatsCache = new HashMap<>();
         final Map<String, String> fileHashCache = new HashMap<>();
         final Map<String, ArchiveInspection> archiveInspectionByPath = new HashMap<>();
@@ -1248,6 +1259,37 @@ public class MainActivity extends Activity {
 
         boolean fullyContained() {
             return missingInReference == 0 && differentFiles == 0 && unreadableFiles == 0;
+        }
+    }
+
+    static class StorageRootEntry {
+        final File root;
+        final String type;
+        final boolean primary;
+        final boolean removable;
+        final long totalBytes;
+        final long freeBytes;
+        final int directItems;
+
+        StorageRootEntry(File root, String type, boolean primary, boolean removable,
+                         long totalBytes, long freeBytes, int directItems) {
+            this.root = root;
+            this.type = type;
+            this.primary = primary;
+            this.removable = removable;
+            this.totalBytes = totalBytes;
+            this.freeBytes = freeBytes;
+            this.directItems = directItems;
+        }
+    }
+
+    static class InventoryFolderEntry {
+        final File dir;
+        final FolderStats stats;
+
+        InventoryFolderEntry(File dir, FolderStats stats) {
+            this.dir = dir;
+            this.stats = stats;
         }
     }
 
@@ -1577,16 +1619,154 @@ public class MainActivity extends Activity {
         return roots;
     }
 
+    private List<File> listAllStorageRoots() {
+        List<File> roots = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+
+        for (File root : listEmulatedStorageRoots()) {
+            if (root != null && root.exists() && root.isDirectory() && seen.add(root.getAbsolutePath())) {
+                roots.add(root);
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                StorageManager sm = (StorageManager) getSystemService(Context.STORAGE_SERVICE);
+                if (sm != null) {
+                    for (StorageVolume volume : sm.getStorageVolumes()) {
+                        File root = volume.getDirectory();
+                        if (root != null && root.exists() && root.isDirectory() &&
+                                seen.add(root.getAbsolutePath())) {
+                            roots.add(root);
+                        }
+                    }
+                }
+            } catch (Exception ignored) { }
+        }
+
+        try {
+            File[] appRoots = getExternalFilesDirs(null);
+            if (appRoots != null) {
+                for (File appDir : appRoots) {
+                    File root = storageRootFromAppExternalDir(appDir);
+                    if (root != null && root.exists() && root.isDirectory() &&
+                            seen.add(root.getAbsolutePath())) {
+                        roots.add(root);
+                    }
+                }
+            }
+        } catch (Exception ignored) { }
+
+        File storage = new File("/storage");
+        File[] storageChildren;
+        try {
+            storageChildren = storage.listFiles();
+        } catch (SecurityException e) {
+            storageChildren = null;
+        }
+        if (storageChildren != null) {
+            for (File child : storageChildren) {
+                if (child == null || !child.exists() || !child.isDirectory()) continue;
+                String name = child.getName() == null ? "" : child.getName();
+                if (name.equalsIgnoreCase("emulated") || name.equalsIgnoreCase("self")) continue;
+                if (!name.matches("[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}")) continue;
+                if (seen.add(child.getAbsolutePath())) roots.add(child);
+            }
+        }
+
+        roots.sort(Comparator.comparing(a -> a.getAbsolutePath().toLowerCase(Locale.ROOT)));
+        return roots;
+    }
+
+    private File storageRootFromAppExternalDir(File appDir) {
+        if (appDir == null) return null;
+        File current = appDir;
+        while (current != null) {
+            if (current.getName().equalsIgnoreCase("Android")) return current.getParentFile();
+            current = current.getParentFile();
+        }
+        return null;
+    }
+
+    private boolean isRemovableStorageRoot(File root) {
+        if (root == null) return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                StorageManager sm = (StorageManager) getSystemService(Context.STORAGE_SERVICE);
+                if (sm != null) {
+                    for (StorageVolume volume : sm.getStorageVolumes()) {
+                        File dir = volume.getDirectory();
+                        if (dir != null && samePath(dir, root)) return volume.isRemovable();
+                    }
+                }
+            } catch (Exception ignored) { }
+        }
+        return root.getAbsolutePath().replace('\\', '/')
+                .matches("^/storage/[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$");
+    }
+
+    private String storageRootType(File root) {
+        if (root == null) return "unbekannt";
+        if (isPrimarySharedStorage(root)) return "Interner gemeinsamer Speicher";
+        if (isRemovableStorageRoot(root)) return "SD-/Speicherkarte";
+        if (root.getAbsolutePath().replace('\\', '/').startsWith("/storage/emulated/")) {
+            return "Zusätzliches Android-Speicherprofil";
+        }
+        return "Zusätzlicher Speicher";
+    }
+
+    private void buildStorageInventory(ScanState state) {
+        if (state == null) return;
+        state.storageRootsInventory.clear();
+        state.inventoryTopFolders.clear();
+
+        for (File root : listAllStorageRoots()) {
+            if (root == null || !root.exists() || !root.isDirectory()) continue;
+
+            File[] direct;
+            try {
+                direct = root.listFiles();
+            } catch (SecurityException e) {
+                direct = null;
+            }
+
+            boolean removable = isRemovableStorageRoot(root);
+            boolean primary = isPrimarySharedStorage(root);
+            state.storageRootsInventory.add(new StorageRootEntry(
+                    root, storageRootType(root), primary, removable,
+                    Math.max(0L, root.getTotalSpace()), Math.max(0L, root.getUsableSpace()),
+                    direct == null ? -1 : direct.length));
+            state.storageRootsInventoryCount++;
+            if (removable) state.removableStorageRoots++;
+
+            if (direct == null) continue;
+            List<File> dirs = new ArrayList<>();
+            for (File child : direct) {
+                if (child != null && child.isDirectory() && !isExcludedPath(child.getAbsolutePath())) {
+                    dirs.add(child);
+                }
+            }
+            dirs.sort(Comparator.comparing(a -> a.getName().toLowerCase(Locale.ROOT)));
+            for (File dir : dirs) {
+                FolderStats stats = folderStats(dir, state, 0);
+                state.inventoryTopFolders.add(new InventoryFolderEntry(dir, stats));
+                state.inventoryTopFoldersCount++;
+            }
+        }
+    }
+
     private boolean isPrimarySharedStorage(File file) {
         if (file == null) return false;
-        File root = emulatedStorageRootFor(file);
         File primary = Environment.getExternalStorageDirectory();
-        return root != null && primary != null && samePath(root, primary);
+        if (primary == null) return false;
+        String p = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        String rp = primary.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        return p.equals(rp) || p.startsWith(rp + "/");
     }
 
     private void discoverAdditionalStorageRoots(ScanState state) {
         if (state == null) return;
-        for (File root : listEmulatedStorageRoots()) {
+        for (File root : listAllStorageRoots()) {
             if (root == null || !root.exists() || !root.isDirectory()) continue;
             if (isPrimarySharedStorage(root)) continue;
 
@@ -1915,7 +2095,7 @@ public class MainActivity extends Activity {
         boolean nestedDuplicate = isNestedDuplicateProjectDir(dir);
         boolean strongProjectName = isStrongProjectName(name);
         boolean inDownload = isDirectoryInDownloadTree(dir);
-        boolean projectMarkers = inDownload && hasProjectMarkers(dir);
+        boolean projectMarkers = hasProjectMarkers(dir);
         int dlDepth = downloadDepth(dir);
 
         // Für die auf diesem Gerät nicht benötigten KC-Programmstände nur den
@@ -1932,6 +2112,8 @@ public class MainActivity extends Activity {
         } else if (devDepth >= 2 && devDepth <= 8 &&
                 (nestedDuplicate || (strongProjectName && (versionLike || projectMarkers)))) {
             projectRoot = true; // tiefe KC-/Versions-/Kopie-Stände
+        } else if (strongProjectName && (versionLike || projectMarkers)) {
+            projectRoot = true; // KC-/Reise-/Kreuzfahrt-Projekt an beliebigem erreichbaren Speicherort
         } else if (inDownload && strongProjectName &&
                 (versionLike || projectMarkers || (dlDepth >= 1 && dlDepth <= 3))) {
             projectRoot = true; // ausgepackte KC-Projekte auch ohne Versionswort
@@ -2026,7 +2208,10 @@ public class MainActivity extends Activity {
                 n.contains("moneybutler") || n.contains("kommunikation") || n.contains("communication") ||
                 n.contains("framework") || n.contains("bilderrechner") ||
                 n.contains("speichercheck") || n.contains("systemcheck") ||
-                n.contains("inventar") || n.contains("weihnachtsmarkt");
+                n.contains("inventar") || n.contains("weihnachtsmarkt") ||
+                n.contains("reiseassistent") || n.contains("reise") ||
+                n.contains("kreuzfahrt") || n.contains("cruise") || n.contains("cruisespace") ||
+                n.contains("urlaub") || n.contains("travel");
     }
 
     private String unpackedKcCleanupKind(File dir) {
@@ -2044,6 +2229,25 @@ public class MainActivity extends Activity {
         }
         if (n.contains("pcmanager") || n.equals("kcmanager") || n.startsWith("kcmanagerv")) {
             return "PC Manager";
+        }
+        if (n.contains("reiseassistent") || n.contains("kreuzfahrt") ||
+                n.contains("cruise") || n.contains("cruisespace") ||
+                n.contains("travel") || n.startsWith("reisev")) {
+            return "Reise/Kreuzfahrt";
+        }
+        if (n.contains("kcfutura") || n.contains("futuraacademy") || n.contains("academy")) {
+            return "KC FUTURA/Academy";
+        }
+        if (n.contains("kccommunication") || n.contains("kckommunikation")) {
+            return "KC Communication";
+        }
+        if (n.contains("dienstplan") || n.contains("kcdp2") || n.contains("kcdp3")) {
+            return "KC Dienstplan";
+        }
+        if (n.contains("weihnachtsmarkt") || n.contains("inventar") ||
+                n.contains("bilderrechner") || n.contains("systemcheck") ||
+                n.contains("speichercheck")) {
+            return "KC Projekt";
         }
         return null;
     }
@@ -3018,6 +3222,9 @@ public class MainActivity extends Activity {
                 compactName.contains("verwaltung") || compactName.contains("manager") ||
                 compactName.contains("communication") || compactName.contains("kommunikation") ||
                 compactName.contains("framework") || compactName.contains("reiseassistent") ||
+                compactName.contains("reise") || compactName.contains("kreuzfahrt") ||
+                compactName.contains("cruise") || compactName.contains("cruisespace") ||
+                compactName.contains("travel") || compactName.contains("urlaub") ||
                 compactName.contains("bilderrechner") || compactName.contains("systemcheck") ||
                 compactName.contains("speichercheck") || compactName.contains("inventar") ||
                 compactName.contains("weihnachtsmarkt");
@@ -3280,6 +3487,51 @@ public class MainActivity extends Activity {
             sb.append("ZIP-Prüfung: ").append(st.zipArchivesInspected).append(" geprüft; ")
                     .append(st.zipArchivesInvalid).append(" ungültig/beschädigt; ")
                     .append(st.zipArchivesEmpty).append(" ohne Dateien\n");
+            sb.append("Speicherinventur: ").append(st.storageRootsInventoryCount)
+                    .append(" Speicherwurzeln; davon ").append(st.removableStorageRoots)
+                    .append(" SD-/Wechselspeicher; ").append(st.inventoryTopFoldersCount)
+                    .append(" direkte Hauptordner inventarisiert\n");
+
+            sb.append("\nSPEICHERINVENTUR – INTERNE SPEICHER, PROFILE UND SD-KARTE\n");
+            if (st.storageRootsInventory.isEmpty()) {
+                sb.append("Keine Speicherwurzel inventarisiert.\n");
+            } else {
+                int si = 1;
+                for (StorageRootEntry entry : st.storageRootsInventory) {
+                    sb.append(si++).append(". ").append(entry.type).append("\n");
+                    sb.append("Pfad: ").append(entry.root.getAbsolutePath()).append("\n");
+                    sb.append("Primär: ").append(entry.primary ? "JA" : "NEIN")
+                            .append(" | Wechselbar/SD: ").append(entry.removable ? "JA" : "NEIN").append("\n");
+                    sb.append("Kapazität: ").append(entry.totalBytes).append(" Bytes")
+                            .append(" | frei/nutzbar: ").append(entry.freeBytes).append(" Bytes\n");
+                    sb.append("Direkte Elemente: ")
+                            .append(entry.directItems < 0 ? "nicht lesbar" : String.valueOf(entry.directItems))
+                            .append("\n\n");
+                }
+            }
+
+            sb.append("\nSPEICHERINVENTUR – HAUPTORDNER MIT GRÖSSE\n");
+            if (st.inventoryTopFolders.isEmpty()) {
+                sb.append("Keine Hauptordner inventarisiert.\n");
+            } else {
+                List<InventoryFolderEntry> topInventory = new ArrayList<>(st.inventoryTopFolders);
+                topInventory.sort((a, b) -> Long.compare(b.stats.bytes, a.stats.bytes));
+                int fi = 1;
+                for (InventoryFolderEntry entry : topInventory) {
+                    sb.append(fi++).append(". ")
+                            .append(entry.dir.getName()).append(" | ")
+                            .append(entry.stats.bytes).append(" Bytes | ")
+                            .append(entry.stats.files).append(" Dateien | ")
+                            .append(Math.max(0, entry.stats.dirs - 1)).append(" Unterordner\n");
+                    sb.append("Pfad: ").append(entry.dir.getAbsolutePath()).append("\n");
+                    if (entry.stats.newestModified > 0) {
+                        sb.append("Neueste Änderung: ")
+                                .append(new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMANY)
+                                        .format(new Date(entry.stats.newestModified))).append("\n");
+                    }
+                    sb.append("\n");
+                }
+            }
 
             sb.append("\nHAUPTVERZEICHNIS – DIREKTE ORDNER\n");
             if (st.rootDirectories.isEmpty()) {
@@ -3386,7 +3638,7 @@ public class MainActivity extends Activity {
     }
 
     private void shareReport() {
-        if (candidates.isEmpty()) {
+        if (lastScanState == null) {
             Toast.makeText(this, "Bitte zuerst den Speicher scannen.", Toast.LENGTH_SHORT).show();
             return;
         }
