@@ -418,7 +418,7 @@ public class MainActivity extends Activity {
             return;
         }
 
-        List<File> roots = listEmulatedStorageRoots();
+        List<File> roots = listAllStorageRoots();
         if (roots.isEmpty()) {
             Toast.makeText(this, "Kein lesbarer Speicherbereich gefunden.", Toast.LENGTH_LONG).show();
             return;
@@ -587,7 +587,7 @@ public class MainActivity extends Activity {
             try {
                 List<File> found = new ArrayList<>();
                 long[] checked = new long[] {0L, 0L};
-                for (File storageRoot : listEmulatedStorageRoots()) {
+                for (File storageRoot : listAllStorageRoots()) {
                     searchFiles(storageRoot, query, found, 0, checked);
                 }
                 augmentFileSearchFromMediaStore(query, found, checked);
@@ -2202,7 +2202,10 @@ public class MainActivity extends Activity {
                 n.contains("moneybutler") || n.contains("kommunikation") || n.contains("communication") ||
                 n.contains("framework") || n.contains("bilderrechner") ||
                 n.contains("speichercheck") || n.contains("systemcheck") ||
-                n.contains("inventar") || n.contains("weihnachtsmarkt");
+                n.contains("inventar") || n.contains("weihnachtsmarkt") ||
+                n.contains("reiseassistent") || n.contains("reise") ||
+                n.contains("kreuzfahrt") || n.contains("cruise") || n.contains("cruisespace") ||
+                n.contains("urlaub") || n.contains("travel");
     }
 
     private String unpackedKcCleanupKind(File dir) {
@@ -2220,6 +2223,25 @@ public class MainActivity extends Activity {
         }
         if (n.contains("pcmanager") || n.equals("kcmanager") || n.startsWith("kcmanagerv")) {
             return "PC Manager";
+        }
+        if (n.contains("reiseassistent") || n.contains("kreuzfahrt") ||
+                n.contains("cruise") || n.contains("cruisespace") ||
+                n.contains("travel") || n.startsWith("reisev")) {
+            return "Reise/Kreuzfahrt";
+        }
+        if (n.contains("kcfutura") || n.contains("futuraacademy") || n.contains("academy")) {
+            return "KC FUTURA/Academy";
+        }
+        if (n.contains("kccommunication") || n.contains("kckommunikation")) {
+            return "KC Communication";
+        }
+        if (n.contains("dienstplan") || n.contains("kcdp2") || n.contains("kcdp3")) {
+            return "KC Dienstplan";
+        }
+        if (n.contains("weihnachtsmarkt") || n.contains("inventar") ||
+                n.contains("bilderrechner") || n.contains("systemcheck") ||
+                n.contains("speichercheck")) {
+            return "KC Projekt";
         }
         return null;
     }
@@ -3194,6 +3216,9 @@ public class MainActivity extends Activity {
                 compactName.contains("verwaltung") || compactName.contains("manager") ||
                 compactName.contains("communication") || compactName.contains("kommunikation") ||
                 compactName.contains("framework") || compactName.contains("reiseassistent") ||
+                compactName.contains("reise") || compactName.contains("kreuzfahrt") ||
+                compactName.contains("cruise") || compactName.contains("cruisespace") ||
+                compactName.contains("travel") || compactName.contains("urlaub") ||
                 compactName.contains("bilderrechner") || compactName.contains("systemcheck") ||
                 compactName.contains("speichercheck") || compactName.contains("inventar") ||
                 compactName.contains("weihnachtsmarkt");
