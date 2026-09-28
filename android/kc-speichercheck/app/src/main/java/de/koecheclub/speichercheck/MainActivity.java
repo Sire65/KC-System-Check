@@ -25,6 +25,8 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.os.storage.StorageManager;
+import android.os.storage.StorageVolume;
 import android.provider.Settings;
 import android.provider.MediaStore;
 import android.database.Cursor;
@@ -1205,6 +1207,9 @@ public class MainActivity extends Activity {
         long additionalStorageRootsEnumerated = 0;
         long additionalStorageRootsScanned = 0;
         long additionalStorageRootsUnreadable = 0;
+        long storageRootsInventoryCount = 0;
+        long removableStorageRoots = 0;
+        long inventoryTopFoldersCount = 0;
         long zipArchivesInspected = 0;
         long zipArchivesInvalid = 0;
         long zipArchivesEmpty = 0;
@@ -1219,6 +1224,8 @@ public class MainActivity extends Activity {
         final Set<String> projectDirPaths = new HashSet<>();
         final List<ProjectDirEntry> projectDirs = new ArrayList<>();
         final List<RootDirectoryEntry> rootDirectories = new ArrayList<>();
+        final List<StorageRootEntry> storageRootsInventory = new ArrayList<>();
+        final List<InventoryFolderEntry> inventoryTopFolders = new ArrayList<>();
         final Map<String, FolderStats> folderStatsCache = new HashMap<>();
         final Map<String, String> fileHashCache = new HashMap<>();
         final Map<String, ArchiveInspection> archiveInspectionByPath = new HashMap<>();
@@ -1248,6 +1255,37 @@ public class MainActivity extends Activity {
 
         boolean fullyContained() {
             return missingInReference == 0 && differentFiles == 0 && unreadableFiles == 0;
+        }
+    }
+
+    static class StorageRootEntry {
+        final File root;
+        final String type;
+        final boolean primary;
+        final boolean removable;
+        final long totalBytes;
+        final long freeBytes;
+        final int directItems;
+
+        StorageRootEntry(File root, String type, boolean primary, boolean removable,
+                         long totalBytes, long freeBytes, int directItems) {
+            this.root = root;
+            this.type = type;
+            this.primary = primary;
+            this.removable = removable;
+            this.totalBytes = totalBytes;
+            this.freeBytes = freeBytes;
+            this.directItems = directItems;
+        }
+    }
+
+    static class InventoryFolderEntry {
+        final File dir;
+        final FolderStats stats;
+
+        InventoryFolderEntry(File dir, FolderStats stats) {
+            this.dir = dir;
+            this.stats = stats;
         }
     }
 
