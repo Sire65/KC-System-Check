@@ -1615,16 +1615,154 @@ public class MainActivity extends Activity {
         return roots;
     }
 
+    private List<File> listAllStorageRoots() {
+        List<File> roots = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+
+        for (File root : listEmulatedStorageRoots()) {
+            if (root != null && root.exists() && root.isDirectory() && seen.add(root.getAbsolutePath())) {
+                roots.add(root);
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                StorageManager sm = (StorageManager) getSystemService(Context.STORAGE_SERVICE);
+                if (sm != null) {
+                    for (StorageVolume volume : sm.getStorageVolumes()) {
+                        File root = volume.getDirectory();
+                        if (root != null && root.exists() && root.isDirectory() &&
+                                seen.add(root.getAbsolutePath())) {
+                            roots.add(root);
+                        }
+                    }
+                }
+            } catch (Exception ignored) { }
+        }
+
+        try {
+            File[] appRoots = getExternalFilesDirs(null);
+            if (appRoots != null) {
+                for (File appDir : appRoots) {
+                    File root = storageRootFromAppExternalDir(appDir);
+                    if (root != null && root.exists() && root.isDirectory() &&
+                            seen.add(root.getAbsolutePath())) {
+                        roots.add(root);
+                    }
+                }
+            }
+        } catch (Exception ignored) { }
+
+        File storage = new File("/storage");
+        File[] storageChildren;
+        try {
+            storageChildren = storage.listFiles();
+        } catch (SecurityException e) {
+            storageChildren = null;
+        }
+        if (storageChildren != null) {
+            for (File child : storageChildren) {
+                if (child == null || !child.exists() || !child.isDirectory()) continue;
+                String name = child.getName() == null ? "" : child.getName();
+                if (name.equalsIgnoreCase("emulated") || name.equalsIgnoreCase("self")) continue;
+                if (!name.matches("[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}")) continue;
+                if (seen.add(child.getAbsolutePath())) roots.add(child);
+            }
+        }
+
+        roots.sort(Comparator.comparing(a -> a.getAbsolutePath().toLowerCase(Locale.ROOT)));
+        return roots;
+    }
+
+    private File storageRootFromAppExternalDir(File appDir) {
+        if (appDir == null) return null;
+        File current = appDir;
+        while (current != null) {
+            if (current.getName().equalsIgnoreCase("Android")) return current.getParentFile();
+            current = current.getParentFile();
+        }
+        return null;
+    }
+
+    private boolean isRemovableStorageRoot(File root) {
+        if (root == null) return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                StorageManager sm = (StorageManager) getSystemService(Context.STORAGE_SERVICE);
+                if (sm != null) {
+                    for (StorageVolume volume : sm.getStorageVolumes()) {
+                        File dir = volume.getDirectory();
+                        if (dir != null && samePath(dir, root)) return volume.isRemovable();
+                    }
+                }
+            } catch (Exception ignored) { }
+        }
+        return root.getAbsolutePath().replace('\\', '/')
+                .matches("^/storage/[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$");
+    }
+
+    private String storageRootType(File root) {
+        if (root == null) return "unbekannt";
+        if (isPrimarySharedStorage(root)) return "Interner gemeinsamer Speicher";
+        if (isRemovableStorageRoot(root)) return "SD-/Speicherkarte";
+        if (root.getAbsolutePath().replace('\\', '/').startsWith("/storage/emulated/")) {
+            return "Zusätzliches Android-Speicherprofil";
+        }
+        return "Zusätzlicher Speicher";
+    }
+
+    private void buildStorageInventory(ScanState state) {
+        if (state == null) return;
+        state.storageRootsInventory.clear();
+        state.inventoryTopFolders.clear();
+
+        for (File root : listAllStorageRoots()) {
+            if (root == null || !root.exists() || !root.isDirectory()) continue;
+
+            File[] direct;
+            try {
+                direct = root.listFiles();
+            } catch (SecurityException e) {
+                direct = null;
+            }
+
+            boolean removable = isRemovableStorageRoot(root);
+            boolean primary = isPrimarySharedStorage(root);
+            state.storageRootsInventory.add(new StorageRootEntry(
+                    root, storageRootType(root), primary, removable,
+                    Math.max(0L, root.getTotalSpace()), Math.max(0L, root.getUsableSpace()),
+                    direct == null ? -1 : direct.length));
+            state.storageRootsInventoryCount++;
+            if (removable) state.removableStorageRoots++;
+
+            if (direct == null) continue;
+            List<File> dirs = new ArrayList<>();
+            for (File child : direct) {
+                if (child != null && child.isDirectory() && !isExcludedPath(child.getAbsolutePath())) {
+                    dirs.add(child);
+                }
+            }
+            dirs.sort(Comparator.comparing(a -> a.getName().toLowerCase(Locale.ROOT)));
+            for (File dir : dirs) {
+                FolderStats stats = folderStats(dir, state, 0);
+                state.inventoryTopFolders.add(new InventoryFolderEntry(dir, stats));
+                state.inventoryTopFoldersCount++;
+            }
+        }
+    }
+
     private boolean isPrimarySharedStorage(File file) {
         if (file == null) return false;
-        File root = emulatedStorageRootFor(file);
         File primary = Environment.getExternalStorageDirectory();
-        return root != null && primary != null && samePath(root, primary);
+        if (primary == null) return false;
+        String p = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        String rp = primary.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        return p.equals(rp) || p.startsWith(rp + "/");
     }
 
     private void discoverAdditionalStorageRoots(ScanState state) {
         if (state == null) return;
-        for (File root : listEmulatedStorageRoots()) {
+        for (File root : listAllStorageRoots()) {
             if (root == null || !root.exists() || !root.isDirectory()) continue;
             if (isPrimarySharedStorage(root)) continue;
 
