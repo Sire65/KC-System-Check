@@ -2095,7 +2095,7 @@ public class MainActivity extends Activity {
         boolean nestedDuplicate = isNestedDuplicateProjectDir(dir);
         boolean strongProjectName = isStrongProjectName(name);
         boolean inDownload = isDirectoryInDownloadTree(dir);
-        boolean projectMarkers = inDownload && hasProjectMarkers(dir);
+        boolean projectMarkers = hasProjectMarkers(dir);
         int dlDepth = downloadDepth(dir);
 
         // Für die auf diesem Gerät nicht benötigten KC-Programmstände nur den
@@ -2112,6 +2112,8 @@ public class MainActivity extends Activity {
         } else if (devDepth >= 2 && devDepth <= 8 &&
                 (nestedDuplicate || (strongProjectName && (versionLike || projectMarkers)))) {
             projectRoot = true; // tiefe KC-/Versions-/Kopie-Stände
+        } else if (strongProjectName && (versionLike || projectMarkers)) {
+            projectRoot = true; // KC-/Reise-/Kreuzfahrt-Projekt an beliebigem erreichbaren Speicherort
         } else if (inDownload && strongProjectName &&
                 (versionLike || projectMarkers || (dlDepth >= 1 && dlDepth <= 3))) {
             projectRoot = true; // ausgepackte KC-Projekte auch ohne Versionswort
@@ -3485,6 +3487,51 @@ public class MainActivity extends Activity {
             sb.append("ZIP-Prüfung: ").append(st.zipArchivesInspected).append(" geprüft; ")
                     .append(st.zipArchivesInvalid).append(" ungültig/beschädigt; ")
                     .append(st.zipArchivesEmpty).append(" ohne Dateien\n");
+            sb.append("Speicherinventur: ").append(st.storageRootsInventoryCount)
+                    .append(" Speicherwurzeln; davon ").append(st.removableStorageRoots)
+                    .append(" SD-/Wechselspeicher; ").append(st.inventoryTopFoldersCount)
+                    .append(" direkte Hauptordner inventarisiert\n");
+
+            sb.append("\nSPEICHERINVENTUR – INTERNE SPEICHER, PROFILE UND SD-KARTE\n");
+            if (st.storageRootsInventory.isEmpty()) {
+                sb.append("Keine Speicherwurzel inventarisiert.\n");
+            } else {
+                int si = 1;
+                for (StorageRootEntry entry : st.storageRootsInventory) {
+                    sb.append(si++).append(". ").append(entry.type).append("\n");
+                    sb.append("Pfad: ").append(entry.root.getAbsolutePath()).append("\n");
+                    sb.append("Primär: ").append(entry.primary ? "JA" : "NEIN")
+                            .append(" | Wechselbar/SD: ").append(entry.removable ? "JA" : "NEIN").append("\n");
+                    sb.append("Kapazität: ").append(entry.totalBytes).append(" Bytes")
+                            .append(" | frei/nutzbar: ").append(entry.freeBytes).append(" Bytes\n");
+                    sb.append("Direkte Elemente: ")
+                            .append(entry.directItems < 0 ? "nicht lesbar" : String.valueOf(entry.directItems))
+                            .append("\n\n");
+                }
+            }
+
+            sb.append("\nSPEICHERINVENTUR – HAUPTORDNER MIT GRÖSSE\n");
+            if (st.inventoryTopFolders.isEmpty()) {
+                sb.append("Keine Hauptordner inventarisiert.\n");
+            } else {
+                List<InventoryFolderEntry> topInventory = new ArrayList<>(st.inventoryTopFolders);
+                topInventory.sort((a, b) -> Long.compare(b.stats.bytes, a.stats.bytes));
+                int fi = 1;
+                for (InventoryFolderEntry entry : topInventory) {
+                    sb.append(fi++).append(". ")
+                            .append(entry.dir.getName()).append(" | ")
+                            .append(entry.stats.bytes).append(" Bytes | ")
+                            .append(entry.stats.files).append(" Dateien | ")
+                            .append(Math.max(0, entry.stats.dirs - 1)).append(" Unterordner\n");
+                    sb.append("Pfad: ").append(entry.dir.getAbsolutePath()).append("\n");
+                    if (entry.stats.newestModified > 0) {
+                        sb.append("Neueste Änderung: ")
+                                .append(new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMANY)
+                                        .format(new Date(entry.stats.newestModified))).append("\n");
+                    }
+                    sb.append("\n");
+                }
+            }
 
             sb.append("\nHAUPTVERZEICHNIS – DIREKTE ORDNER\n");
             if (st.rootDirectories.isEmpty()) {
