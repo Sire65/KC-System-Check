@@ -1,8 +1,8 @@
 {
-  "versionCode": 27,
-  "versionName": "1.4.9",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.9-STABIL.apk",
-  "sha256": "2668693785e850aef07fb499d0512285190974d0fcd428fb3ad8a3936233ff80",
-  "notes": "Neu: kompaktere Buttonleiste ohne zusätzliche Zeile; in der dritten Zeile stehen Update, Start-Icon, Explorer und Lupe. Der große Statistik-/Erklärungsblock ist standardmäßig eingeklappt und wird über die Kurzzeile Details ▼/▲ geöffnet. Der neue Ordner-Explorer erlaubt die Auswahl eines Ordners oder Unterordners und einen gezielten rekursiven Scan mit den bestehenden Grün/Gelb/Rot-, ZIP-, SHA-256- und Auto-Lösch-Sicherheitsregeln.",
+  "versionCode": 28,
+  "versionName": "1.4.10",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.10-STABIL.apk",
+  "sha256": "f54f4af692d3c290a4fe7492e294102085430d77f43d1f9f286007379ec57e35",
+  "notes": "Neu: echte Komplett-Inventur aller erreichbaren Speicherwurzeln inklusive internem Speicher, zusätzlichen Android-Profilen und vorhandener SD-/Speicherkarte. Bericht enthält Speicherart, Kapazität/freien Speicher, Hauptordner mit Größe/Dateien/Unterordnern/letzter Änderung, alle erreichbaren Archive sowie erweiterte Erkennung von Reise-, Kreuzfahrt-, Cruise-/Cruisespace- und weiteren KC-Projektständen. Zusatz- und Wechselspeicher werden diagnostiziert, aber nicht automatisch bereinigt.",
   "published": "2026-09-28"
 }
