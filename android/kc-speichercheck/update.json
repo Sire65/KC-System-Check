@@ -1,8 +1,8 @@
 {
-  "versionCode": 26,
-  "versionName": "1.4.8",
-  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.8-STABIL.apk",
-  "sha256": "df251a27bc858726f436d3119bcde9add1071c7a66fa36086fa28de68a05c9b3",
-  "notes": "Neu: zusätzliche Android-Speicherprofile unter /storage/emulated werden direkt erkannt, soweit lesbar tief gescannt und auch von der Lupe durchsucht. Leere Ordner und andere Treffer in Zusatzprofilen werden diagnostiziert, aber nicht automatisch gelöscht; Auto-Löschen bleibt auf den primären gemeinsamen Speicher beschränkt. ZIP-/SHA-256-Sicherheitsregeln aus v1.4.7 bleiben erhalten.",
+  "versionCode": 27,
+  "versionName": "1.4.9",
+  "apkUrl": "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/downloads/KC-SpeicherCheck-v1.4.9-STABIL.apk",
+  "sha256": "2668693785e850aef07fb499d0512285190974d0fcd428fb3ad8a3936233ff80",
+  "notes": "Neu: kompaktere Buttonleiste ohne zusätzliche Zeile; in der dritten Zeile stehen Update, Start-Icon, Explorer und Lupe. Der große Statistik-/Erklärungsblock ist standardmäßig eingeklappt und wird über die Kurzzeile Details ▼/▲ geöffnet. Der neue Ordner-Explorer erlaubt die Auswahl eines Ordners oder Unterordners und einen gezielten rekursiven Scan mit den bestehenden Grün/Gelb/Rot-, ZIP-, SHA-256- und Auto-Lösch-Sicherheitsregeln.",
   "published": "2026-09-28"
 }
