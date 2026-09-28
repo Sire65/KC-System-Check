@@ -1025,34 +1025,38 @@ public class MainActivity extends Activity {
 
             // Globaler Android-Dateiindex: findet insbesondere Archive, die
             // Xiaomi/Android im Dateimanager kennt, aber der File-Baum nicht sah.
-            setScanProgress(46, "4/8 Globaler Android-Dateiindex · Archive");
+            setScanProgress(46, "4/9 Globaler Android-Dateiindex · Archive");
             scanGlobalArchiveMediaStoreFallback(state);
-            setScanProgress(55, "4/8 Zusätzliche Speicherbereiche werden gesucht");
+            setScanProgress(53, "4/9 Zusatzspeicher und SD-Karte werden gesucht");
             discoverAdditionalStorageRoots(state);
             scanAdditionalStorageRoots(state);
-            setScanProgress(58, "4/8 Globaler Archivindex und Zusatzspeicher abgeschlossen");
+            setScanProgress(58, "4/9 Alle erreichbaren Speicherbereiche gescannt");
 
-            setScanProgress(59, "5/8 KC-/Projektstände werden ausgewertet");
+            setScanProgress(59, "5/9 Vollständige Speicherinventur wird erstellt");
+            buildStorageInventory(state);
+            setScanProgress(66, "5/9 Speicherinventur abgeschlossen");
+
+            setScanProgress(67, "6/9 KC-/Reise-/Kreuzfahrt-Projekte werden ausgewertet");
             analyzeProjectDirectories(state);
-            setScanProgress(75, "5/8 KC-/Projektstände ausgewertet");
+            setScanProgress(78, "6/9 Projektstände ausgewertet");
 
-            setScanProgress(76, "6/8 WhatsApp-Dubletten werden geprüft");
+            setScanProgress(79, "7/9 WhatsApp-Dubletten werden geprüft");
             findWhatsAppPhotoDuplicates(state);
-            setScanProgress(84, "6/8 WhatsApp-Dubletten geprüft");
+            setScanProgress(86, "7/9 WhatsApp-Dubletten geprüft");
 
-            setScanProgress(85, "7/8 Dateidubletten werden geprüft");
+            setScanProgress(87, "8/9 Dateidubletten werden geprüft");
             findDuplicates(state);
-            setScanProgress(94, "7/8 Dateidubletten geprüft");
+            setScanProgress(94, "8/9 Dateidubletten geprüft");
 
             lastScanState = state;
 
-            setScanProgress(95, "8/8 Treffer werden sortiert");
+            setScanProgress(95, "9/9 Treffer werden sortiert");
             Collections.sort(candidates, Comparator.comparingLong((Candidate c) -> c.size).reversed());
-            setScanProgress(96, "8/8 Treffer werden vorbereitet");
+            setScanProgress(96, "9/9 Treffer werden vorbereitet");
             if (candidates.size() > MAX_VISIBLE) {
                 candidates.subList(MAX_VISIBLE, candidates.size()).clear();
             }
-            setScanProgress(97, "8/8 Treffer werden aufgelistet");
+            setScanProgress(97, "9/9 Treffer werden aufgelistet");
 
             runOnUiThread(() -> {
                 displayRows.clear();
@@ -1063,7 +1067,7 @@ public class MainActivity extends Activity {
                     row++;
                     if (totalRows > 0 && (row % 50 == 0 || row == totalRows)) {
                         scanProgressPercent = row == totalRows ? 99 : 98;
-                        scanProgressPhase = "8/8 Treffer werden aufgelistet · " + row + "/" + totalRows;
+                        scanProgressPhase = "9/9 Treffer werden aufgelistet · " + row + "/" + totalRows;
                         renderScanProgress();
                     }
                 }
@@ -1073,8 +1077,8 @@ public class MainActivity extends Activity {
                 if (explorerButton != null) explorerButton.setEnabled(true);
                 deleteButton.setEnabled(!candidates.isEmpty());
                 updateAutoCleanButton();
-                reportButton.setEnabled(!candidates.isEmpty());
-                shareReportButton.setEnabled(!candidates.isEmpty());
+                reportButton.setEnabled(true);
+                shareReportButton.setEnabled(true);
                 updateOverallSummary();
                 finishScanProgress(state);
             });
@@ -3587,7 +3591,7 @@ public class MainActivity extends Activity {
     }
 
     private void shareReport() {
-        if (candidates.isEmpty()) {
+        if (lastScanState == null) {
             Toast.makeText(this, "Bitte zuerst den Speicher scannen.", Toast.LENGTH_SHORT).show();
             return;
         }
