@@ -447,7 +447,9 @@ public class MainActivity extends Activity {
             try {
                 List<File> found = new ArrayList<>();
                 long[] checked = new long[] {0L, 0L};
-                searchFiles(Environment.getExternalStorageDirectory(), query, found, 0, checked);
+                for (File storageRoot : listEmulatedStorageRoots()) {
+                    searchFiles(storageRoot, query, found, 0, checked);
+                }
                 augmentFileSearchFromMediaStore(query, found, checked);
 
                 found.sort((a, b) -> {
@@ -871,7 +873,8 @@ public class MainActivity extends Activity {
             // Xiaomi/Android im Dateimanager kennt, aber der File-Baum nicht sah.
             setScanProgress(46, "4/8 Globaler Android-Dateiindex · Archive");
             scanGlobalArchiveMediaStoreFallback(state);
-            setScanProgress(55, "4/8 Zusätzliche Speicherbereiche werden tief geprüft");
+            setScanProgress(55, "4/8 Zusätzliche Speicherbereiche werden gesucht");
+            discoverAdditionalStorageRoots(state);
             scanAdditionalStorageRoots(state);
             setScanProgress(58, "4/8 Globaler Archivindex und Zusatzspeicher abgeschlossen");
 
@@ -952,6 +955,7 @@ public class MainActivity extends Activity {
         long rootDirectoriesProtected = 0;
         long rootDirectoriesOccupied = 0;
         long rootDirectoriesSafeEmpty = 0;
+        long rootDirectoriesSecondaryEmpty = 0;
         long rootDirectoriesUnreadable = 0;
         long downloadFilesSeen = 0;
         long downloadDirsSeen = 0;
@@ -969,6 +973,7 @@ public class MainActivity extends Activity {
         long mediaStoreGlobalPathMisses = 0;
         long mediaStoreGlobalQueryErrors = 0;
         long additionalStorageRootsFound = 0;
+        long additionalStorageRootsEnumerated = 0;
         long additionalStorageRootsScanned = 0;
         long additionalStorageRootsUnreadable = 0;
         long zipArchivesInspected = 0;
@@ -1310,6 +1315,60 @@ public class MainActivity extends Activity {
         }
     }
 
+    private List<File> listEmulatedStorageRoots() {
+        List<File> roots = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+
+        File primary = Environment.getExternalStorageDirectory();
+        if (primary != null && primary.exists() && primary.isDirectory()) {
+            String p = primary.getAbsolutePath();
+            if (seen.add(p)) roots.add(primary);
+        }
+
+        File emulated = primary != null ? primary.getParentFile() : new File("/storage/emulated");
+        if (emulated != null && emulated.exists() && emulated.isDirectory()) {
+            File[] children;
+            try {
+                children = emulated.listFiles();
+            } catch (SecurityException e) {
+                children = null;
+            }
+            if (children != null) {
+                for (File child : children) {
+                    if (child == null || !child.exists() || !child.isDirectory()) continue;
+                    String name = child.getName() == null ? "" : child.getName();
+                    if (!name.matches("[0-9]+")) continue;
+                    String p = child.getAbsolutePath();
+                    if (seen.add(p)) roots.add(child);
+                }
+            }
+        }
+
+        roots.sort(Comparator.comparing(a -> a.getAbsolutePath().toLowerCase(Locale.ROOT)));
+        return roots;
+    }
+
+    private boolean isPrimarySharedStorage(File file) {
+        if (file == null) return false;
+        File root = emulatedStorageRootFor(file);
+        File primary = Environment.getExternalStorageDirectory();
+        return root != null && primary != null && samePath(root, primary);
+    }
+
+    private void discoverAdditionalStorageRoots(ScanState state) {
+        if (state == null) return;
+        for (File root : listEmulatedStorageRoots()) {
+            if (root == null || !root.exists() || !root.isDirectory()) continue;
+            if (isPrimarySharedStorage(root)) continue;
+
+            state.additionalStorageRootsEnumerated++;
+            String p = root.getAbsolutePath();
+            if (state.additionalStorageRootPaths.add(p)) {
+                state.additionalStorageRootsFound++;
+            }
+        }
+    }
+
     private void rememberAdditionalStorageRoot(String absolutePath, ScanState state) {
         if (absolutePath == null || state == null) return;
         String p = absolutePath.replace('\\', '/');
@@ -1430,11 +1489,19 @@ public class MainActivity extends Activity {
             }
 
             if (direct.length == 0) {
-                state.rootDirectoriesSafeEmpty++;
-                state.rootDirectories.add(new RootDirectoryEntry(
-                        dir,
-                        "LEER – sicher löschbar; wird vor dem Löschen erneut geprüft",
-                        0));
+                if (isPrimarySharedStorage(dir)) {
+                    state.rootDirectoriesSafeEmpty++;
+                    state.rootDirectories.add(new RootDirectoryEntry(
+                            dir,
+                            "LEER – sicher löschbar; wird vor dem Löschen erneut geprüft",
+                            0));
+                } else {
+                    state.rootDirectoriesSecondaryEmpty++;
+                    state.rootDirectories.add(new RootDirectoryEntry(
+                            dir,
+                            "LEER – zusätzliches Android-Speicherprofil; nur manuell prüfen, nicht automatisch löschen",
+                            0));
+                }
             } else {
                 state.rootDirectoriesOccupied++;
                 state.rootDirectories.add(new RootDirectoryEntry(
@@ -1466,9 +1533,14 @@ public class MainActivity extends Activity {
             selectedRoots.add(dir);
             String p = dir.getAbsolutePath();
             if (!state.candidatePaths.contains(p)) {
-                addCandidate(dir, 0L, Risk.GREEN,
-                        "Leerer Ordnerbaum außerhalb geschützter System-/App-Bereiche; sicher automatisch löschbar", state);
-                state.safeEmptyDirectoryTrees++;
+                if (isPrimarySharedStorage(dir)) {
+                    addCandidate(dir, 0L, Risk.GREEN,
+                            "Leerer Ordnerbaum außerhalb geschützter System-/App-Bereiche; sicher automatisch löschbar", state);
+                    state.safeEmptyDirectoryTrees++;
+                } else {
+                    addCandidate(dir, 0L, Risk.YELLOW,
+                            "Leerer Ordnerbaum in zusätzlichem Android-Speicherprofil; erkannt, aber nicht automatisch löschen", state);
+                }
             }
         }
     }
@@ -2659,11 +2731,13 @@ public class MainActivity extends Activity {
                 " · geschützt " + st.rootDirectoriesProtected +
                 " · belegt " + st.rootDirectoriesOccupied +
                 " · leer löschbar " + st.rootDirectoriesSafeEmpty +
+                " · leer Zusatzprofil " + st.rootDirectoriesSecondaryEmpty +
                 " · nicht lesbar " + st.rootDirectoriesUnreadable +
                 "\nDoppelte Projektordner: " + st.nestedDuplicateFolders +
                 "\nZIP-Prüfung: " + st.zipArchivesInspected + " geprüft · " +
                 st.zipArchivesInvalid + " defekt · " + st.zipArchivesEmpty + " leer" +
                 "\nZusatzspeicher: " + st.additionalStorageRootsFound + " erkannt · " +
+                st.additionalStorageRootsEnumerated + " direkt aufgelistet · " +
                 st.additionalStorageRootsScanned + " tief gescannt · " +
                 st.additionalStorageRootsUnreadable + " nicht lesbar" +
                 "\nGlobaler Android-Dateiindex: " + st.mediaStoreGlobalRows +
@@ -2725,6 +2799,11 @@ public class MainActivity extends Activity {
 
     private boolean isAutoDeleteSafe(Candidate c) {
         if (c == null || c.risk == Risk.RED) return false;
+
+        // Automatik bleibt bewusst auf dem primären gemeinsamen Speicher.
+        // Zusätzliche Android-Profile (z. B. /storage/emulated/999) werden
+        // vollständig diagnostiziert, aber niemals ungefragt bereinigt.
+        if (!isPrimarySharedStorage(c.file)) return false;
 
         String reason = c.reason == null ? "" : c.reason;
 
@@ -2797,13 +2876,13 @@ public class MainActivity extends Activity {
         String msg = safe.size() + " eindeutig freigegebene Treffer mit insgesamt " +
                 Formatter.formatFileSize(this, bytes) + " werden dauerhaft gelöscht.\n\n" +
                 "Automatisch gelöscht werden nur:\n" +
-                "• leere Ordner bzw. reine Leerordner-Bäume außerhalb geschützter Android-, System-, App- und Medienbereiche; direkt vor dem Löschen wird erneut auf Leerstand geprüft\n" +
+                "• leere Ordner bzw. reine Leerordner-Bäume außerhalb geschützter Android-, System-, App- und Medienbereiche im primären Speicher; direkt vor dem Löschen wird erneut auf Leerstand geprüft\n" +
                 "• entpackte Hauptordner von KC Verwaltung, Money Butler, Kasse/MarktKasse und PC Manager im Download-Baum; verschachtelte Unterordner werden nicht doppelt gezählt\n" +
                 "• ältere Projektstände, deren sämtliche Dateien per SHA-256 am gleichen relativen Pfad bytegleich im Referenzstand vorhanden sind\n" +
                 "• KC-/Entwicklungsarchive (ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ) im Download-Baum erst ab 3 Tagen Alter\n" +
                 "• alte ZIP/RAR/7Z/TAR/GZ/TGZ/BZ2/XZ-Archive direkt im Download-Ordner – auch kleine Dateien unter 1 MB\n" +
                 "• byte-identische Dubletten direkt im Download-Ordner, wenn eine andere Kopie erhalten bleibt\n\n" +
-                "Geschützt bleiben insbesondere Android, versteckte Ordner, App-Strukturen, MIUI/Xiaomi, downloaded_rom, WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents und APK/AAB-Dateien.\n\n" +
+                "Geschützt bleiben insbesondere Android, versteckte Ordner, App-Strukturen, MIUI/Xiaomi, downloaded_rom, WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents und APK/AAB-Dateien. Zusätzliche Android-Speicherprofile werden gescannt, aber nicht automatisch bereinigt.\n\n" +
                 "Der Vorgang kann nicht rückgängig gemacht werden.";
 
         new AlertDialog.Builder(this)
@@ -2937,6 +3016,7 @@ public class MainActivity extends Activity {
                     .append("; geschützt ").append(st.rootDirectoriesProtected)
                     .append("; belegt ").append(st.rootDirectoriesOccupied)
                     .append("; leer/löschbar ").append(st.rootDirectoriesSafeEmpty)
+                    .append("; leer Zusatzprofil ").append(st.rootDirectoriesSecondaryEmpty)
                     .append("; nicht lesbar ").append(st.rootDirectoriesUnreadable).append("\n");
             sb.append("Download im Hauptscan: ").append(st.downloadFilesSeen).append(" Dateien, ")
                     .append(st.downloadDirsSeen).append(" Ordner, ")
@@ -2955,9 +3035,11 @@ public class MainActivity extends Activity {
                     .append(" Indexeinträge ohne erreichbaren Dateipfad; Fehler ")
                     .append(st.mediaStoreGlobalQueryErrors).append("\n");
             sb.append("Zusätzliche Speicherwurzeln: ").append(st.additionalStorageRootsFound)
-                    .append(" erkannt; ").append(st.additionalStorageRootsScanned)
+                    .append(" erkannt; ").append(st.additionalStorageRootsEnumerated)
+                    .append(" direkt unter /storage/emulated aufgelistet; ")
+                    .append(st.additionalStorageRootsScanned)
                     .append(" tief gescannt; ").append(st.additionalStorageRootsUnreadable)
-                    .append(" nicht lesbar\n");
+                    .append(" nicht lesbar; Auto-Löschen dort gesperrt\n");
             sb.append("ZIP-Prüfung: ").append(st.zipArchivesInspected).append(" geprüft; ")
                     .append(st.zipArchivesInvalid).append(" ungültig/beschädigt; ")
                     .append(st.zipArchivesEmpty).append(" ohne Dateien\n");
