@@ -18,6 +18,8 @@ Android-App zum Prüfen des gemeinsamen Gerätespeichers.
 - **Hauptverzeichnis-Diagnose**: bewertet jeden direkt unter „Interner Speicher“ sichtbaren Ordner als geschützt, belegt, wirklich leer/löschbar oder nicht lesbar. Die Diagnose wird im Bericht mit direkter Elementzahl und Pfad ausgegeben.
 - **Zusatzspeicher-Tiefenscan**: weitere Android-Speicherprofile wie `/storage/emulated/999` werden jetzt zusätzlich direkt unter `/storage/emulated` erkannt und – soweit lesbar – rekursiv geprüft. Die Lupe durchsucht diese Profile ebenfalls. Automatische Löschungen bleiben dort standardmäßig gesperrt.
 - **ZIP-Inhaltsprüfung**: ZIP-Dateien werden geöffnet und auf Gültigkeit, Einträge, enthaltene Dateien und unkomprimierte Größe geprüft; leere oder beschädigte ZIPs bleiben von der Automatik ausgeschlossen.
+- **Kompakte Oberfläche**: Statistik-/Erklärungsblock ist standardmäßig eingeklappt und wird über die Kurzzeile `Details ▼/▲` ein- bzw. ausgeblendet; keine zusätzliche Bedienzeile.
+- **Ordner-Explorer**: neuer kompakter Explorer-Button in der bestehenden dritten Buttonzeile. Ordner und Unterordner können gezielt ausgewählt und separat gescannt werden; der Scan-Bereich wird im Bericht protokolliert.
 - **Versionsordner-Vergleich**: Namen mit `fixed`/`final` sowie bestehende Kopie-/Backup-/Alt-Muster werden besser gruppiert und nur nach vollständigem SHA-256-Vergleich automatisch freigegeben.
 - Automatik-Schutz: Android-/App-Strukturen, versteckte Ordner, MIUI/Xiaomi, downloaded_rom, WhatsApp, DCIM/Kamera, Pictures/Bilder, Documents sowie APK/AAB-Dateien werden nicht automatisch gelöscht. Leere Ordner werden unmittelbar vor dem Löschen erneut geprüft.
 - Ausschluss von \`/Android/data\` und \`/Android/obb\`.

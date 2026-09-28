@@ -115,6 +115,10 @@ public class MainActivity extends Activity {
     private ArrayAdapter<String> adapter;
     private TextView status;
     private TextView summary;
+    private TextView legend;
+    private String summaryCollapsedText = "Details ▼ · Noch kein Scan";
+    private String summaryExpandedText = "Noch kein Scan.";
+    private boolean summaryExpanded = false;
     private ProgressBar progress;
     private ListView list;
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
@@ -136,10 +140,12 @@ public class MainActivity extends Activity {
     private Button reportButton;
     private Button shareReportButton;
     private Button updateButton;
+    private Button explorerButton;
     private ImageButton searchButton;
     private volatile boolean scanning = false;
     private volatile boolean fileSearchRunning = false;
     private volatile ScanState lastScanState;
+    private volatile String lastScanScope = "Gesamter Gerätespeicher";
 
     private static final String UPDATE_MANIFEST_URL =
             "https://raw.githubusercontent.com/Sire65/KC-System-Check/main/android/kc-speichercheck/update.json";
@@ -272,12 +278,18 @@ public class MainActivity extends Activity {
         styleCompactButton(shortcutButton);
         row3.addView(shortcutButton, compactButtonParams());
 
+        explorerButton = new Button(this);
+        explorerButton.setText("Explorer");
+        explorerButton.setOnClickListener(v -> showFolderExplorer());
+        styleCompactButton(explorerButton);
+        row3.addView(explorerButton, compactButtonParams());
+
         searchButton = new ImageButton(this);
         searchButton.setImageResource(android.R.drawable.ic_menu_search);
         searchButton.setContentDescription("Datei suchen");
-        searchButton.setPadding(dp(8), dp(8), dp(8), dp(8));
+        searchButton.setPadding(dp(6), dp(6), dp(6), dp(6));
         searchButton.setOnClickListener(v -> showFileSearchDialog());
-        row3.addView(searchButton, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        row3.addView(searchButton, new LinearLayout.LayoutParams(dp(36), dp(36)));
         root.addView(row3);
 
         status = new TextView(this);
@@ -293,14 +305,17 @@ public class MainActivity extends Activity {
         root.addView(progress, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(8)));
 
         summary = new TextView(this);
-        summary.setText("Noch kein Scan.");
-        summary.setTextSize(14);
-        summary.setPadding(0, dp(6), 0, dp(6));
+        summary.setText(summaryCollapsedText);
+        summary.setTextSize(12.5f);
+        summary.setPadding(0, dp(4), 0, dp(4));
+        summary.setClickable(true);
+        summary.setOnClickListener(v -> toggleSummaryDetails());
         root.addView(summary);
 
-        TextView legend = new TextView(this);
+        legend = new TextView(this);
         legend.setText("🟢 löschbar/temporär   🟡 prüfen   🔴 geschützt\nDoppeltipp auf Treffer = Foto/Video/Details. Dubletten bleiben manuell; Auto löscht nur streng sichere Download-Treffer.");
-        legend.setTextSize(12);
+        legend.setTextSize(11.5f);
+        legend.setVisibility(View.GONE);
         root.addView(legend);
 
         LinearLayout selectRow = new LinearLayout(this);
@@ -367,17 +382,138 @@ public class MainActivity extends Activity {
     }
 
     private void styleCompactButton(Button button) {
-        button.setTextSize(10.5f);
+        button.setTextSize(9.5f);
         button.setAllCaps(false);
         button.setMinHeight(0);
         button.setMinimumHeight(0);
-        button.setPadding(dp(3), 0, dp(3), 0);
+        button.setMinWidth(0);
+        button.setMinimumWidth(0);
+        button.setPadding(dp(2), 0, dp(2), 0);
     }
 
     private LinearLayout.LayoutParams compactButtonParams() {
-        return new LinearLayout.LayoutParams(0, dp(42), 1);
+        return new LinearLayout.LayoutParams(0, dp(36), 1);
     }
 
+    private void toggleSummaryDetails() {
+        summaryExpanded = !summaryExpanded;
+        renderSummaryDetails();
+    }
+
+    private void renderSummaryDetails() {
+        if (summary == null) return;
+        summary.setText(summaryExpanded ? "Details ▲\n" + summaryExpandedText : summaryCollapsedText);
+        if (legend != null) legend.setVisibility(summaryExpanded ? View.VISIBLE : View.GONE);
+    }
+
+    private void showFolderExplorer() {
+        if (!hasStorageAccess()) {
+            requestStorageAccess();
+            return;
+        }
+        if (scanning || fileSearchRunning) {
+            Toast.makeText(this, "Bitte laufenden Scan oder Suche zuerst beenden.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<File> roots = listEmulatedStorageRoots();
+        if (roots.isEmpty()) {
+            Toast.makeText(this, "Kein lesbarer Speicherbereich gefunden.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        File start = Environment.getExternalStorageDirectory();
+        if (start == null || !start.exists() || !start.isDirectory()) start = roots.get(0);
+        showFolderExplorerAt(start);
+    }
+
+    private void showFolderExplorerAt(File start) {
+        final File[] current = new File[] { start };
+        final List<File> folders = new ArrayList<>();
+        final List<String> names = new ArrayList<>();
+
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(10), dp(2), dp(10), 0);
+
+        TextView pathView = new TextView(this);
+        pathView.setTextSize(11.5f);
+        pathView.setPadding(0, 0, 0, dp(4));
+        body.addView(pathView);
+
+        ListView folderList = new ListView(this);
+        ArrayAdapter<String> folderAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_list_item_1, names);
+        folderList.setAdapter(folderAdapter);
+        body.addView(folderList, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(330)));
+
+        Runnable refresh = () -> {
+            folders.clear();
+            names.clear();
+
+            File here = current[0];
+            pathView.setText("Ordner: " + here.getAbsolutePath());
+
+            File[] children;
+            try {
+                children = here.listFiles();
+            } catch (SecurityException e) {
+                children = null;
+            }
+            if (children != null) {
+                List<File> dirs = new ArrayList<>();
+                for (File child : children) {
+                    if (child != null && child.exists() && child.isDirectory() &&
+                            !isExcludedPath(child.getAbsolutePath())) {
+                        dirs.add(child);
+                    }
+                }
+                dirs.sort(Comparator.comparing(a -> a.getName().toLowerCase(Locale.ROOT)));
+                for (File dir : dirs) {
+                    folders.add(dir);
+                    names.add("📁 " + dir.getName());
+                }
+            }
+            if (names.isEmpty()) names.add("(keine Unterordner)");
+            folderAdapter.notifyDataSetChanged();
+        };
+
+        folderList.setOnItemClickListener((parent, view, position, id) -> {
+            if (position >= 0 && position < folders.size()) {
+                current[0] = folders.get(position);
+                refresh.run();
+            }
+        });
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Explorer · Ordner wählen")
+                .setView(body)
+                .setNegativeButton("Schließen", null)
+                .setNeutralButton("Hoch", null)
+                .setPositiveButton("Diesen Ordner scannen", null)
+                .create();
+
+        dialog.setOnShowListener(d -> {
+            refresh.run();
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
+                File parent = current[0].getParentFile();
+                File root = emulatedStorageRootFor(current[0]);
+                if (parent == null || root == null || samePath(current[0], root)) {
+                    Toast.makeText(this, "Oberste Ebene dieses Speicherbereichs erreicht.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                current[0] = parent;
+                refresh.run();
+            });
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                File chosen = current[0];
+                dialog.dismiss();
+                startFolderScan(chosen);
+            });
+        });
+        dialog.show();
+    }
 
     private void showFileSearchDialog() {
         if (!hasStorageAccess()) {
@@ -441,6 +577,8 @@ public class MainActivity extends Activity {
 
         fileSearchRunning = true;
         if (searchButton != null) searchButton.setEnabled(false);
+        if (explorerButton != null) explorerButton.setEnabled(false);
+        if (scanButton != null) scanButton.setEnabled(false);
         status.setText("Dateisuche: " + query + " …");
 
         new Thread(() -> {
@@ -464,6 +602,8 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     fileSearchRunning = false;
                     if (searchButton != null) searchButton.setEnabled(true);
+                    if (scanButton != null) scanButton.setEnabled(hasStorageAccess() && !scanning);
+                    if (explorerButton != null) explorerButton.setEnabled(hasStorageAccess() && !scanning);
                     status.setText("Dateisuche: " + total + " Treffer · neueste zuerst");
                     showFileSearchResults(query, visible, total, checked[0], checked[1]);
                 });
@@ -471,6 +611,8 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     fileSearchRunning = false;
                     if (searchButton != null) searchButton.setEnabled(true);
+                    if (scanButton != null) scanButton.setEnabled(hasStorageAccess() && !scanning);
+                    if (explorerButton != null) explorerButton.setEnabled(hasStorageAccess() && !scanning);
                     status.setText("Dateisuche fehlgeschlagen.");
                     Toast.makeText(this, "Dateisuche fehlgeschlagen: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
@@ -789,6 +931,7 @@ public class MainActivity extends Activity {
         boolean ok = hasStorageAccess();
         permissionButton.setText(ok ? "Zugriff ✓" : "Zugriff");
         scanButton.setEnabled(ok && !scanning);
+        if (explorerButton != null) explorerButton.setEnabled(ok && !scanning && !fileSearchRunning);
         if (!ok) status.setText("Für den vollständigen gemeinsamen Gerätespeicher ist eine einmalige Freigabe nötig.");
     }
 
@@ -833,14 +976,23 @@ public class MainActivity extends Activity {
             return;
         }
         if (scanning) return;
+        if (fileSearchRunning) {
+            Toast.makeText(this, "Während der Dateisuche bitte kurz warten.", Toast.LENGTH_SHORT).show();
+            return;
+        }
         scanning = true;
         candidates.clear();
         displayRows.clear();
         list.clearChoices();
         adapter.notifyDataSetChanged();
         beginScanProgress();
-        summary.setText("Dateien werden geprüft.");
+        summaryExpanded = false;
+        summaryCollapsedText = "Details ▼ · Scan läuft …";
+        summaryExpandedText = "Dateien werden geprüft.";
+        renderSummaryDetails();
+        lastScanScope = "Gesamter Gerätespeicher";
         scanButton.setEnabled(false);
+        if (explorerButton != null) explorerButton.setEnabled(false);
         deleteButton.setEnabled(false);
         autoCleanButton.setEnabled(false);
         reportButton.setEnabled(false);
@@ -916,6 +1068,83 @@ public class MainActivity extends Activity {
                 adapter.notifyDataSetChanged();
                 scanning = false;
                 scanButton.setEnabled(true);
+                if (explorerButton != null) explorerButton.setEnabled(true);
+                deleteButton.setEnabled(!candidates.isEmpty());
+                updateAutoCleanButton();
+                reportButton.setEnabled(!candidates.isEmpty());
+                shareReportButton.setEnabled(!candidates.isEmpty());
+                updateOverallSummary();
+                finishScanProgress(state);
+            });
+        }).start();
+    }
+
+    private void startFolderScan(File selectedRoot) {
+        if (selectedRoot == null || !selectedRoot.exists() || !selectedRoot.isDirectory()) {
+            Toast.makeText(this, "Der gewählte Ordner ist nicht mehr verfügbar.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (!hasStorageAccess()) {
+            requestStorageAccess();
+            return;
+        }
+        if (scanning) return;
+
+        scanning = true;
+        candidates.clear();
+        displayRows.clear();
+        list.clearChoices();
+        adapter.notifyDataSetChanged();
+        beginScanProgress();
+
+        lastScanScope = selectedRoot.getAbsolutePath();
+        summaryExpanded = false;
+        summaryCollapsedText = "Details ▼ · Ordnerscan läuft …";
+        summaryExpandedText = "Gewählter Ordner wird einschließlich Unterordner geprüft:\n" +
+                selectedRoot.getAbsolutePath();
+        renderSummaryDetails();
+
+        scanButton.setEnabled(false);
+        if (explorerButton != null) explorerButton.setEnabled(false);
+        deleteButton.setEnabled(false);
+        autoCleanButton.setEnabled(false);
+        reportButton.setEnabled(false);
+        shareReportButton.setEnabled(false);
+
+        new Thread(() -> {
+            ScanState state = new ScanState();
+
+            setScanProgress(5, "1/5 Ordner und Unterordner werden geprüft");
+            scanTree(selectedRoot, state);
+            setScanProgress(45, "2/5 Leere Ordner werden sicher geprüft");
+            findSafeEmptyDirectoryTrees(selectedRoot, state);
+
+            setScanProgress(55, "3/5 Projektstände werden ausgewertet");
+            analyzeProjectDirectories(state);
+            setScanProgress(75, "3/5 Projektstände ausgewertet");
+
+            setScanProgress(76, "4/5 Dubletten werden geprüft");
+            findWhatsAppPhotoDuplicates(state);
+            findDuplicates(state);
+            setScanProgress(94, "4/5 Dubletten geprüft");
+
+            lastScanState = state;
+            setScanProgress(96, "5/5 Treffer werden sortiert");
+            Collections.sort(candidates, Comparator.comparingLong((Candidate candidate) -> candidate.size).reversed());
+            if (candidates.size() > MAX_VISIBLE) {
+                candidates.subList(MAX_VISIBLE, candidates.size()).clear();
+            }
+            setScanProgress(98, "5/5 Treffer werden aufgelistet");
+
+            runOnUiThread(() -> {
+                displayRows.clear();
+                for (Candidate candidate : candidates) {
+                    displayRows.add(candidate.display(this));
+                }
+                adapter.notifyDataSetChanged();
+                scanning = false;
+                scanButton.setEnabled(true);
+                if (explorerButton != null) explorerButton.setEnabled(true);
                 deleteButton.setEnabled(!candidates.isEmpty());
                 updateAutoCleanButton();
                 reportButton.setEnabled(!candidates.isEmpty());
@@ -2743,10 +2972,17 @@ public class MainActivity extends Activity {
                 "\nGlobaler Android-Dateiindex: " + st.mediaStoreGlobalRows +
                 " Einträge · " + st.mediaStoreGlobalArchivesSeen + " Archive · " +
                 st.mediaStoreGlobalArchivesAdded + " zusätzlich gefunden";
-        summary.setText("Gefunden (max. " + MAX_VISIBLE + " größte Treffer):\n" +
+        long totalCandidateBytes = green + yellow + red;
+        int totalCandidates = gc + yc + rc;
+        summaryCollapsedText = "Details ▼ · " + totalCandidates + " Treffer · " +
+                Formatter.formatFileSize(this, totalCandidateBytes) +
+                " · 🟢" + gc + " 🟡" + yc + " 🔴" + rc;
+        summaryExpandedText = "Scan-Bereich: " + lastScanScope + "\n" +
+                "Gefunden (max. " + MAX_VISIBLE + " größte Treffer):\n" +
                 "🟢 " + gc + " · " + Formatter.formatFileSize(this, green) + "   " +
                 "🟡 " + yc + " · " + Formatter.formatFileSize(this, yellow) + "   " +
-                "🔴 " + rc + " · " + Formatter.formatFileSize(this, red) + archiveInfo);
+                "🔴 " + rc + " · " + Formatter.formatFileSize(this, red) + archiveInfo;
+        renderSummaryDetails();
     }
 
     private boolean isInDownloadTree(File file) {
@@ -2984,6 +3220,7 @@ public class MainActivity extends Activity {
         StringBuilder sb = new StringBuilder();
         sb.append("KC SpeicherCheck v").append(BuildConfig.VERSION_NAME).append("\n");
         sb.append("Erstellt: ").append(new Date()).append("\n");
+        sb.append("Scan-Bereich: ").append(lastScanScope).append("\n");
         sb.append("Gerät: ").append(Build.MANUFACTURER).append(" ").append(Build.MODEL).append("\n");
         sb.append("Android: ").append(Build.VERSION.RELEASE).append("\n");
         ScanState st = lastScanState;
