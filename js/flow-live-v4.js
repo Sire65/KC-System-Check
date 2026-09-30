@@ -19,6 +19,7 @@ const STATIC_ROUTES=[
   {from:"money-butler",to:"supabase",fromLabel:"Money Butler",toLabel:"Supabase · KC Core",kind:"Bargeld-Sync"},
   {from:"kc-verwaltung",to:"supabase",fromLabel:"KC Verwaltung",toLabel:"Supabase · KC Core",kind:"Verwaltungs-Sync"},
   {from:"dp-app",to:"supabase",fromLabel:"KC Dienstplan",toLabel:"Supabase · KC Core",kind:"Dienstplan-Sync"},
+  {from:"club-app",to:"supabase",fromLabel:"KC Club-App",toLabel:"Supabase · KC Core",kind:"Mitglieder-Daten"},
   {from:"pc-backup",to:"b2",fromLabel:"PC Backup Vault",toLabel:"Backblaze B2",kind:"Backup"},
   {from:"pc-backup",to:"neon-vault",fromLabel:"PC Backup Vault",toLabel:"Neon · Backup",kind:"Backup"},
   {from:"supabase",to:"neon-mirror",fromLabel:"Supabase · KC Core",toLabel:"Neon · Spiegel",kind:"Spiegelung"}
@@ -46,6 +47,7 @@ export function normalizeFlowNode(raw){
   if(/manager/.test(id))return"pc-manager";
   if(/money|butler|bargeld/.test(id))return"money-butler";
   if(/kc[-_]?dp|dienstplan/.test(id))return"dp-app";
+  if(/kc[-_ ]?club(?:app)?|club[-_ ]?app/.test(id))return"club-app";
   if(/neon[-_]?mirror|mirror|spiegel/.test(id))return"neon-mirror";
   if(/b2|backblaze/.test(id))return"b2";
   if(/neon/.test(id))return"neon-vault";
