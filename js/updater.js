@@ -63,7 +63,13 @@ export async function checkForAppUpdate({silent=true}={}){
 async function uebernehmen(){
   const install=$("#installUpdateBtn");
   try{
-    if(LOCAL_REPO_HOST){alert("Lokale KC-System-Check-Installation erkannt. Bitte GitHub Desktop öffnen, KC-System-Check auswählen, „Pull origin“ ausführen und anschließend neu laden.");return}
+    if(LOCAL_REPO_HOST){
+      const r=await fetch("/__kc_update",{method:"POST",cache:"no-store"});
+      if(!r.ok)throw new Error(`Lokales Update HTTP ${r.status}`);
+      if(install)install.textContent="Update läuft …";
+      setTimeout(()=>{location.href="/?updated="+Date.now()},8000);
+      return
+    }
     if(pflichtTimer){clearTimeout(pflichtTimer);pflichtTimer=null}
     if(waitingWorker){waitingWorker.postMessage({type:"SKIP_WAITING"});setTimeout(()=>location.reload(),3000);return}
     const reg=await navigator.serviceWorker?.getRegistration();if(reg)await reg.update();location.reload();
