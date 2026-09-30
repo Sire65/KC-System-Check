@@ -5,7 +5,7 @@
 // Browser-Tab sendete weiter Heartbeats, obwohl GitHub Pages schon neuer war.
 import"./diagnostics-runtime.js";
 import{isNewerVersion}from"./version-compare.js";
-const CURRENT_VERSION="0.9.5",VERSION_URL="./version.json",REMOTE_VERSION_URL="https://raw.githubusercontent.com/Sire65/KC-System-Check/main/version.json",LOCAL_REPO_HOST=/^(?:127\.0\.0\.1|localhost)$/i.test(location.hostname)||location.protocol==="file:";
+const CURRENT_VERSION="0.9.6",VERSION_URL="./version.json",REMOTE_VERSION_URL="https://raw.githubusercontent.com/Sire65/KC-System-Check/main/version.json",LOCAL_REPO_HOST=/^(?:127\.0\.0\.1|localhost)$/i.test(location.hostname)||location.protocol==="file:";
 const $=s=>document.querySelector(s);
 const SPAETER='kc-update-spaeter';
 const SPAETER_STUNDEN=12;
@@ -63,7 +63,13 @@ export async function checkForAppUpdate({silent=true}={}){
 async function uebernehmen(){
   const install=$("#installUpdateBtn");
   try{
-    if(LOCAL_REPO_HOST){alert("Lokale KC-System-Check-Installation erkannt. Bitte GitHub Desktop öffnen, KC-System-Check auswählen, „Pull origin“ ausführen und anschließend neu laden.");return}
+    if(LOCAL_REPO_HOST){
+      const r=await fetch("/__kc_update",{method:"POST",cache:"no-store"});
+      if(!r.ok)throw new Error(`Lokales Update HTTP ${r.status}`);
+      if(install)install.textContent="Update läuft …";
+      setTimeout(()=>{location.href="/?updated="+Date.now()},8000);
+      return
+    }
     if(pflichtTimer){clearTimeout(pflichtTimer);pflichtTimer=null}
     if(waitingWorker){waitingWorker.postMessage({type:"SKIP_WAITING"});setTimeout(()=>location.reload(),3000);return}
     const reg=await navigator.serviceWorker?.getRegistration();if(reg)await reg.update();location.reload();
