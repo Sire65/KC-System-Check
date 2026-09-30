@@ -28,7 +28,7 @@ const ROUTE_BY_KEY=new Map(STATIC_ROUTES.map(r=>[`${r.from}>${r.to}`,r]));
 const activity=new Map();
 const counters=new Map();
 const seen=new Map();
-let snapshot=null,observer=null,queued=false,ws=null,wsTimer=null,wsHeartbeat=null,wsRuntimeKey="",realtimeState="aus";
+let snapshot=null,observer=null,queued=false,ws=null,wsTimer=null,wsHeartbeat=null,wsRuntimeKey="",realtimeState="aus",visualTimer=null;
 
 export function counterDelta(previous,current){
   const a=Number(previous),b=Number(current);
@@ -170,11 +170,11 @@ function renderMap(){
   const host=document.querySelector("#kcdfKarte");if(!host)return;
   ensureCss();host.dataset.kcFlowTruth="4";
   const list=entries(),o=overall(list);
-  const paths=list.map((x,i)=>{const a=MAP_NODES[x.from],b=MAP_NODES[x.to],d=mapPath(a,b),v=x.view,stroke=v.bad?"var(--bad)":v.moving?"var(--ok)":"#30394a",width=v.moving?3.4:2.2,id=`kcTruthPathV4${i}`;const moving=v.moving?`<circle r="5" fill="var(--ok)" opacity=".98"><animateMotion path="${d}" dur="1.5s" repeatCount="indefinite" begin="0s"/></circle>`:"";const recent=v.recent?`<circle cx="${(a.x+b.x)/2}" cy="${(a.y+b.y)/2}" r="4" fill="var(--ok)" opacity=".9"/>`:"";return`<path id="${id}" d="${d}" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round"/>${recent}${moving}`}).join("");
+  const paths=list.map((x,i)=>{const a=MAP_NODES[x.from],b=MAP_NODES[x.to],d=mapPath(a,b),v=x.view,stroke=v.bad?"var(--bad)":v.moving?"var(--ok)":"#30394a",width=v.moving?3.4:2.2,id=`kcTruthPathV4${i}`;const anim=animationProfile(x.state,v);const moving=v.moving?Array.from({length:anim.count},(_,j)=>`<circle r="5" fill="var(--ok)" opacity=".98"><animateMotion path="${d}" dur="${anim.duration}s" repeatCount="indefinite" begin="-${(j*anim.duration/anim.count).toFixed(2)}s"/></circle>`).join(""):"";const recent=v.recent?`<circle cx="${(a.x+b.x)/2}" cy="${(a.y+b.y)/2}" r="4" fill="var(--ok)" opacity=".9"/>`:"";return`<path id="${id}" d="${d}" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round"/>${recent}${moving}`}).join("");
   const nodes=Object.values(MAP_NODES).map(n=>`<g transform="translate(${n.x-72} ${n.y-20})"><rect width="144" height="40" rx="9" fill="#0e1728" stroke="#52617a"/><text x="72" y="25" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="700">${esc(n.label)}</text></g>`).join("");
   host.innerHTML=`<div class="kc-truth-map"><div class="row between" style="margin-bottom:5px"><div class="muted small">Keine Dekoration: Bewegung entsteht nur durch echten gemessenen Verkehr.</div><span class="badge${o==="live"?" live":""}">${o==="bad"?"STÖRUNG":o==="live"?"VERKEHR":o==="recent"?"KÜRZLICH":"RUHE"}</span></div><svg viewBox="0 0 780 470" role="img" aria-label="KC Datenfluss: grau ohne aktuellen Verkehr, statischer grüner Punkt bei kürzlichem Verkehr, grün bewegt bei aktuellem Verkehr">${paths}${nodes}</svg><div class="kc-truth-legend"><span><i class="kc-truth-swatch"></i>kein aktueller Verkehr</span><span><i class="kc-truth-swatch"></i><i class="kc-truth-mini"></i>echter Verkehr ≤ 15 min</span><span><i class="kc-truth-swatch live"></i>bewegter Punkt = echter Verkehr ≤ 60 s</span></div></div>`;
 }
-function renderAll(){renderList();renderMap()}
+function renderAll(){renderList();renderMap()}\nfunction startVisualClock(){if(typeof document==="undefined"||visualTimer)return;visualTimer=setInterval(renderAll,5_000)}
 function upgradeWhenReady(){if(typeof document==="undefined")return;const a=document.querySelector("#kcLiveFlowOverview"),b=document.querySelector("#kcdfKarte");if((a&&a.dataset.kcFlowTruth!=="4")||(b&&b.dataset.kcFlowTruth!=="4"))renderAll()}
 function queueUpgrade(){if(queued)return;queued=true;queueMicrotask(()=>{queued=false;upgradeWhenReady()})}
 function realtimeStop(){clearInterval(wsHeartbeat);clearTimeout(wsTimer);wsHeartbeat=wsTimer=null;try{ws?.close()}catch{}ws=null}
@@ -193,7 +193,7 @@ if(typeof document!=="undefined"){
   ensureCss();
   observer=new MutationObserver(queueUpgrade);
   const start=()=>{const live=document.querySelector("#live");if(live)observer.observe(live,{childList:true,subtree:true});queueUpgrade()};
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>{start();startVisualClock()},{once:true});else{start();startVisualClock()}
 }
 subscribe(onState);
 
