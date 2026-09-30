@@ -1,8 +1,8 @@
 {
-  "version": "0.9.8",
-  "note": "0.9.8: Einheitlicher Update-Button für Handy/PWA und PC; lokaler Windows-Updater wird nur verwendet, wenn er tatsächlich verfügbar ist.",
+  "version": "0.9.9",
+  "note": "0.9.9: Handy/PWA-Update gehärtet: kein unkontrollierter Service-Worker-Wechsel mehr; neue App-Dateien werden kontrolliert übernommen.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true,
-  "notes": "0.9.8: Einheitlicher Update-Button für Handy/PWA und PC; lokaler Windows-Updater wird nur verwendet, wenn er tatsächlich verfügbar ist."
+  "notes": "0.9.9: Handy/PWA-Update gehärtet: kein unkontrollierter Service-Worker-Wechsel mehr; neue App-Dateien werden kontrolliert übernommen."
 }
