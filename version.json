@@ -1,6 +1,6 @@
 {
-  "version": "0.9.3",
-  "note": "0.9.3: KC Club-App im Heartbeat-Monitoring und im echten Datenfluss Club-App → Supabase ergänzt; Heartbeat bleibt vom Nutzdatenverkehr getrennt.",
+  "version": "0.9.4",
+  "note": "0.9.4: KC Club-App als eigener Knoten in der grafischen Datenflussübersicht mit Verbindung zu Supabase ergänzt.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true
