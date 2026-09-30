@@ -5,7 +5,7 @@
 // Browser-Tab sendete weiter Heartbeats, obwohl GitHub Pages schon neuer war.
 import"./diagnostics-runtime.js";
 import{isNewerVersion}from"./version-compare.js";
-const CURRENT_VERSION="0.9.8",VERSION_URL="./version.json",REMOTE_VERSION_URL="https://raw.githubusercontent.com/Sire65/KC-System-Check/main/version.json",LOCAL_HTTP_HOST=/^(?:127\.0\.0\.1|localhost)$/i.test(location.hostname),FILE_MODE=location.protocol==="file:";
+const CURRENT_VERSION="0.9.9",VERSION_URL="./version.json",REMOTE_VERSION_URL="https://raw.githubusercontent.com/Sire65/KC-System-Check/main/version.json",LOCAL_HTTP_HOST=/^(?:127\.0\.0\.1|localhost)$/i.test(location.hostname),FILE_MODE=location.protocol==="file:";
 const $=s=>document.querySelector(s);
 const SPAETER='kc-update-spaeter';
 const SPAETER_STUNDEN=12;
@@ -82,6 +82,6 @@ async function uebernehmen(){
 export function setupUpdater(){
   $("#laterUpdateBtn")?.addEventListener("click",()=>{if(angekuendigt)spaeterMerken(angekuendigt);$("#updateBanner")?.classList.add("hidden")});
   $("#installUpdateBtn")?.addEventListener("click",()=>{const install=$("#installUpdateBtn"),spaeter=$("#laterUpdateBtn");install.disabled=true;install.textContent="Wird vorbereitet …";if(spaeter)spaeter.disabled=true;spaeterVergessen();if(pflichtTimer){clearTimeout(pflichtTimer);pflichtTimer=null}balkenLaufenLassen(installSekunden,uebernehmen)});
-  if("serviceWorker"in navigator){let hadController=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadController)location.reload();hadController=true});navigator.serviceWorker.ready.then(reg=>{if(reg.waiting)waitingWorker=reg.waiting;reg.addEventListener("updatefound",()=>{const worker=reg.installing;worker?.addEventListener("statechange",()=>{if(worker.state==="installed"&&navigator.serviceWorker.controller){waitingWorker=worker;showUpdate("neu","App-Dateien sind bereit")}})})}).catch(()=>{})}
+  if("serviceWorker"in navigator){let hadController=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadController)location.reload();hadController=true});navigator.serviceWorker.ready.then(reg=>{if(reg.waiting){waitingWorker=reg.waiting;showUpdate("neu","App-Dateien sind bereit")}reg.addEventListener("updatefound",()=>{const worker=reg.installing;worker?.addEventListener("statechange",()=>{if(worker.state==="installed"&&navigator.serviceWorker.controller){waitingWorker=worker;showUpdate("neu","App-Dateien sind bereit")}})})}).catch(()=>{})}
   checkForAppUpdate({silent:true});setInterval(()=>checkForAppUpdate({silent:true}),CHECK_INTERVAL_MS);
 }
