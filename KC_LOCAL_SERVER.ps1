@@ -66,6 +66,22 @@ try {
             $rawPath = if ($parts.Length -gt 1) { $parts[1] } else { '/' }
             $pathOnly = $rawPath.Split('?')[0]
 
+            if ($method -eq 'POST' -and $pathOnly -eq '/__kc_update') {
+                $updater = Join-Path $Root 'KC_SELF_UPDATE.ps1'
+                if (-not (Test-Path $updater -PathType Leaf)) {
+                    $body = [Text.Encoding]::UTF8.GetBytes('{"ok":false,"message":"Lokaler Updater fehlt"}')
+                    $headers = "HTTP/1.1 500 Internal Server Error`r`nContent-Type: application/json; charset=utf-8`r`nContent-Length: $($body.Length)`r`nCache-Control: no-store`r`nConnection: close`r`n`r`n"
+                    $headerBytes = [Text.Encoding]::ASCII.GetBytes($headers); $stream.Write($headerBytes,0,$headerBytes.Length); $stream.Write($body,0,$body.Length); $stream.Flush()
+                    continue
+                }
+                Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',('"' + $updater + '"'),'-Root',('"' + $Root + '"'),'-Port',"$Port")
+                $body = [Text.Encoding]::UTF8.GetBytes('{"ok":true,"message":"Update gestartet"}')
+                $headers = "HTTP/1.1 202 Accepted`r`nContent-Type: application/json; charset=utf-8`r`nContent-Length: $($body.Length)`r`nCache-Control: no-store`r`nConnection: close`r`n`r`n"
+                $headerBytes = [Text.Encoding]::ASCII.GetBytes($headers); $stream.Write($headerBytes,0,$headerBytes.Length); $stream.Write($body,0,$body.Length); $stream.Flush()
+                $shutdown = $true
+                continue
+            }
+
             if ($method -eq 'POST' -and $pathOnly -eq '/__kc_shutdown') {
                 $body = [Text.Encoding]::UTF8.GetBytes('{"ok":true,"message":"KC System Check wird beendet"}')
                 $headers = "HTTP/1.1 200 OK`r`nContent-Type: application/json; charset=utf-8`r`nContent-Length: $($body.Length)`r`nCache-Control: no-store`r`nConnection: close`r`n`r`n"
