@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const ALLOWED_PROGRAMS = new Set(['kc-dp2','kc-communication','kicc','kc-pc-manager','kc-bilderkasse','kc-system-check','kc-wm-presentation','kc-verwaltung','kc-money-butler']);
+const ALLOWED_PROGRAMS = new Set(['kc-dp2','kc-communication','kicc','kc-pc-manager','kc-bilderkasse','kc-system-check','kc-wm-presentation','kc-verwaltung','kc-money-butler','kc-clubapp']);
 const MAX_SKEW_MS = 120_000;
 const MIN_INTERVAL_MS = 5_000;
 
