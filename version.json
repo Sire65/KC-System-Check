@@ -1,8 +1,8 @@
 {
-  "version": "0.9.7",
-  "note": "0.9.7: Einmaliger Übergangs-Updater für ältere lokale Installationen ergänzt; danach laufen lokale Updates direkt aus KC System Check.",
+  "version": "0.9.8",
+  "note": "0.9.8: Einheitlicher Update-Button für Handy/PWA und PC; lokaler Windows-Updater wird nur verwendet, wenn er tatsächlich verfügbar ist.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true,
-  "notes": "0.9.7: Einmaliger Übergangs-Updater für ältere lokale Installationen ergänzt; danach laufen lokale Updates direkt aus KC System Check."
+  "notes": "0.9.8: Einheitlicher Update-Button für Handy/PWA und PC; lokaler Windows-Updater wird nur verwendet, wenn er tatsächlich verfügbar ist."
 }
