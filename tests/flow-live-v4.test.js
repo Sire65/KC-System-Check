@@ -10,7 +10,7 @@ test('kumulativer Verkehr wird nur als positive Differenz gewertet',()=>{
   assert.equal(counterDelta(752,4),0);
 });
 
-test('nur frisch bestaetigter echter Verkehr bis 8 Sekunden bewegt die Linie',()=>{
+test('nur frisch bestaetigter echter Verkehr bis 15 Sekunden bewegt die Linie',()=>{
   const now=1_000_000;
   assert.deepEqual(trafficView(null,now),{moving:false,recent:false,bad:false,cls:'idle',tag:'KEIN VERKEHR'});
   const live=trafficView({at:now-5_000,events:2,bad:false},now);
