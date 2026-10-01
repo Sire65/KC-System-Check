@@ -174,7 +174,8 @@ function renderMap(){
   const nodes=Object.values(MAP_NODES).map(n=>`<g transform="translate(${n.x-72} ${n.y-20})"><rect width="144" height="40" rx="9" fill="#0e1728" stroke="#52617a"/><text x="72" y="25" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="700">${esc(n.label)}</text></g>`).join("");
   host.innerHTML=`<div class="kc-truth-map"><div class="row between" style="margin-bottom:5px"><div class="muted small">Keine Dekoration: Bewegung entsteht nur durch echten gemessenen Verkehr.</div><span class="badge${o==="live"?" live":""}">${o==="bad"?"STÖRUNG":o==="live"?"VERKEHR":o==="recent"?"KÜRZLICH":"RUHE"}</span></div><svg viewBox="0 0 780 470" role="img" aria-label="KC Datenfluss: grau ohne aktuellen Verkehr, statischer grüner Punkt bei kürzlichem Verkehr, grün bewegt bei aktuellem Verkehr">${paths}${nodes}</svg><div class="kc-truth-legend"><span><i class="kc-truth-swatch"></i>kein aktueller Verkehr</span><span><i class="kc-truth-swatch"></i><i class="kc-truth-mini"></i>echter Verkehr ≤ 15 min</span><span><i class="kc-truth-swatch live"></i>bewegter Punkt = echter Verkehr ≤ 60 s</span></div></div>`;
 }
-function renderAll(){renderList();renderMap()}\nfunction startVisualClock(){if(typeof document==="undefined"||visualTimer)return;visualTimer=setInterval(renderAll,5_000)}
+function renderAll(){renderList();renderMap()}
+function startVisualClock(){if(typeof document==="undefined"||visualTimer)return;visualTimer=setInterval(renderAll,5_000)}
 function upgradeWhenReady(){if(typeof document==="undefined")return;const a=document.querySelector("#kcLiveFlowOverview"),b=document.querySelector("#kcdfKarte");if((a&&a.dataset.kcFlowTruth!=="4")||(b&&b.dataset.kcFlowTruth!=="4"))renderAll()}
 function queueUpgrade(){if(queued)return;queued=true;queueMicrotask(()=>{queued=false;upgradeWhenReady()})}
 function realtimeStop(){clearInterval(wsHeartbeat);clearTimeout(wsTimer);wsHeartbeat=wsTimer=null;try{ws?.close()}catch{}ws=null}
