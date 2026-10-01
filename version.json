@@ -1,8 +1,8 @@
 {
-  "version": "0.10.1",
-  "note": "0.10.1: PWA-Start repariert. KC Check löscht beim normalen Start nicht mehr Service Worker und Cache; Updates werden wieder kontrolliert übernommen.",
+  "version": "0.10.2",
+  "note": "0.10.2: Kritischen JavaScript-Syntaxfehler im LIVE-Datenfluss behoben, der KC Check beim Start vollständig eingefroren hat.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true,
-  "notes": "0.10.1: PWA-Start repariert. KC Check löscht beim normalen Start nicht mehr Service Worker und Cache; Updates werden wieder kontrolliert übernommen."
+  "notes": "0.10.2: Kritischen JavaScript-Syntaxfehler im LIVE-Datenfluss behoben, der KC Check beim Start vollständig eingefroren hat."
 }
