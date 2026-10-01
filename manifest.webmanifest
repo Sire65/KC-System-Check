@@ -1,7 +1,7 @@
 {
   "name": "KC System Check",
   "short_name": "KC Check",
-  "start_url": "./?kc_recover=1",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0b1220",
   "theme_color": "#0b1220",
