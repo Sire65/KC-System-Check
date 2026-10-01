@@ -2,11 +2,11 @@ import {subscribe} from "./state.js";
 import {esc} from "./safe-html.js";
 
 // Datenfluss-Wahrheitsschicht v4.
-// LIVE     = echter gemessener Verkehr in den letzten 60 Sekunden.
+// LIVE     = frisch bestaetigter echter Verkehr; Bewegung endet nach 8 Sekunden ohne neuen Messwert.
 // KUERZLICH= echter gemessener Verkehr in den letzten 15 Minuten, aber nicht mehr live.
 // RUHE     = Route ist bekannt, aktuell wurde kein Verkehr gemessen.
 // Heartbeats allein sind KEIN Verkehr. Nur positive Zaehlerdifferenzen zaehlen.
-const LIVE_MS=60_000;
+const LIVE_MS=8_000;
 const RECENT_TRAFFIC_MS=15*60_000;
 const ERROR_MS=10*60_000;
 const RETAIN_MS=24*60*60_000;
@@ -180,7 +180,7 @@ function renderMap(){
   const list=entries(),o=overall(list);
   const paths=list.map((x,i)=>{const a=MAP_NODES[x.from],b=MAP_NODES[x.to],d=mapPath(a,b),v=x.view,stroke=v.bad?"var(--bad)":v.moving?"var(--ok)":"#30394a",width=v.moving?3.4:2.2,id=`kcTruthPathV4${i}`;const anim=animationProfile(x.state,v);const moving=v.moving?Array.from({length:anim.count},(_,j)=>`<circle r="5" fill="var(--ok)" opacity=".98"><animateMotion path="${d}" dur="${anim.duration}s" repeatCount="indefinite" begin="-${(j*anim.duration/anim.count).toFixed(2)}s"/></circle>`).join(""):"";const recent=v.recent?`<circle cx="${(a.x+b.x)/2}" cy="${(a.y+b.y)/2}" r="4" fill="var(--ok)" opacity=".9"/>`:"";return`<path id="${id}" d="${d}" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round"/>${recent}${moving}`}).join("");
   const nodes=Object.values(MAP_NODES).map(n=>`<g transform="translate(${n.x-72} ${n.y-20})"><rect width="144" height="40" rx="9" fill="#0e1728" stroke="#52617a"/><text x="72" y="25" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="700">${esc(n.label)}</text></g>`).join("");
-  host.innerHTML=`<div class="kc-truth-map"><div class="row between" style="margin-bottom:5px"><div class="muted small">Keine Dekoration: Bewegung entsteht nur durch echten gemessenen Verkehr.</div><span class="badge${o==="live"?" live":""}">${o==="bad"?"STÖRUNG":o==="live"?"VERKEHR":o==="recent"?"KÜRZLICH":"RUHE"}</span></div><svg viewBox="0 0 780 470" role="img" aria-label="KC Datenfluss: grau ohne aktuellen Verkehr, statischer grüner Punkt bei kürzlichem Verkehr, grün bewegt bei aktuellem Verkehr">${paths}${nodes}</svg><div class="kc-truth-legend"><span><i class="kc-truth-swatch"></i>kein aktueller Verkehr</span><span><i class="kc-truth-swatch"></i><i class="kc-truth-mini"></i>echter Verkehr ≤ 15 min</span><span><i class="kc-truth-swatch live"></i>bewegter Punkt = echter Verkehr ≤ 60 s</span></div></div>`;
+  host.innerHTML=`<div class="kc-truth-map"><div class="row between" style="margin-bottom:5px"><div class="muted small">Keine Dekoration: Bewegung entsteht nur durch echten gemessenen Verkehr.</div><span class="badge${o==="live"?" live":""}">${o==="bad"?"STÖRUNG":o==="live"?"VERKEHR":o==="recent"?"KÜRZLICH":"RUHE"}</span></div><svg viewBox="0 0 780 470" role="img" aria-label="KC Datenfluss: grau ohne aktuellen Verkehr, statischer grüner Punkt bei kürzlichem Verkehr, grün bewegt bei aktuellem Verkehr">${paths}${nodes}</svg><div class="kc-truth-legend"><span><i class="kc-truth-swatch"></i>kein aktueller Verkehr</span><span><i class="kc-truth-swatch"></i><i class="kc-truth-mini"></i>echter Verkehr ≤ 15 min</span><span><i class="kc-truth-swatch live"></i>bewegte Punkte = echter Verkehr ≤ 8 s</span></div></div>`;
 }
 function renderAll(){renderList();renderMap()}
 function startVisualClock(){if(typeof document==="undefined"||visualTimer)return;visualTimer=setInterval(renderAll,5_000)}
