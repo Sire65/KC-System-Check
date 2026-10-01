@@ -38,7 +38,8 @@ test('feste Routen entsprechen der realen Architektur',()=>{
   assert.equal(normalizeFlowNode('kc-bilderkasse'),null);
   assert.equal(normalizeFlowNode('kasse-01'),'kasse-01');
   assert.equal(normalizeFlowNode('kasse-02'),'kasse-02');
-  assert.equal(__flowTruthForTests.STATIC_ROUTES.length,9);
+  assert.equal(__flowTruthForTests.STATIC_ROUTES.length,10);
+  assert.ok(__flowTruthForTests.STATIC_ROUTES.some(r=>r.from==='club-app'&&r.to==='supabase'));
   assert.ok(__flowTruthForTests.STATIC_ROUTES.some(r=>r.from==='kc-verwaltung'&&r.to==='supabase'));
   assert.ok(__flowTruthForTests.STATIC_ROUTES.some(r=>r.from==='kasse-01'&&r.to==='pc-manager'));
   assert.ok(__flowTruthForTests.STATIC_ROUTES.some(r=>r.from==='kasse-02'&&r.to==='pc-manager'));
