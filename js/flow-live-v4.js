@@ -165,6 +165,14 @@ const MAP_NODES={
   supabase:{x:390,y:221,label:"Supabase · KC Core"},"neon-mirror":{x:675,y:85,label:"Neon · Spiegel"},"neon-vault":{x:675,y:287,label:"Neon · Backup"},b2:{x:675,y:417,label:"Backblaze B2"}
 };
 function mapPath(a,b){const x1=a.x+72,x2=b.x-72,m=(x1+x2)/2;return`M${x1},${a.y} C${m},${a.y} ${m},${b.y} ${x2},${b.y}`}
+export function animationProfile(state,view){
+  if(!view?.moving)return{count:0,duration:2.4};
+  const events=Math.max(1,Number(state?.events||1)),bytes=Math.max(0,Number(state?.bytes||0));
+  const load=Math.max(events,Math.ceil(bytes/4096));
+  const count=Math.max(1,Math.min(8,1+Math.floor(Math.log2(load))));
+  const duration=Math.max(.55,Math.min(2.4,2.4-(count-1)*.27));
+  return{count,duration};
+}
 function renderMap(){
   if(typeof document==="undefined")return;
   const host=document.querySelector("#kcdfKarte");if(!host)return;
