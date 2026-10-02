@@ -1,8 +1,8 @@
 {
-  "version": "0.10.2",
-  "note": "0.10.2: Kritischen JavaScript-Syntaxfehler im LIVE-Datenfluss behoben, der KC Check beim Start vollständig eingefroren hat.",
+  "version": "0.10.3",
+  "note": "0.10.3: Neue Anzeige „Köcheclub-App · Notbetrieb“ – zeigt, ob die Club-App normal läuft, im Notbetrieb (Ersatz-Server) ist und wie alt das Notfall-Paket ist.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true,
-  "notes": "0.10.2: Kritischen JavaScript-Syntaxfehler im LIVE-Datenfluss behoben, der KC Check beim Start vollständig eingefroren hat."
+  "notes": "0.10.3: Neue Anzeige „Köcheclub-App · Notbetrieb“ – zeigt, ob die Club-App normal läuft, im Notbetrieb (Ersatz-Server) ist und wie alt das Notfall-Paket ist."
 }

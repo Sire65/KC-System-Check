@@ -477,3 +477,26 @@ dass es abgestuerzt ist - es meldet gar nichts. Fuer einen echten
 Verfuegbarkeitsnachweis braucht es eine Pruefung von aussen. Diese Kachel
 beantwortet die kleinere, aber nuetzliche Frage: laeuft die Version, die ich
 erwarte, und meldet sie Fehler?
+
+## Köcheclub-App · Notbetrieb (ab 0.10.3)
+
+Fällt Supabase aus, schaltet die Club-App auf ihren Ersatz-Server bei Cloudflare um (nur ansehen). KC Check zeigt das in
+der Karte **Systeme** als Zeile „Köcheclub-App · Notbetrieb“ und – solange der Notbetrieb läuft – als oranges Band oben in
+der Betriebsübersicht (`js/club-notbetrieb.js`, Adressen in `config/runtime.public.json` → `clubNotbetrieb`).
+
+Die Prüfung läuft **direkt im Browser** und nicht über die Prüf-API, denn die liegt selbst bei Supabase und wäre beim
+Ausfall ebenfalls weg. Abgefragt wird nur Öffentliches, ohne Zugangsdaten, alle 2 Minuten:
+
+| Quelle | Bedeutung |
+|---|---|
+| `notbetrieb.json` der Club-App | Handschalter `auto`/`an`/`aus` und Adresse des Ersatz-Servers |
+| `<Ersatz-Server>/status` | Ist ein Notfall-Paket da, von wann ist der Stand? (keine Daten) |
+| Club-Server ohne Zugang | Antwortet er überhaupt (auch „Kein Zugang“ zählt als erreichbar)? Erst nach 2 Fehlversuchen gilt er als weg. |
+
+| Anzeige | Wann |
+|---|---|
+| GRÜN „BEREIT“ | Club-Server erreichbar, Notfall-Paket nicht älter als 45 Min. |
+| GELB „VERALTET“ / „PRÜFEN“ / „ABGESCHALTET“ | Paket zu alt, Ersatz-Server ohne Paket, Handschalter `aus` |
+| ROT „NOTBETRIEB AKTIV“ | Club-Server weg und Ersatz-Server bereit, oder Handschalter `an` |
+| ROT „AUSFALL“ | Club-Server weg und Ersatz-Server nicht bereit |
+| GRAU „NICHT GEPRÜFT“ | Keine Messung (z. B. Gerät offline) – nie grün |

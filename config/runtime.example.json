@@ -5,5 +5,10 @@
   "heartbeatEndpoint": "",
   "heartbeatToken": "",
   "heartbeatApiKey": "",
-  "heartbeatUseApiToken": false
+  "heartbeatUseApiToken": false,
+  "clubNotbetrieb": {
+    "konfigUrl": "https://sire65.github.io/KC-Clubapp/notbetrieb.json",
+    "serverUrl": "https://ptblnpiroqftcvlsrhac.supabase.co/functions/v1/kc-club",
+    "ersatzUrl": "https://kc-club-notbetrieb.ha-joko.workers.dev"
+  }
 }

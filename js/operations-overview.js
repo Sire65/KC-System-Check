@@ -1,6 +1,7 @@
 import{subscribe,latestResults}from"./state.js";
 import"./device-readiness.js";
 import"./schema-drift.js";
+import"./club-notbetrieb.js";
 
 const GROUPS=[
   {id:"systems",title:"Systeme",ids:["kc_core","future_academy","github","programs"]},

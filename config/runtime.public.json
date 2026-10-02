@@ -4,5 +4,10 @@
   "apiStyle": "supabase-edge",
   "heartbeatEndpoint": "https://ptblnpiroqftcvlsrhac.supabase.co/functions/v1/kicc-program-heartbeat",
   "heartbeatUseApiToken": true,
-  "mode": "live"
+  "mode": "live",
+  "clubNotbetrieb": {
+    "konfigUrl": "https://sire65.github.io/KC-Clubapp/notbetrieb.json",
+    "serverUrl": "https://ptblnpiroqftcvlsrhac.supabase.co/functions/v1/kc-club",
+    "ersatzUrl": "https://kc-club-notbetrieb.ha-joko.workers.dev"
+  }
 }
