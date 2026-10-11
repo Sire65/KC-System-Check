@@ -1,8 +1,8 @@
 {
-  "version": "0.10.4",
-  "note": "0.10.4: Neue Prüfung „Komplett-Sicherung · Neon Frankfurt“ – zeigt die nächtliche Datei-Sicherung der Club-App-Datenbank (Stand, Größe, Rücklese-Test); älter als 26 Std. gelb, älter als 48 Std. rot.",
+  "version": "0.10.5",
+  "note": "0.10.5: KC Check an der direkten Leitung – Datenverkehr und Programmzustände kommen jetzt sofort über Supabase Realtime statt erst mit der 30-Sekunden-Abfrage (die bleibt als Rückfall). Sparbremse gemeinsam mit der Club-App.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true,
-  "notes": "0.10.4: Neue Prüfung „Komplett-Sicherung · Neon Frankfurt“ – zeigt die nächtliche Datei-Sicherung der Club-App-Datenbank (Stand, Größe, Rücklese-Test); älter als 26 Std. gelb, älter als 48 Std. rot."
+  "notes": "0.10.5: KC Check an der direkten Leitung – Datenverkehr und Programmzustände kommen jetzt sofort über Supabase Realtime statt erst mit der 30-Sekunden-Abfrage (die bleibt als Rückfall). Sparbremse gemeinsam mit der Club-App."
 }
