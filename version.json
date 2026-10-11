@@ -1,8 +1,8 @@
 {
-  "version": "0.10.3",
-  "note": "0.10.3: Neue Anzeige „Köcheclub-App · Notbetrieb“ – zeigt, ob die Club-App normal läuft, im Notbetrieb (Ersatz-Server) ist und wie alt das Notfall-Paket ist.",
+  "version": "0.10.4",
+  "note": "0.10.4: Neue Prüfung „Komplett-Sicherung · Neon Frankfurt“ – zeigt die nächtliche Datei-Sicherung der Club-App-Datenbank (Stand, Größe, Rücklese-Test); älter als 26 Std. gelb, älter als 48 Std. rot.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true,
-  "notes": "0.10.3: Neue Anzeige „Köcheclub-App · Notbetrieb“ – zeigt, ob die Club-App normal läuft, im Notbetrieb (Ersatz-Server) ist und wie alt das Notfall-Paket ist."
+  "notes": "0.10.4: Neue Prüfung „Komplett-Sicherung · Neon Frankfurt“ – zeigt die nächtliche Datei-Sicherung der Club-App-Datenbank (Stand, Größe, Rücklese-Test); älter als 26 Std. gelb, älter als 48 Std. rot."
 }

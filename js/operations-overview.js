@@ -7,7 +7,7 @@ const GROUPS=[
   {id:"systems",title:"Systeme",ids:["kc_core","future_academy","github","programs"]},
   {id:"failover",title:"Datenbank & Failover",ids:["mirror","neon","db_capacity","schema_drift"]},
   {id:"devices",title:"Kassen & Geräte",ids:["programs","device_health","kicc_devices","cash_registers"]},
-  {id:"backup",title:"Backup & Sicherheit",ids:["b2","r2","oci","db_security","endpoint_exposure","key_lifetime"]}
+  {id:"backup",title:"Backup & Sicherheit",ids:["b2","backup_neon_ffm","r2","oci","db_security","endpoint_exposure","key_lifetime"]}
 ];
 
 function norm(status){
