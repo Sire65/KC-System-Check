@@ -384,13 +384,19 @@ function frankfurtBackupResult(row:any){
   if(!row)return{id,name,kind,status:"unknown",health:null,latency:null,usage:null,capacityLabel:"Kein Status",detail:"Noch kein Sicherungslauf gemeldet",metrics:{}};
   const m=row.metrics||{},age=stunden(row.zeit),map:any={ok:"healthy",warnung:"warning",fehler:"critical",laeuft:"warning"};
   let status=map[String(row.status||"").toLowerCase()]||"unknown";
+  // 0.10.6 KC-CHECK-FRA-LAEUFT-PLANMAESSIG (Wunsch Hansi „keine unnützen Fehler“): Ein Lauf im Zeitfenster der Club-App (01:00–03:58 UTC, Zeitplaner
+  // */2 1-3), der sich in den letzten 15 Min. gemeldet hat, ist planmäßig → grün. Gelb/Rot nur bei echtem Problem: meldet sich nicht mehr,
+  // Fenster vorbei ohne Abschluss, Fehler/Warnung vom Lauf selbst (die Club-App setzt „fehler“, wenn er bis 03:50 UTC nicht fertig ist).
+  const laeuft=String(row.status||"").toLowerCase()==="laeuft",fenster=fraFenster(),planmaessig=laeuft&&fenster&&age!==null&&age<=0.25;
+  if(laeuft)status=planmaessig?"healthy":"warning";
   if(age===null)status="unknown";else if(age>48)status="critical";else if(age>26&&status==="healthy")status="warning";
   const restore=Number(m.teile)>0?`${Number(m.geprueft)||0}/${Number(m.teile)} zurückgelesen`:"Rücklese-Test offen";
   return{id,name,kind,status,health:status==="critical"?35:status==="warning"?72:status==="healthy"?100:null,latency:null,usage:null,
     capacityLabel:age===null?"Keine Sicherung":`vor ${tageText(age)} · ${(Number(m.bytes||0)/1048576).toFixed(1)} MB`,
-    detail:[row.text,restore,age!==null&&age>26?`letzter Lauf vor ${tageText(age)} · nächtlich erwartet`:null].filter(Boolean).join(" · "),
-    metrics:{last_backup_at:row.zeit,lauf:row.lauf,age_hours:age===null?null:Math.round(age*10)/10,tables:m.tabellen??null,parts:m.teile??null,rows:m.zeilen??null,bytes:m.bytes??null,restore_checked:m.geprueft??null,restore_failed:m.fehler??null,raw_status:row.status}};
+    detail:[laeuft?(planmaessig?"Nächtlicher Lauf planmäßig":!fenster?"Zeitfenster vorbei, Lauf nicht abgeschlossen":"Lauf meldet sich seit über 15 Min. nicht"):null,row.text,restore,age!==null&&age>26?`letzter Lauf vor ${tageText(age)} · nächtlich erwartet`:null].filter(Boolean).join(" · "),
+    metrics:{last_backup_at:row.zeit,lauf:row.lauf,age_hours:age===null?null:Math.round(age*10)/10,tables:m.tabellen??null,parts:m.teile??null,rows:m.zeilen??null,bytes:m.bytes??null,restore_checked:m.geprueft??null,restore_failed:m.fehler??null,raw_status:row.status,scheduled_run:planmaessig}};
 }
+function fraFenster(now=new Date()){const h=now.getUTCHours(),m=now.getUTCMinutes();return h>=1&&(h<3||h===3&&m<58)}
 function stunden(iso:any){if(!iso)return null;const t=Date.parse(String(iso));return Number.isFinite(t)?Math.max(0,(Date.now()-t)/3600000):null}
 function tageText(h:number){return h<48?`${Math.round(h)} h`:`${Math.round(h/24)} Tagen`}
 // PC Backup Vault ist eine manuell gestartete Anwendung. Das Alter eines

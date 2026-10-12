@@ -1,8 +1,8 @@
 {
-  "version": "0.10.5",
-  "note": "0.10.5: KC Check an der direkten Leitung – Datenverkehr und Programmzustände kommen jetzt sofort über Supabase Realtime statt erst mit der 30-Sekunden-Abfrage (die bleibt als Rückfall). Sparbremse gemeinsam mit der Club-App.",
+  "version": "0.10.6",
+  "note": "0.10.6: Die nächtliche Komplett-Sicherung nach Neon Frankfurt meldet während ihres planmäßigen Laufs (ca. 3–6 Uhr) kein GELB mehr. Gelb/Rot nur noch, wenn sie hängen bleibt, Fehler meldet oder nicht fertig wird.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true,
-  "notes": "0.10.5: KC Check an der direkten Leitung – Datenverkehr und Programmzustände kommen jetzt sofort über Supabase Realtime statt erst mit der 30-Sekunden-Abfrage (die bleibt als Rückfall). Sparbremse gemeinsam mit der Club-App."
+  "notes": "0.10.6: Die nächtliche Komplett-Sicherung nach Neon Frankfurt meldet während ihres planmäßigen Laufs (ca. 3–6 Uhr) kein GELB mehr. Gelb/Rot nur noch, wenn sie hängen bleibt, Fehler meldet oder nicht fertig wird."
 }
