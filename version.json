@@ -1,8 +1,8 @@
 {
-  "version": "0.10.6",
-  "note": "0.10.6: Die nächtliche Komplett-Sicherung nach Neon Frankfurt meldet während ihres planmäßigen Laufs (ca. 3–6 Uhr) kein GELB mehr. Gelb/Rot nur noch, wenn sie hängen bleibt, Fehler meldet oder nicht fertig wird.",
+  "version": "0.10.7",
+  "note": "0.10.7: Weniger Datenbank-Anfragen – der Zustellnachweis wird jede Minute statt alle 10 Sekunden geholt, Alarm-Einstellungen und Nachweis nicht mehr, solange das Fenster im Hintergrund liegt; eine fehlgeschlagene Geräte-Registrierung wird höchstens alle 5 Minuten wiederholt.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true,
-  "notes": "0.10.6: Die nächtliche Komplett-Sicherung nach Neon Frankfurt meldet während ihres planmäßigen Laufs (ca. 3–6 Uhr) kein GELB mehr. Gelb/Rot nur noch, wenn sie hängen bleibt, Fehler meldet oder nicht fertig wird."
+  "notes": "0.10.7: Weniger Datenbank-Anfragen – der Zustellnachweis wird jede Minute statt alle 10 Sekunden geholt, Alarm-Einstellungen und Nachweis nicht mehr, solange das Fenster im Hintergrund liegt; eine fehlgeschlagene Geräte-Registrierung wird höchstens alle 5 Minuten wiederholt."
 }
