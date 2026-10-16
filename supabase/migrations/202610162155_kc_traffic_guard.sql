@@ -58,7 +58,7 @@ BEGIN
  SELECT (x.xact_commit+x.xact_rollback)::bigint INTO t_total FROM pg_catalog.pg_stat_database x
    WHERE x.datname=pg_catalog.current_database();
  SELECT * INTO previous FROM public.kc_traffic_guard_samples ORDER BY measured_at DESC,id DESC LIMIT 1;
- SELECT pg_catalog.percentile_cont(0.5) WITHIN GROUP (ORDER BY calls_15m)
+ SELECT pg_catalog.avg(recent.calls_15m)
    INTO baseline FROM (SELECT calls_15m FROM public.kc_traffic_guard_samples
      WHERE calls_15m IS NOT NULL AND measured_at > pg_catalog.now()-INTERVAL '24 hours'
      ORDER BY measured_at DESC LIMIT 96) recent;
