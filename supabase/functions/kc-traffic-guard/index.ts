@@ -61,7 +61,7 @@ Deno.serve(async (req:Request) => {
           subject:"KC Supabase-Waechter",
           message:msg,body:msg,text:msg,short:msg,kurz:msg,
           status:sample.level, timestamp:new Date().toISOString(),
-          url:"https://sire65.github.io/KC-System-Check/"
+          url:"https://sire65.github.io/KC-Clubapp/"
         }
       })
     });
