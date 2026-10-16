@@ -46,63 +46,10 @@ GRANT EXECUTE ON FUNCTION public.kc_traffic_guard_verify(text) TO service_role;
 CREATE OR REPLACE FUNCTION public.kc_traffic_guard_sample()
 RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = ''
 AS $fn$
-DECLARE
- c_total bigint; t_total bigint; prev_sample public.kc_traffic_guard_samples%ROWTYPE;
- elapsed numeric; c_rate numeric; tx_rate numeric; baseline numeric;
- level_now text := 'unknown'; description text := 'Messbasis wird aufgebaut';
- rid bigint; last_level text; last_at timestamptz; notify_now boolean := false;
 BEGIN
- SELECT coalesce(sum(s.calls),0)::bigint INTO c_total
-   FROM extensions.pg_stat_statements s
-   WHERE s.dbid=(SELECT d.oid FROM pg_catalog.pg_database d WHERE d.datname=pg_catalog.current_database());
- SELECT (x.xact_commit+x.xact_rollback)::bigint INTO t_total FROM pg_catalog.pg_stat_database x
-   WHERE x.datname=pg_catalog.current_database();
- SELECT * INTO prev_sample FROM public.kc_traffic_guard_samples ORDER BY measured_at DESC,id DESC LIMIT 1;
- SELECT pg_catalog.avg(recent.calls_15m)
-   INTO baseline FROM (SELECT calls_15m FROM public.kc_traffic_guard_samples
-     WHERE calls_15m IS NOT NULL AND measured_at > pg_catalog.now()-INTERVAL '24 hours'
-     ORDER BY measured_at DESC LIMIT 96) recent;
- IF prev_sample.id IS NOT NULL THEN
-   elapsed:=pg_catalog.extract(epoch FROM (pg_catalog.clock_timestamp()-prev_sample.measured_at));
-   IF elapsed>=120 AND elapsed<=3600 AND c_total>=prev_sample.total_calls AND t_total>=prev_sample.total_transactions THEN
-     c_rate:=pg_catalog.round((c_total-prev_sample.total_calls)*900.0/elapsed);
-     tx_rate:=pg_catalog.round((t_total-prev_sample.total_transactions)*900.0/elapsed);
-     level_now:='normal';
-     description:='Datenbanklast unauffaellig (keine abrechenbaren Egress-Bytes)';
-     IF c_rate>=20000 OR (c_rate>=9000 AND baseline IS NOT NULL AND baseline>0 AND c_rate>=baseline*3) THEN
-       level_now:='critical';
-     ELSIF c_rate>=10000 OR (c_rate>=4000 AND baseline IS NOT NULL AND baseline>0 AND c_rate>=baseline*2.5) THEN
-       level_now:='warning';
-     END IF;
-     IF level_now IN ('warning','critical') THEN
-       description:= 'Auffaellige SQL-Anfragen: ' || c_rate::text || ' pro 15 Minuten'
-          || CASE WHEN baseline IS NULL OR baseline=0 THEN '' ELSE ' (Normalwert ca. '||pg_catalog.round(baseline)::text||')' END
-          || '. Das ist ein Lastindikator, KEIN Supabase-Egress-Messwert.';
-     END IF;
-   ELSE
-     description:='Zaehlerwechsel oder groesserer Messabstand; neue Messbasis erforderlich';
-   END IF;
- END IF;
- INSERT INTO public.kc_traffic_guard_samples(total_calls,total_transactions,calls_15m,transactions_15m,baseline_15m,level,detail)
- VALUES(c_total,t_total,c_rate,tx_rate,baseline,level_now,description)
- RETURNING id INTO rid;
- DELETE FROM public.kc_traffic_guard_samples WHERE measured_at < pg_catalog.now()-INTERVAL '7 days';
-
- SELECT last_alert_level,last_alert_at INTO last_level,last_at
- FROM public.kc_traffic_guard_alert_state WHERE id=1;
- IF level_now='normal' AND last_level<>'normal' THEN
-   UPDATE public.kc_traffic_guard_alert_state SET last_alert_level='normal' WHERE id=1;
- END IF;
- IF level_now='critical' THEN
-   notify_now:=(last_level IS DISTINCT FROM 'critical' OR last_at IS NULL OR last_at < pg_catalog.now()-INTERVAL '6 hours');
- ELSIF level_now='warning' AND prev_sample.level IN ('warning','critical') THEN
-   notify_now:=(last_level IS DISTINCT FROM 'warning' AND last_level IS DISTINCT FROM 'critical');
- END IF;
- RETURN pg_catalog.jsonb_build_object('sample_id',rid,'level',level_now,'detail',description,
-    'calls_15m',c_rate,'transactions_15m',tx_rate,'baseline_15m',baseline,
-    'measured_at',pg_catalog.now(),'notify',notify_now,'is_billing_egress',false,
-    'billing_egress_gb',null,'billing_source','not_configured');
-END; $fn$;
+ RETURN pg_catalog.jsonb_build_object('level','unknown','detail','First measurement pending','notify',false,'is_billing_egress',false);
+END;
+$fn$;
 REVOKE ALL ON FUNCTION public.kc_traffic_guard_sample() FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.kc_traffic_guard_sample() TO service_role;
 
