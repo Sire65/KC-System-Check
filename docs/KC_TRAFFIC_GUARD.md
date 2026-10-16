@@ -33,3 +33,15 @@ Offizielle Pruefung: https://supabase.com/dashboard/org/_/usage#egress
 
 ## Rollback
 - Cron \`kc-traffic-guard-15m\` gezielt deaktivieren, dann neue UI-Skripte aus den Indices entfernen, ggf. Edge Function \`kc-traffic-guard\` deaktivieren. Die vorhandenen KC-Check- und Club-Funktionen NICHT zuruecksetzen.
+
+## Ausbau v2 (16.10.2026)
+- Neu: `kc_traffic_guard_row_samples`, `kc_traffic_guard_row_alert`, `kc_traffic_guard_row_sample()`, `kc_traffic_guard_row_status()`, `kc_traffic_guard_row_ack()`.
+- Die Spalte `pg_stat_statements.rows` ist ein Indikator fuer die Anzahl verarbeiteter bzw. zurueckgemeldeter SQL-Ergebniszeilen. Sie ist keine Byte-Messung, kein PostgREST-Egress und keine Abrechnungszahl.
+- Gelb: >=65.000 Zeilen / 15 Min. oder mindestens 15.000 und mindestens 3x vorherige 24h-Basis.
+- Rot: >=150.000 Zeilen / 15 Min. oder mindestens 35.000 und mindestens 5x vorherige 24h-Basis.
+- Gelb erst nach 2 auffaelligen Messungen. Rot sofort, Wiederholung hoechstens alle 6 Stunden; bei erfolgreichem Versand quittiert. Zusammenfassung beider Alarm-Signale in maximal einer KC-Communicator-Nachricht je Prueflauf.
+- Neue SQL-Zeilenmessung muss erst zwei Messpunkte im gueltigen Abstand haben, bis sie vom Zustand unknown auf normal oder Warnung wechselt.
+- UI in KC Check und Club Admin zeigt SQL-Aufrufe/15 Min und Ergebniszeilen/15 Min getrennt.
+- Externer GitHub-Workflow `.github/workflows/traffic-guard-external.yml` prueft stuendlich, ob der Guard erreichbar ist und ob beide Messpunkte juenger als 55 Min. sind. GitHub-Fehlschlaege allein sind keine garantierte Handy-Push-Zustellung, wenn Supabase selbst ausfaellt.
+- Dokumentierte Supabase Management API `/v1/projects/{ref}/analytics/endpoints/usage.api-counts` meldet Anfragezahlen, nicht die fuer die 5-GB-Grenze erforderlichen gesamten Abrechnungs-Bytes.
+- Fuer vollautomatische 5-GB-Prognosen muss zuerst eine zugaengliche und verifizierte organisationsweite Billing-Egress-Quelle fuer BEIDE Projekte angebunden werden. Bis dahin `billing_meter: not_configured` und keine Prozentanzeige.
