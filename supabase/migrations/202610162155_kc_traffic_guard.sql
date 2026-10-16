@@ -102,7 +102,7 @@ BEGIN
     'calls_15m',c_rate,'transactions_15m',tx_rate,'baseline_15m',baseline,
     'measured_at',pg_catalog.now(),'notify',notify_now,'is_billing_egress',false,
     'billing_egress_gb',null,'billing_source','not_configured');
-END $fn$;
+END; $fn$;
 REVOKE ALL ON FUNCTION public.kc_traffic_guard_sample() FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.kc_traffic_guard_sample() TO service_role;
 
@@ -114,7 +114,7 @@ AS $fn$ BEGIN
  UPDATE public.kc_traffic_guard_alert_state
  SET last_alert_level=p_level,last_alert_at=pg_catalog.now(),last_sample_id=p_sample_id WHERE id=1;
  RETURN true;
-END $fn$;
+END; $fn$;
 REVOKE ALL ON FUNCTION public.kc_traffic_guard_ack(bigint,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.kc_traffic_guard_ack(bigint,text) TO service_role;
 
