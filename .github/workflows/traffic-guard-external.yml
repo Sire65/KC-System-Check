@@ -1,0 +1,44 @@
+name: KC Traffic Guard – external healthcheck
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Unabhaengiger Healthcheck des Traffic Guards
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import datetime, json, sys, urllib.request
+          url="https://ptblnpiroqftcvlsrhac.supabase.co/functions/v1/kc-traffic-guard"
+          req=urllib.request.Request(url,headers={"Accept":"application/json","User-Agent":"KC-Guard-External/1.0"})
+          try:
+              with urllib.request.urlopen(req,timeout=12) as res:
+                  if res.status != 200: raise RuntimeError("HTTP {}".format(res.status))
+                  obj=json.load(res)
+          except Exception as exc:
+              sys.exit("::error::KC Traffic Guard nicht erreichbar: "+str(exc))
+          if obj.get("ok") is not True:
+              sys.exit("::error::KC Traffic Guard meldet ungueltigen Status")
+          now=datetime.datetime.now(datetime.timezone.utc)
+          for label,key in (("SQL-Abfragen","measured_at"),("Ergebniszeilen","rows_measured_at")):
+              stamp=obj.get(key)
+              if not stamp:
+                  sys.exit("::error::KC Traffic Guard: {} hat keinen Messzeitpunkt".format(label))
+              try:
+                  dt=datetime.datetime.fromisoformat(stamp.replace("Z","+00:00"))
+                  age=(now-dt).total_seconds()/60
+              except Exception:
+                  sys.exit("::error::KC Traffic Guard: ungültiger Zeitstempel fuer "+label)
+              if age < -5 or age > 55:
+                  sys.exit("::error::KC Traffic Guard: {} zuletzt vor {:.0f} min aktualisiert".format(label,age))
+              print("{}: Messwert {:.1f} min alt".format(label,age))
+          print("KC Traffic Guard erreichbar. SQL-Last:",obj.get("load_level"),
+            "| Ergebniszeilen:",obj.get("row_level"),
+            "| Egress-Abrechnungs-GB: nicht automatisch verfuegbar")
+          PY
