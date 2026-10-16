@@ -22,12 +22,25 @@ Deno.serve(async (req:Request) => {
   if (req.method==="OPTIONS") return new Response(null,{status:204,headers:CORS});
   if (req.method==="GET") {
     try {
-      const status=await rpc("kc_traffic_guard_status");
-      // Nur ein anonym nutzbares, technisch begrenztes Statussignal; keine Nutzerdaten/Schluessel.
-      return json({ok:true,level:status?.level||"unknown",measured_at:status?.measured_at||null,
+      const [status, rows]=await Promise.all([
+        rpc("kc_traffic_guard_status"),
+        rpc("kc_traffic_guard_row_status").catch(()=>null)
+      ]);
+      const severity=(x:string)=>x==="critical"?2:x==="warning"?1:x==="normal"?0:-1;
+      const loadLevel=String(status?.level||"unknown"), rowLevel=String(rows?.level||"unknown");
+      const overall=severity(rowLevel)>severity(loadLevel)?rowLevel:loadLevel;
+      const bothNormal=loadLevel==="normal"&&rowLevel==="normal";
+      const level=severity(overall)>0?overall:bothNormal?"normal":"unknown";
+      const detail=severity(rowLevel)>severity(loadLevel)?
+        String(rows?.detail||"Auffaellige Ergebnismenge"):
+        String(status?.detail||"Keine aktuelle Messung");
+      // Alle Werte sind SQL-Lastindikatoren; offizielle GB bleiben absichtlich leer.
+      return json({ok:true,level,load_level:loadLevel,row_level:rowLevel,
+        measured_at:status?.measured_at||null,rows_measured_at:rows?.measured_at||null,
         calls_15m:status?.calls_15m??null,baseline_15m:status?.baseline_15m??null,
-        detail:status?.detail||"Keine aktuelle Messung",billing_egress_gb:null,
-        billing_meter:"not_configured",is_billing_egress:false});
+        rows_15m:rows?.rows_15m??null,rows_baseline_15m:rows?.baseline_15m??null,
+        detail,rows_detail:rows?.detail||"Noch keine Zeilenmessung",
+        billing_egress_gb:null,billing_meter:"not_configured",is_billing_egress:false});
     } catch { return json({ok:false,level:"unknown",detail:"Messstatus zurzeit nicht erreichbar",
       is_billing_egress:false,billing_egress_gb:null},503); }
   }
@@ -39,12 +52,20 @@ Deno.serve(async (req:Request) => {
   if (!verified) return json({error:"not_authorized"},403);
   try {
     const sample=await rpc("kc_traffic_guard_sample");
-    if (!sample?.notify || !["warning","critical"].includes(sample?.level))
-      return json({ok:true,sample:sample?.sample_id,level:sample?.level||"unknown",notified:false});
-    const critical=sample.level==="critical";
+    // Die zweite Messung ist unabhaengig: Ausfall dieses neuen Moduls darf
+    // die vorhandenen SQL-Aufrufalarme nicht blockieren.
+    const rowSample=await rpc("kc_traffic_guard_row_sample").catch(()=>null);
+    const signals=[sample,rowSample].filter(x=>x?.notify && ["warning","critical"].includes(x?.level));
+    const critical=signals.some(x=>x.level==="critical");
+    const level=critical?"critical":signals.length?"warning":
+      (sample?.level==="normal"&&rowSample?.level==="normal"?"normal":"unknown");
+    if (!signals.length)
+      return json({ok:true,sample:sample?.sample_id,row_sample:rowSample?.sample_id,
+        level,load_level:sample?.level||"unknown",row_level:rowSample?.level||"unknown",
+        notified:false});
     const msg=(critical?"KRITISCHE Datenbanklast. ":"Auffaellige Datenbanklast. ")+
-      String(sample.detail||"Bitte KC Check pruefen.").slice(0,250)+" KC Check: Kontingent-Waechter. "+
-      "Diese Messung ist KEIN offizieller Supabase-Egress-Wert.";
+      signals.map(x=>String(x.detail||"Bitte KC Check pruefen.").slice(0,190)).join(" | ")+
+      " KC Check: Lastwaechter. Messungen sind KEINE offiziellen Supabase-Egress-Werte.";
     // Wiederverwendung des bestehenden KC-System-Check -> KC Communicator Push/Email-Regelwerks.
     const rr=await fetch(BASE+"/functions/v1/kc-communication-router",{
       method:"POST",headers:H,
@@ -53,22 +74,26 @@ Deno.serve(async (req:Request) => {
         eventKey:critical?"system_error":"system_warning",
         recipients:[],
         priority:critical?"critical":"high",testOnly:false,
-        correlationId:"kc-traffic-guard-"+sample.sample_id,
+        correlationId:"kc-traffic-guard-v2-c"+sample.sample_id+"-r"+(rowSample?.sample_id||0),
         variables:{
           programName:"KC Traffic Guard",
           eventName:critical?"Supabase-Lastspitze":"Supabase-Fruehwarnung",
           title:critical?"🚨 KC: Datenbanklast kritisch":"⚠️ KC: Datenbanklast erhoeht",
           subject:"KC Supabase-Waechter",
           message:msg,body:msg,text:msg,short:msg,kurz:msg,
-          status:sample.level, timestamp:new Date().toISOString(),
+          status:level, timestamp:new Date().toISOString(),
           url:"https://sire65.github.io/KC-Clubapp/"
         }
       })
     });
     const delivery=await rr.json().catch(()=>({}));
     const sent=rr.ok && delivery?.ok===true;
-    if (sent) await rpc("kc_traffic_guard_ack",{p_sample_id:sample.sample_id,p_level:sample.level});
-    return json({ok:sent,level:sample.level,notified:sent,delivery_status:rr.status,
-      sample:sample.sample_id},sent?200:502);
+    if (sent) {
+      // Quittiere nur tatsaechlich gemeldete Warnungen, niemals einen Fehlversuch.
+      if (sample?.notify) await rpc("kc_traffic_guard_ack",{p_sample_id:sample.sample_id,p_level:sample.level});
+      if (rowSample?.notify) await rpc("kc_traffic_guard_row_ack",{p_sample_id:rowSample.sample_id,p_level:rowSample.level});
+    }
+    return json({ok:sent,level,notified:sent,delivery_status:rr.status,
+      sample:sample.sample_id,row_sample:rowSample?.sample_id},sent?200:502);
   } catch(e) { return json({ok:false,error:"sample_or_delivery_failed",detail:String((e as Error)?.message||e).slice(0,140)},503); }
 });
