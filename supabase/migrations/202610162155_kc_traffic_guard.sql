@@ -47,7 +47,7 @@ CREATE OR REPLACE FUNCTION public.kc_traffic_guard_sample()
 RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = ''
 AS $fn$
 DECLARE
- c_total bigint; t_total bigint; previous public.kc_traffic_guard_samples%ROWTYPE;
+ c_total bigint; t_total bigint; prev_sample public.kc_traffic_guard_samples%ROWTYPE;
  elapsed numeric; c_rate numeric; tx_rate numeric; baseline numeric;
  level_now text := 'unknown'; description text := 'Messbasis wird aufgebaut';
  rid bigint; last_level text; last_at timestamptz; notify_now boolean := false;
@@ -57,16 +57,16 @@ BEGIN
    WHERE s.dbid=(SELECT d.oid FROM pg_catalog.pg_database d WHERE d.datname=pg_catalog.current_database());
  SELECT (x.xact_commit+x.xact_rollback)::bigint INTO t_total FROM pg_catalog.pg_stat_database x
    WHERE x.datname=pg_catalog.current_database();
- SELECT * INTO previous FROM public.kc_traffic_guard_samples ORDER BY measured_at DESC,id DESC LIMIT 1;
+ SELECT * INTO prev_sample FROM public.kc_traffic_guard_samples ORDER BY measured_at DESC,id DESC LIMIT 1;
  SELECT pg_catalog.avg(recent.calls_15m)
    INTO baseline FROM (SELECT calls_15m FROM public.kc_traffic_guard_samples
      WHERE calls_15m IS NOT NULL AND measured_at > pg_catalog.now()-INTERVAL '24 hours'
      ORDER BY measured_at DESC LIMIT 96) recent;
- IF previous.id IS NOT NULL THEN
-   elapsed:=pg_catalog.extract(epoch FROM (pg_catalog.clock_timestamp()-previous.measured_at));
-   IF elapsed>=120 AND elapsed<=3600 AND c_total>=previous.total_calls AND t_total>=previous.total_transactions THEN
-     c_rate:=pg_catalog.round((c_total-previous.total_calls)*900.0/elapsed);
-     tx_rate:=pg_catalog.round((t_total-previous.total_transactions)*900.0/elapsed);
+ IF prev_sample.id IS NOT NULL THEN
+   elapsed:=pg_catalog.extract(epoch FROM (pg_catalog.clock_timestamp()-prev_sample.measured_at));
+   IF elapsed>=120 AND elapsed<=3600 AND c_total>=prev_sample.total_calls AND t_total>=prev_sample.total_transactions THEN
+     c_rate:=pg_catalog.round((c_total-prev_sample.total_calls)*900.0/elapsed);
+     tx_rate:=pg_catalog.round((t_total-prev_sample.total_transactions)*900.0/elapsed);
      level_now:='normal';
      description:='Datenbanklast unauffaellig (keine abrechenbaren Egress-Bytes)';
      IF c_rate>=20000 OR (c_rate>=9000 AND baseline IS NOT NULL AND baseline>0 AND c_rate>=baseline*3) THEN
@@ -95,7 +95,7 @@ BEGIN
  END IF;
  IF level_now='critical' THEN
    notify_now:=(last_level IS DISTINCT FROM 'critical' OR last_at IS NULL OR last_at < pg_catalog.now()-INTERVAL '6 hours');
- ELSIF level_now='warning' AND previous.level IN ('warning','critical') THEN
+ ELSIF level_now='warning' AND prev_sample.level IN ('warning','critical') THEN
    notify_now:=(last_level IS DISTINCT FROM 'warning' AND last_level IS DISTINCT FROM 'critical');
  END IF;
  RETURN pg_catalog.jsonb_build_object('sample_id',rid,'level',level_now,'detail',description,
