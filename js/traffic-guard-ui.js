@@ -9,7 +9,7 @@ function host(){
   const before=document.getElementById("capacityCards")||document.getElementById("usageCards");
   if(!before)return null;
   el=document.createElement("section");el.id="kcTrafficGuardPanel";el.style.cssText="margin:12px 0;padding:14px;border:1px solid var(--line,#374151);border-radius:12px;";
-  el.innerHTML='<div class="row between"><strong>🚦 Supabase-Lastwächter</strong><button type="button" class="secondary" id="kcTrafficGuardRefresh">↻ Neu messen</button></div>'+
+  el.innerHTML='<div class="row between"><strong>🚦 Supabase-Lastwächter</strong><button type="button" class="secondary" id="kcTrafficGuardRefresh">↻ Status aktualisieren</button></div>'+
     '<div id="kcTrafficGuardValue" aria-live="polite" style="margin:8px 0">Noch keine Messung</div>'+
     '<div class="muted small">Kontrolliert den Datenbank-Anfragetrend automatisch alle 15 Minuten – auch bei geschlossenem KC Check. Keine GB-Abrechnungsdaten. Push über KC Communicator.</div>'+
     '<a href="https://supabase.com/dashboard/org/_/usage#egress" target="_blank" rel="noopener noreferrer">Offiziellen Supabase-Egress anzeigen ↗</a>';
