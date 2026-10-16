@@ -11,7 +11,7 @@ function host(){
   el=document.createElement("section");el.id="kcTrafficGuardPanel";el.style.cssText="margin:12px 0;padding:14px;border:1px solid var(--line,#374151);border-radius:12px;";
   el.innerHTML='<div class="row between"><strong>🚦 Supabase-Lastwächter</strong><button type="button" class="secondary" id="kcTrafficGuardRefresh">↻ Status aktualisieren</button></div>'+
     '<div id="kcTrafficGuardValue" aria-live="polite" style="margin:8px 0">Noch keine Messung</div>'+
-    '<div class="muted small">Kontrolliert den Datenbank-Anfragetrend automatisch alle 15 Minuten – auch bei geschlossenem KC Check. Keine GB-Abrechnungsdaten. Push über KC Communicator.</div>'+
+    '<div class="muted small">Kontrolliert Datenbank-Anfragen und Ergebniszeilen automatisch alle 15 Minuten – auch bei geschlossenem KC Check. Keine GB-Abrechnungsdaten. Push über KC Communicator.</div>'+
     '<a href="https://supabase.com/dashboard/org/_/usage#egress" target="_blank" rel="noopener noreferrer">Offiziellen Supabase-Egress anzeigen ↗</a>';
   before.parentNode.insertBefore(el,before);
   el.querySelector("#kcTrafficGuardRefresh")?.addEventListener("click",()=>refresh(true));
@@ -28,6 +28,8 @@ function render(){
  el.className=cls;
  h.innerHTML='<strong>'+safe(label)+'</strong> · '+safe(v.detail||"")+
    '<div class="muted small">SQL-Aufrufe/15 Minuten: '+(Number.isFinite(Number(v.calls_15m))&&v.calls_15m!==null?Math.round(Number(v.calls_15m)).toLocaleString("de-DE"):"—")+
+   ' · Ergebniszeilen/15 Minuten: '+(Number.isFinite(Number(v.rows_15m))&&v.rows_15m!==null?Math.round(Number(v.rows_15m)).toLocaleString("de-DE"):"—")+
+   ' · Zeilenalarm: '+safe(v.row_level||"unbekannt")+
    ' · Letzte Messung: '+safe(time)+'</div>';
 }
 async function refresh(force=false){
