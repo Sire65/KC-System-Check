@@ -34,12 +34,14 @@ Deno.serve(async (req:Request) => {
       const detail=severity(rowLevel)>severity(loadLevel)?
         String(rows?.detail||"Auffaellige Ergebnismenge"):
         String(status?.detail||"Keine aktuelle Messung");
+      // KC Traffic Guard v3: geplant = die auffaellige Messung hat eine bekannte, geplante Ursache (Notfall-Paket, neue Version, Datensicherung).
+      const geplant=severity(level)>0 && (severity(loadLevel)<=0||status?.geplant===true) && (severity(rowLevel)<=0||rows?.geplant===true);
       // Alle Werte sind SQL-Lastindikatoren; offizielle GB bleiben absichtlich leer.
       return json({ok:true,level,load_level:loadLevel,row_level:rowLevel,
         measured_at:status?.measured_at||null,rows_measured_at:rows?.measured_at||null,
         calls_15m:status?.calls_15m??null,baseline_15m:status?.baseline_15m??null,
         rows_15m:rows?.rows_15m??null,rows_baseline_15m:rows?.baseline_15m??null,
-        detail,rows_detail:rows?.detail||"Noch keine Zeilenmessung",
+        detail,geplant,rows_detail:rows?.detail||"Noch keine Zeilenmessung",
         billing_egress_gb:null,billing_meter:"not_configured",is_billing_egress:false});
     } catch { return json({ok:false,level:"unknown",detail:"Messstatus zurzeit nicht erreichbar",
       is_billing_egress:false,billing_egress_gb:null},503); }
@@ -62,9 +64,9 @@ Deno.serve(async (req:Request) => {
     if (!signals.length)
       return json({ok:true,sample:sample?.sample_id,row_sample:rowSample?.sample_id,
         level,load_level:sample?.level||"unknown",row_level:rowSample?.level||"unknown",
-        notified:false});
+        notified:false,gebremst:sample?.gebremst===true||rowSample?.gebremst===true});
     const msg=(critical?"KRITISCHE Datenbanklast. ":"Auffaellige Datenbanklast. ")+
-      signals.map(x=>String(x.detail||"Bitte KC Check pruefen.").slice(0,190)).join(" | ")+
+      signals.map(x=>String(x.detail||"Bitte KC Check pruefen.").slice(0,360)).join(" | ")+
       " KC Check: Lastwaechter. Messungen sind KEINE offiziellen Supabase-Egress-Werte.";
     // Wiederverwendung des bestehenden KC-System-Check -> KC Communicator Push/Email-Regelwerks.
     const rr=await fetch(BASE+"/functions/v1/kc-communication-router",{
