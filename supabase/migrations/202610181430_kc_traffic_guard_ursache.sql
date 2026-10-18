@@ -6,14 +6,16 @@
 --   1. kc_traffic_guard_ursache(): ordnet eine auffaellige Messung bekannten Ereignissen im Messfenster zu
 --      (Protokoll notpaket_gebaut mit gemessenen DB-Abfragen, App-Starts, Datensicherungslaeufe, Tageswechsel) und schaetzt,
 --      welchen Anteil der Mehrlast sie erklaeren. Unbekannte Ursache wird als solche benannt, nie verschwiegen.
---   2. Die Messung speichert die Ursache (Spalte ursache) und haengt sie an den Hinweistext.
+--   2. kc_traffic_guard_ursache_merken(): haengt die Ursache an die gerade gespeicherte Messung (Spalte ursache, Hinweistext) und
+--      sagt der Edge Function, ob der Push gebremst wird. Die Messfunktionen kc_traffic_guard_sample/_row_sample bleiben unveraendert.
 --   3. Push-Regeln: GELB aus geplanter Ursache zaehlt nicht fuer „zwei Messungen in Folge“. ROT wird nur dann nicht gepusht,
 --      wenn die geplante Ursache mindestens 80 % der Mehrlast erklaert UND die Last unter 40.000 SQL-Aufrufen / 15 Min. bleibt.
 --      Alle anderen ROT-Messungen werden wie bisher sofort gemeldet – jetzt mit Ursache. Ergebniszeilen-ROT wird nie unterdrueckt.
 --   Die Messwerte selbst, Schwellen, Statusanzeige (level) und Quittierung bleiben unveraendert. Keine Aenderung an Datensicherung,
 --   Spiegelung, Notbetrieb oder KC Communicator.
--- Rueckweg: supabase/migrations/202610162200_kc_traffic_guard_sampler.sql und 202610162245_kc_traffic_guard_rows.sql erneut
--- einspielen (Funktionsstaende vor v3); die Spalten ursache und die Funktion kc_traffic_guard_ursache stoeren dann nicht.
+-- Rueckweg: Edge Function kc-traffic-guard auf den Stand vor v3 zuruecksetzen (ruft ursache_merken dann nicht mehr auf);
+-- Spalten ursache, Feld geplant im Status und die neuen Funktionen stoeren dann nicht.
+-- Eingespielt 18.10.2026 in 4 Teilen: kc_traffic_guard_ursache_1_spalten, _2_funktion, _3_merken, _4_status.
 
 ALTER TABLE public.kc_traffic_guard_samples ADD COLUMN IF NOT EXISTS ursache jsonb;
 ALTER TABLE public.kc_traffic_guard_row_samples ADD COLUMN IF NOT EXISTS ursache jsonb;
@@ -113,171 +115,52 @@ $fn$;
 REVOKE ALL ON FUNCTION public.kc_traffic_guard_ursache(timestamptz,numeric,numeric,timestamptz) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.kc_traffic_guard_ursache(timestamptz,numeric,numeric,timestamptz) TO service_role;
 
-CREATE OR REPLACE FUNCTION public.kc_traffic_guard_sample()
+-- Ursache an die gerade gespeicherte Messung haengen und Push-Bremse bestimmen (Aufruf aus der Edge Function nach den Messungen).
+-- GELB: gebremst, wenn diese oder die vorige Messung eine geplante Ursache hat. ROT: gebremst nur bei geplanter Ursache,
+-- >= 80 % erklaerter Mehrlast und < 40.000 SQL-Aufrufen / 15 Min. Ergebniszeilen-ROT wird nie gebremst.
+CREATE OR REPLACE FUNCTION public.kc_traffic_guard_ursache_merken(p_sample_id bigint, p_row_sample_id bigint)
 RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = ''
 AS $fn$
 DECLARE
- v_calls bigint := 0;
- v_tx bigint := 0;
- v_prev record;
- v_dt numeric;
- v_per15 numeric;
- v_txper15 numeric;
- v_baseline numeric;
- v_level text := 'unknown';
- v_detail text := 'Messbasis wird aufgebaut';
- v_id bigint;
- v_last text;
- v_last_at timestamptz;
- v_notify boolean := false;
- v_ursache jsonb;
- v_geplant boolean := false;
- v_gebremst boolean := false;
+  s record; v record; u jsonb; g boolean; br boolean;
+  v_last jsonb := NULL; v_rows jsonb := NULL;
 BEGIN
- SELECT COALESCE(SUM(calls),0)::bigint INTO v_calls FROM extensions.pg_stat_statements
-  WHERE dbid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database());
- SELECT (x.xact_commit+x.xact_rollback)::bigint INTO v_tx
-  FROM pg_catalog.pg_stat_database x WHERE x.datname=pg_catalog.current_database();
- SELECT s.id,s.measured_at,s.total_calls,s.total_transactions,s.level,s.ursache
-  INTO v_prev FROM public.kc_traffic_guard_samples s
-  ORDER BY s.measured_at DESC,s.id DESC LIMIT 1;
- SELECT AVG(q.calls_15m) INTO v_baseline FROM
-  (SELECT s.calls_15m FROM public.kc_traffic_guard_samples s
-    WHERE s.calls_15m IS NOT NULL AND s.measured_at>pg_catalog.now()-INTERVAL '24 hours'
-    ORDER BY s.measured_at DESC LIMIT 96) q;
- IF v_prev.id IS NOT NULL THEN
-   v_dt:=EXTRACT(EPOCH FROM (clock_timestamp()-v_prev.measured_at));
-   IF v_dt BETWEEN 120 AND 3600 AND v_calls>=v_prev.total_calls AND v_tx>=v_prev.total_transactions THEN
-     v_per15:=round((v_calls-v_prev.total_calls)*900.0/v_dt);
-     v_txper15:=round((v_tx-v_prev.total_transactions)*900.0/v_dt);
-     v_level:='normal';
-     v_detail:='Datenbanklast unauffaellig (kein Egress-Abrechnungswert)';
-     IF v_per15>=20000 OR (v_per15>=9000 AND v_baseline>0 AND v_per15>=v_baseline*3) THEN
-       v_level:='critical';
-     ELSIF v_per15>=10000 OR (v_per15>=4000 AND v_baseline>0 AND v_per15>=v_baseline*2.5) THEN
-       v_level:='warning';
-     END IF;
-     IF v_level<>'normal' THEN
-       v_detail:='Auffaellige Datenbanklast: '||v_per15::text||' SQL-Aufrufe / 15 Min.'
-         ||CASE WHEN v_baseline>0 THEN ' (Durchschnitt '||round(v_baseline)::text||')' ELSE '' END
-         ||'. Indikator, keine abrechenbaren Egress-GB.';
-       -- KC Traffic Guard v3: Ursache im Messfenster; ein Fehler hier darf die Messung nie verhindern.
-       BEGIN
-         v_ursache:=public.kc_traffic_guard_ursache(v_prev.measured_at-INTERVAL '2 minutes',v_per15,v_baseline);
-         v_detail:=v_detail||' '||(v_ursache->>'text');
-         v_geplant:=coalesce((v_ursache->>'geplant')::boolean,false);
-       EXCEPTION WHEN OTHERS THEN
-         v_ursache:=pg_catalog.jsonb_build_object('geplant',false,'text','Ursache nicht ermittelbar');
-       END;
-     END IF;
-   ELSE
-     v_detail:='Statistikzaehler zurueckgesetzt oder Messabstand ungueltig';
-   END IF;
- END IF;
- INSERT INTO public.kc_traffic_guard_samples (total_calls,total_transactions,calls_15m,transactions_15m,baseline_15m,level,detail,ursache)
- VALUES (v_calls,v_tx,v_per15,v_txper15,v_baseline,v_level,v_detail,v_ursache) RETURNING id INTO v_id;
- DELETE FROM public.kc_traffic_guard_samples WHERE measured_at<pg_catalog.now()-INTERVAL '7 days';
- SELECT last_alert_level,last_alert_at INTO v_last,v_last_at
-   FROM public.kc_traffic_guard_alert_state WHERE id=1;
- IF v_level='normal' AND v_last<>'normal' THEN
-   UPDATE public.kc_traffic_guard_alert_state SET last_alert_level='normal' WHERE id=1;
- END IF;
- IF v_level='critical' THEN
-   v_notify:=v_last IS DISTINCT FROM 'critical' OR v_last_at IS NULL OR v_last_at<pg_catalog.now()-INTERVAL '6 hours';
-   -- Geplante Spitze, die fast vollstaendig erklaert ist und unter der harten Obergrenze bleibt: kein Push.
-   v_gebremst:=v_notify AND v_geplant AND coalesce((v_ursache->>'anteil')::numeric,0)>=0.8 AND v_per15<40000;
- ELSIF v_level='warning' AND v_prev.level IN ('warning','critical') THEN
-   v_notify:=v_last IS DISTINCT FROM 'warning' AND v_last IS DISTINCT FROM 'critical';
-   -- Zwei auffaellige Messungen in Folge zaehlen nur, wenn keine davon geplant ist.
-   v_gebremst:=v_notify AND (v_geplant OR coalesce((v_prev.ursache->>'geplant')::boolean,false));
- END IF;
- IF v_gebremst THEN v_notify:=false; END IF;
- RETURN jsonb_build_object('sample_id',v_id,'level',v_level,'detail',v_detail,'calls_15m',v_per15,
-   'transactions_15m',v_txper15,'baseline_15m',v_baseline,'measured_at',pg_catalog.now(),
-   'notify',v_notify,'gebremst',v_gebremst,'ursache',v_ursache,
-   'is_billing_egress',false,'billing_egress_gb',null,'billing_source','not_configured');
+  SELECT * INTO s FROM public.kc_traffic_guard_samples WHERE id = p_sample_id;
+  IF s.id IS NOT NULL AND s.level IN ('warning','critical') THEN
+    SELECT * INTO v FROM public.kc_traffic_guard_samples WHERE measured_at < s.measured_at ORDER BY measured_at DESC, id DESC LIMIT 1;
+    u := coalesce(s.ursache, public.kc_traffic_guard_ursache(coalesce(v.measured_at, s.measured_at - interval '15 minutes') - interval '2 minutes',
+                                                             s.calls_15m, s.baseline_15m, s.measured_at));
+    IF s.ursache IS NULL THEN
+      UPDATE public.kc_traffic_guard_samples SET ursache = u, detail = s.detail || ' ' || (u->>'text') WHERE id = s.id;
+    END IF;
+    g := coalesce((u->>'geplant')::boolean, false);
+    br := CASE WHEN s.level = 'critical'
+               THEN g AND coalesce((u->>'anteil')::numeric, 0) >= 0.8 AND s.calls_15m < 40000
+               ELSE g OR coalesce((v.ursache->>'geplant')::boolean, false) END;
+    v_last := pg_catalog.jsonb_build_object('geplant', g, 'gebremst', br, 'text', u->>'text',
+                                            'detail', s.detail || CASE WHEN s.ursache IS NULL THEN ' ' || (u->>'text') ELSE '' END);
+  END IF;
+
+  SELECT * INTO s FROM public.kc_traffic_guard_row_samples WHERE id = p_row_sample_id;
+  IF s.id IS NOT NULL AND s.level IN ('warning','critical') THEN
+    SELECT * INTO v FROM public.kc_traffic_guard_row_samples WHERE measured_at < s.measured_at ORDER BY measured_at DESC, id DESC LIMIT 1;
+    u := coalesce(s.ursache, public.kc_traffic_guard_ursache(coalesce(v.measured_at, s.measured_at - interval '15 minutes') - interval '2 minutes',
+                                                             NULL, NULL, s.measured_at));
+    IF s.ursache IS NULL THEN
+      UPDATE public.kc_traffic_guard_row_samples SET ursache = u, detail = s.detail || ' ' || (u->>'text') WHERE id = s.id;
+    END IF;
+    g := coalesce((u->>'geplant')::boolean, false);
+    -- Ergebniszeilen-ROT wird nie gebremst.
+    br := s.level = 'warning' AND (g OR coalesce((v.ursache->>'geplant')::boolean, false));
+    v_rows := pg_catalog.jsonb_build_object('geplant', g, 'gebremst', br, 'text', u->>'text',
+                                            'detail', s.detail || CASE WHEN s.ursache IS NULL THEN ' ' || (u->>'text') ELSE '' END);
+  END IF;
+
+  RETURN pg_catalog.jsonb_build_object('last', v_last, 'zeilen', v_rows);
 END;
 $fn$;
-REVOKE ALL ON FUNCTION public.kc_traffic_guard_sample() FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.kc_traffic_guard_sample() TO service_role;
-
-CREATE OR REPLACE FUNCTION public.kc_traffic_guard_row_sample()
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
-AS $function$
-DECLARE
-  total_now bigint:=0;
-  previous_sample record;
-  base numeric;
-  seconds_between numeric;
-  rows_per_15m numeric;
-  alarm text:='unknown';
-  explanation text:='Messbasis fuer Ergebnismengen wird aufgebaut';
-  inserted_id bigint;
-  prev_alarm text;
-  prev_sent timestamptz;
-  should_send boolean:=false;
-  cause jsonb;
-  planned boolean:=false;
-  held boolean:=false;
-BEGIN
- SELECT coalesce(sum(s.rows),0)::bigint INTO total_now
- FROM extensions.pg_stat_statements s
- WHERE s.dbid=(SELECT d.oid FROM pg_catalog.pg_database d WHERE d.datname=pg_catalog.current_database());
- SELECT id,measured_at,total_rows,level,ursache INTO previous_sample
- FROM public.kc_traffic_guard_row_samples ORDER BY measured_at DESC,id DESC LIMIT 1;
- SELECT avg(z.rows_15m) INTO base
- FROM (SELECT t.rows_15m FROM public.kc_traffic_guard_row_samples t
-       WHERE t.rows_15m IS NOT NULL AND t.measured_at>pg_catalog.now()-interval '24 hours'
-       ORDER BY t.measured_at DESC LIMIT 96) z;
- IF previous_sample.id IS NOT NULL THEN
-   seconds_between:=extract(epoch FROM (clock_timestamp()-previous_sample.measured_at));
-   IF seconds_between BETWEEN 120 AND 3600 AND total_now>=previous_sample.total_rows THEN
-      rows_per_15m:=round((total_now-previous_sample.total_rows)*900.0/seconds_between);
-      alarm:='normal';
-      explanation:='Ergebnismengen innerhalb des Vergleichsbereichs';
-      IF rows_per_15m>=150000 OR (rows_per_15m>=35000 AND base>0 AND rows_per_15m>=base*5) THEN
-         alarm:='critical';
-      ELSIF rows_per_15m>=65000 OR (rows_per_15m>=15000 AND base>0 AND rows_per_15m>=base*3) THEN
-         alarm:='warning';
-      END IF;
-      IF alarm IN ('warning','critical') THEN
-         explanation:='Auffaellige SQL-Ergebnismenge: '||rows_per_15m::text||
-           ' Zeilen pro 15 Min. (kein Supabase-Egress-Messwert)';
-         BEGIN
-           cause:=public.kc_traffic_guard_ursache(previous_sample.measured_at-interval '2 minutes',NULL,NULL);
-           explanation:=explanation||' '||(cause->>'text');
-           planned:=coalesce((cause->>'geplant')::boolean,false);
-         EXCEPTION WHEN OTHERS THEN
-           cause:=jsonb_build_object('geplant',false,'text','Ursache nicht ermittelbar');
-         END;
-      END IF;
-   ELSE
-      explanation:='Messabstand zu kurz/lang oder Statistiken zurueckgesetzt';
-   END IF;
- END IF;
- INSERT INTO public.kc_traffic_guard_row_samples(total_rows,rows_15m,baseline_15m,level,detail,ursache)
- VALUES(total_now,rows_per_15m,base,alarm,explanation,cause) RETURNING id INTO inserted_id;
- DELETE FROM public.kc_traffic_guard_row_samples WHERE measured_at<pg_catalog.now()-interval '7 days';
- SELECT last_level,last_sent_at INTO prev_alarm,prev_sent FROM public.kc_traffic_guard_row_alert WHERE id=1;
- IF alarm='normal' AND prev_alarm<>'normal' THEN
-   UPDATE public.kc_traffic_guard_row_alert SET last_level='normal' WHERE id=1;
- END IF;
- IF alarm='critical' THEN
-    -- Ergebniszeilen-ROT wird nie gebremst (keine Mengenschaetzung fuer Zeilen).
-    should_send:=(prev_alarm IS DISTINCT FROM 'critical' OR prev_sent IS NULL
-                  OR prev_sent < pg_catalog.now()-interval '6 hours');
- ELSIF alarm='warning' AND previous_sample.level IN ('warning','critical') THEN
-    should_send:=(prev_alarm IS DISTINCT FROM 'warning' AND prev_alarm IS DISTINCT FROM 'critical');
-    held:=should_send AND (planned OR coalesce((previous_sample.ursache->>'geplant')::boolean,false));
-    IF held THEN should_send:=false; END IF;
- END IF;
- RETURN jsonb_build_object('sample_id',inserted_id,'level',alarm,'rows_15m',rows_per_15m,
-   'baseline_15m',base,'detail',explanation,'measured_at',pg_catalog.now(),'notify',should_send,
-   'gebremst',held,'ursache',cause,'is_billing_egress',false);
-END;
-$function$;
-REVOKE ALL ON FUNCTION public.kc_traffic_guard_row_sample() FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.kc_traffic_guard_row_sample() TO service_role;
+REVOKE ALL ON FUNCTION public.kc_traffic_guard_ursache_merken(bigint,bigint) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.kc_traffic_guard_ursache_merken(bigint,bigint) TO service_role;
 
 -- Status: zusaetzlich „geplant“ fuer die Anzeige (Stufe level bleibt unveraendert).
 CREATE OR REPLACE FUNCTION public.kc_traffic_guard_status()

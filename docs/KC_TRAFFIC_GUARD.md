@@ -45,3 +45,11 @@ Offizielle Pruefung: https://supabase.com/dashboard/org/_/usage#egress
 - Externer GitHub-Workflow `.github/workflows/traffic-guard-external.yml` prueft stuendlich, ob der Guard erreichbar ist und ob beide Messpunkte juenger als 55 Min. sind. GitHub-Fehlschlaege allein sind keine garantierte Handy-Push-Zustellung, wenn Supabase selbst ausfaellt.
 - Dokumentierte Supabase Management API `/v1/projects/{ref}/analytics/endpoints/usage.api-counts` meldet Anfragezahlen, nicht die fuer die 5-GB-Grenze erforderlichen gesamten Abrechnungs-Bytes.
 - Fuer vollautomatische 5-GB-Prognosen muss zuerst eine zugaengliche und verifizierte organisationsweite Billing-Egress-Quelle fuer BEIDE Projekte angebunden werden. Bis dahin `billing_meter: not_configured` und keine Prozentanzeige.
+
+## Ausbau v3 (18.10.2026) – Ursache und Push-Bremse fuer geplante Spitzen
+- Neu: `kc_traffic_guard_ursache()` ordnet eine auffaellige Messung bekannten Ereignissen im Messfenster zu: Neubau Notfall-Paket (Protokoll `notpaket_gebaut` mit gemessenen DB-Abfragen), App-Starts nach neuer Version, Datensicherungslaeufe, Tageswechsel. Schaetzt den erklaerten Anteil der Mehrlast (1 REST-Abfrage ≈ 2 SQL-Aufrufe; App-Start ≈ 140). Ohne Treffer: „Ursache unbekannt – bitte pruefen“ mit den haeufigsten Club-Aktionen.
+- Neu: `kc_traffic_guard_ursache_merken(sample, row_sample)` – von der Edge Function nur bei Gelb/Rot aufgerufen; speichert Ursache (Spalte `ursache`) und haengt sie an den Hinweistext und den Push.
+- Push-Bremse: GELB zaehlt nicht fuer „zwei in Folge“, wenn diese oder die vorige Messung eine geplante Ursache hat. ROT wird nur dann nicht gepusht, wenn die geplante Ursache >= 80 % der Mehrlast erklaert UND < 40.000 SQL-Aufrufe / 15 Min. Ergebniszeilen-ROT wird nie gebremst. Faellt der Ursachen-Schritt aus, gilt das alte Verhalten.
+- Status (GET) liefert zusaetzlich `geplant`. Messung, Schwellen und Quittierung unveraendert; die Messfunktionen selbst wurden nicht geaendert.
+- Pruefung an echten Daten 16.–18.10.: 13:18 Gelb → Notfall-Paket (92 %), kein Push; 10:03 Gelb → App-Starts nach neuer Version, kein Push; 09:33 Rot → 2 erzwungene Neubauten + App-Starts (77 %), Push mit Ursache.
+- Rueckweg: Edge Function auf v2-Stand (Commit vor v3) zuruecksetzen; die neuen Spalten/Funktionen stoeren dann nicht.

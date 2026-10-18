@@ -57,6 +57,16 @@ Deno.serve(async (req:Request) => {
     // Die zweite Messung ist unabhaengig: Ausfall dieses neuen Moduls darf
     // die vorhandenen SQL-Aufrufalarme nicht blockieren.
     const rowSample=await rpc("kc_traffic_guard_row_sample").catch(()=>null);
+    // KC Traffic Guard v3: Ursache an die Messungen haengen und geplante Spitzen bremsen. Faellt dieser Schritt aus,
+    // gilt das alte Verhalten (jede Meldung geht raus) – niemals stiller als vorher.
+    const auffaellig=(x:any)=>["warning","critical"].includes(x?.level);
+    const ursache=auffaellig(sample)||auffaellig(rowSample)?await rpc("kc_traffic_guard_ursache_merken",
+      {p_sample_id:sample?.sample_id??null,p_row_sample_id:rowSample?.sample_id??null}).catch(()=>null):null;
+    for (const [x,u] of [[sample,ursache?.last],[rowSample,ursache?.zeilen]] as const) {
+      if (!x || !u) continue;
+      if (u.detail) x.detail=u.detail;
+      if (u.gebremst===true && x.notify) { x.notify=false; x.gebremst=true; }
+    }
     const signals=[sample,rowSample].filter(x=>x?.notify && ["warning","critical"].includes(x?.level));
     const critical=signals.some(x=>x.level==="critical");
     const level=critical?"critical":signals.length?"warning":
