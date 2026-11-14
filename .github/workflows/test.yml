@@ -1,5 +1,8 @@
 name: Tests
 on: [push, pull_request]
+permissions:
+  contents: read
+
 jobs:
   js-unit:
     runs-on: ubuntu-latest
@@ -8,8 +11,10 @@ jobs:
       matrix:
         test: [cloudflare-edge, frankfurt-backup, club-notbetrieb, backup-telemetry-edge-sanitizer, alarm-chain, alarm-policy, alarm-push-calibration, backup-state, backup-telemetry-ingest, backup-vault-adapter, backup-vault-manual, datenfluss, db-monitor-package, desktop-layout, early-warning, flow-live-v4-hotfix, flow-live-v4, health-assistant, heartbeat-package, kasse-interval-traffic, kc-system-check-neon-wakeup, leitstand-program-monitor, live-derived-flows, live-layout, mail-values-program-health, mirror-detail, mirror-efficiency, monitor-contract, monitoring-runs-sync, neon-compute-budget, neon-mirror-wakeup, programs-heartbeat, public-exposure, quality-tools, release-hardening, runtime-config, safe-html, security-reviewed-exceptions-edge, security-reviewed-exceptions, selection-visibility, status-model, storage-backup-live, trace-context, updater]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
       - name: Run ${{ matrix.test }}
@@ -27,8 +32,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
       - name: Archive gateway regression tests
@@ -63,7 +70,7 @@ jobs:
       - name: Playwright installieren
         run: |
           npm init -y >/dev/null 2>&1
-          npm install --no-save @playwright/test@1.55.0
+          npm install --ignore-scripts --no-save @playwright/test@1.55.0
           npx playwright install --with-deps chromium
           python3 -m http.server 4173 >/tmp/kc-http.log 2>&1 &
       - name: Playwright mobile smoke TÜV
@@ -102,6 +109,8 @@ jobs:
       PGUSER: postgres
       PGPASSWORD: postgres
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Migrationen und Serverfunktionen gegen PostgreSQL pruefen
         run: tests/sql/run.sh
