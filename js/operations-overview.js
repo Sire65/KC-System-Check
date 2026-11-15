@@ -1,6 +1,7 @@
 import{subscribe,latestResults}from"./state.js";
 import"./device-readiness.js";
 import"./schema-drift.js";
+import"./dp-handy-fehler.js";
 import"./club-notbetrieb.js";
 
 const GROUPS=[

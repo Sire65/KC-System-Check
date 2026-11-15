@@ -1,8 +1,8 @@
 {
-  "version": "0.10.7",
-  "note": "0.10.7: Weniger Datenbank-Anfragen – der Zustellnachweis wird jede Minute statt alle 10 Sekunden geholt, Alarm-Einstellungen und Nachweis nicht mehr, solange das Fenster im Hintergrund liegt; eine fehlgeschlagene Geräte-Registrierung wird höchstens alle 5 Minuten wiederholt.",
+  "version": "0.10.8",
+  "note": "0.10.8: Neue Fehlerampel „Dienstplan · Handy-Fehler“ in der Karte „Kassen & Geräte“ – zeigt offene Fehler der Dienstplan-App auf Mitglieder-Handys (nur Zahlen und Fehlercodes, keine Namen). Sichtbar nach Anmeldung mit Dienstplan-Rolle; Abfrage höchstens alle 5 Minuten und nur bei sichtbarem Fenster.",
   "channel": "stable",
   "installSekunden": 5,
   "verbindlich": true,
-  "notes": "0.10.7: Weniger Datenbank-Anfragen – der Zustellnachweis wird jede Minute statt alle 10 Sekunden geholt, Alarm-Einstellungen und Nachweis nicht mehr, solange das Fenster im Hintergrund liegt; eine fehlgeschlagene Geräte-Registrierung wird höchstens alle 5 Minuten wiederholt."
+  "notes": "0.10.8: Neue Fehlerampel „Dienstplan · Handy-Fehler“ in der Karte „Kassen & Geräte“ – zeigt offene Fehler der Dienstplan-App auf Mitglieder-Handys (nur Zahlen und Fehlercodes, keine Namen). Sichtbar nach Anmeldung mit Dienstplan-Rolle; Abfrage höchstens alle 5 Minuten und nur bei sichtbarem Fenster."
 }
